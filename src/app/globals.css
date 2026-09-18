@@ -7,3 +7,71 @@ body,
   margin: 0;
   box-sizing: border-box;
 }
+
+/* Leaflet draws a white circular background/border/shadow behind every
+   divIcon by default -- our pin SVGs already carry their own silhouette,
+   so that default chrome would just show through as a mismatched box. */
+.zpots-pin-icon {
+  background: none;
+  border: none;
+}
+
+/* Popup shell: square off Leaflet's default rounded card and give the
+   content real breathing room. */
+.leaflet-popup-content-wrapper {
+  border-radius: 2px;
+  padding: 0;
+  box-shadow: 0 2px 10px rgba(15, 23, 20, 0.18);
+}
+
+.leaflet-popup-content {
+  margin: 0;
+  padding: 14px 16px;
+  min-width: 200px;
+}
+
+.leaflet-popup-tip {
+  border-radius: 0;
+}
+
+.zpots-popup-name {
+  margin: 0 0 4px;
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #1f2420;
+}
+
+.zpots-popup-note {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: #4a4842;
+}
+
+.zpots-popup-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--zpots-status-color, #7a7368) 14%, white);
+  color: var(--zpots-status-color, #7a7368);
+}
+
+.zpots-popup-status[data-status="confirmed"] {
+  --zpots-status-color: #0f7a63;
+}
+
+.zpots-popup-status[data-status="unconfirmed"] {
+  --zpots-status-color: #7a7368;
+}
+
+.zpots-popup-credit {
+  margin: 8px 0 0;
+  font-size: 0.7rem;
+  font-style: italic;
+  color: #8a8579;
+}
