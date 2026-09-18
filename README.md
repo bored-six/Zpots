@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Zpots
 
-## Getting Started
+A crowdsourced map of local spots in Zamboanga City — street food, hangouts, and hidden gems that don't show up well on Google Maps. Anyone can drop a pin with a photo and a short note. Other people confirm it's real by tapping **"I've been here."**
 
-First, run the development server:
+No accounts. No passwords. Just the map.
+
+## How it works
+
+1. **Browse the map** — pan and zoom around Zamboanga City on OpenStreetMap tiles.
+2. **Add a spot** — tap "Add a spot," tap the location, attach a photo, name, and a short note. An optional nickname is the only identity involved.
+3. **New pins show up immediately**, marked **Unconfirmed**.
+4. **Confirm — I've been here** — once 2 different people confirm a spot, it flips to **Confirmed**.
+5. **Report** — flag a pin as spam, wrong info, or closed. Reports are a signal, not a delete; nothing disappears automatically.
+
+## Stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| Frontend | Next.js 16 + TypeScript + Tailwind | Fast to build, matches existing experience |
+| Map | Leaflet + OpenStreetMap via react-leaflet | Free, no API key or billing setup |
+| Backend + photos | Supabase (Postgres + Storage) | One free service covers data and files |
+| Tests | Vitest + Testing Library + jsdom | Fast, ESM-native |
+| Hosting | Vercel + Supabase | Both free tier |
+
+## Running it locally
 
 ```bash
+npm install
+cp .env.local.example .env.local
+# fill in NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The database schema (tables, row-level security, and the photo storage bucket) lives in `supabase/migrations/0001_init.sql` — paste it into your Supabase project's SQL Editor once, before running the app against a fresh project.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Commands
 
-## Learn More
+```bash
+npm run dev        # dev server
+npm test           # run tests once
+npm run test:watch # watch mode
+npm run lint
+npx tsc --noEmit
+npm run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Project docs
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [`CLAUDE.md`](./CLAUDE.md) — scope, stack rationale, and workflow rules
+- [`.claude/steering/`](./.claude/steering) — product rules and code conventions
+- [`.claude/prds/add-pin-schema.md`](./.claude/prds/add-pin-schema.md) — the database schema design and its trade-offs
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Scope
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This is a portfolio-scale MVP. Explicitly out of scope for now: live-location "ask for help nearby" notes, full accounts/login, categories, search, and filters.
