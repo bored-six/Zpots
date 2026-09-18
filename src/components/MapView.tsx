@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 
 import type { Spot } from "@/lib/spots";
+import type { NewSpotInput, ReportReason } from "@/lib/validation";
 
 // Leaflet touches `window`, so SpotMap can only load on the client -- this
 // wrapper is the client boundary that makes `ssr: false` legal, since
@@ -18,8 +19,26 @@ const SpotMap = dynamic(() => import("@/components/SpotMap"), {
 
 interface MapViewProps {
   spots: readonly Spot[];
+  confirmedSpotIds: ReadonlySet<string>;
+  onCreateSpot: (input: NewSpotInput) => Promise<void>;
+  onConfirmSpot: (spotId: string) => Promise<void>;
+  onReportSpot: (spotId: string, reason: ReportReason, details?: string) => Promise<void>;
 }
 
-export default function MapView({ spots }: MapViewProps) {
-  return <SpotMap spots={spots} />;
+export default function MapView({
+  spots,
+  confirmedSpotIds,
+  onCreateSpot,
+  onConfirmSpot,
+  onReportSpot,
+}: MapViewProps) {
+  return (
+    <SpotMap
+      spots={spots}
+      confirmedSpotIds={confirmedSpotIds}
+      onCreateSpot={onCreateSpot}
+      onConfirmSpot={onConfirmSpot}
+      onReportSpot={onReportSpot}
+    />
+  );
 }

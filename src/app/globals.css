@@ -74,3 +74,18 @@ body {
   font-style: italic;
   color: #8a8579;
 }
+
+.zpots-popup-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.zpots-popup-report-ack {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #0f7a63;
+}
