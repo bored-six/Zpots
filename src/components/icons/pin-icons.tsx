@@ -38,6 +38,16 @@ export function UnconfirmedPin({ size = 32, className, ...props }: PinIconProps)
       aria-hidden="true"
       focusable="false"
     >
+      {/* Fixed-color halo (not currentColor) so the silhouette separates
+          from busy map tiles regardless of pin state or terrain color. */}
+      <path
+        d={PIN_OUTLINE}
+        fill="none"
+        stroke="white"
+        strokeOpacity={0.95}
+        strokeWidth={4}
+        strokeLinejoin="round"
+      />
       <path
         d={PIN_OUTLINE}
         fill="currentColor"
@@ -75,6 +85,16 @@ export function ConfirmedPin({ size = 32, className, ...props }: PinIconProps) {
       aria-hidden="true"
       focusable="false"
     >
+      {/* Fixed-color halo (not currentColor) so the silhouette separates
+          from busy map tiles regardless of pin state or terrain color. */}
+      <path
+        d={PIN_OUTLINE}
+        fill="none"
+        stroke="white"
+        strokeOpacity={0.95}
+        strokeWidth={4}
+        strokeLinejoin="round"
+      />
       <path
         d={`${PIN_OUTLINE} ${PIN_MARK}`}
         fillRule="evenodd"

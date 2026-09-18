@@ -1,8 +1,7 @@
 @import "tailwindcss";
 
 html,
-body,
-#__next {
+body {
   height: 100%;
   margin: 0;
   box-sizing: border-box;
