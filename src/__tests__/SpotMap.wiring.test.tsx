@@ -21,6 +21,9 @@ const { fakeMap, emitMapClick } = vi.hoisted(() => {
     off: (event: string, handler: (e: unknown) => void) => {
       handlers[event] = (handlers[event] ?? []).filter((h) => h !== handler);
     },
+    // SpotMap now also calls this imperatively (belt-and-suspenders on top
+    // of the `maxBounds` JSX prop) once the map instance is available.
+    setMaxBounds: () => {},
   };
   const emitMapClick = (lat: number, lng: number) => {
     for (const handler of handlers["click"] ?? []) {

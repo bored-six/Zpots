@@ -85,6 +85,21 @@ export default function SpotMap({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [reportedSpotIds, setReportedSpotIds] = useState<ReadonlySet<string>>(new Set());
 
+  // Belt-and-suspenders enforcement of the Mindanao restriction: the
+  // `maxBounds`/`maxBoundsViscosity` props below get applied by react-leaflet
+  // as one-shot Leaflet Map *constructor* options, at the moment the
+  // underlying DOM node is first attached -- before layout has necessarily
+  // settled. Calling `setMaxBounds` again here, once the real Leaflet Map
+  // instance is available post-mount, is the imperative safety net most
+  // real-world react-leaflet v5 apps also rely on for this: Leaflet's own
+  // `setMaxBounds` re-clamps the current view immediately if the map is
+  // already loaded, so this also self-corrects if the initial view somehow
+  // ended up outside bounds by the time this runs.
+  useEffect(() => {
+    if (!leafletMap) return;
+    leafletMap.setMaxBounds(MINDANAO_BOUNDS);
+  }, [leafletMap]);
+
   // Only listens once the real Leaflet Map instance is available (never
   // happens under a test double that doesn't forward `ref`) -- clicking an
   // existing Marker/Popup does not reach this handler, since Leaflet
