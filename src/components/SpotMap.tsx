@@ -13,6 +13,7 @@ import {
   DEFAULT_ZOOM,
   MAX_ZOOM,
   MIN_ZOOM,
+  MINDANAO_BOUNDS,
   TILE_ATTRIBUTION,
   TILE_URL,
   ZAMBOANGA_CENTER,
@@ -156,6 +157,8 @@ export default function SpotMap({
         zoom={DEFAULT_ZOOM}
         minZoom={MIN_ZOOM}
         maxZoom={MAX_ZOOM}
+        maxBounds={MINDANAO_BOUNDS}
+        maxBoundsViscosity={1.0}
         scrollWheelZoom
         className="h-full w-full"
       >
