@@ -12,6 +12,8 @@ export interface Spot {
   createdAt: string;
   /** Optional, purely cosmetic -- never presented as a verified identity. */
   nickname?: string;
+  /** Public storage URL for the spot's photo. Maps to `photo_url` in 0001_init.sql. */
+  photoUrl?: string;
 }
 
 /**
