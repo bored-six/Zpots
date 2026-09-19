@@ -25,8 +25,8 @@ const FIELD_LABEL_CLASS = "text-sm font-medium text-[#3a3730]";
 const FIELD_HELP_CLASS = "text-xs text-[#8a8579]";
 const TEXT_INPUT_CLASS =
   "w-full rounded-sm border border-[#d8d4cb] bg-white px-3 py-2 text-sm text-[#1f2420] " +
-  "placeholder:text-[#a9a498] focus:border-[#0f7a63] focus:outline-none focus:ring-2 " +
-  "focus:ring-[#0f7a63]/25";
+  "placeholder:text-[#a9a498] focus:border-[var(--zpots-brass)] focus:outline-none focus:ring-2 " +
+  "focus:ring-[var(--zpots-brass)]/25";
 
 function ErrorText({ message }: { message: string }) {
   return (
@@ -148,7 +148,7 @@ export default function AddSpotForm({
           type="file"
           accept="image/jpeg,image/png,image/webp,image/gif"
           onChange={handlePhotoChange}
-          className="block w-full text-sm text-[#3a3730] file:mr-3 file:rounded-sm file:border-0 file:bg-[#0f7a63] file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-[#0c624f]"
+          className="block w-full text-sm text-[#3a3730] file:mr-3 file:rounded-sm file:border-0 file:bg-[var(--zpots-brass)] file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:brightness-90"
         />
         <p className={FIELD_HELP_CLASS}>JPEG, PNG, WEBP, or GIF, under 5MB.</p>
         {errors.photoFile && <ErrorText message={errors.photoFile} />}
@@ -164,7 +164,7 @@ export default function AddSpotForm({
         </button>
         <button
           type="submit"
-          className="rounded-sm bg-[#0f7a63] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0c624f]"
+          className="rounded-sm bg-[var(--zpots-brass)] px-4 py-2 text-sm font-semibold text-white hover:brightness-90"
         >
           Add pin
         </button>

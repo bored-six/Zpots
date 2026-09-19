@@ -12,7 +12,7 @@ import type { NewSpotInput, ReportReason } from "@/lib/validation";
 const SpotMap = dynamic(() => import("@/components/SpotMap"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full w-full items-center justify-center text-sm text-[#7a7368]">
+    <div className="flex h-full w-full items-center justify-center text-sm text-[var(--zpots-pewter)]">
       Loading map…
     </div>
   ),

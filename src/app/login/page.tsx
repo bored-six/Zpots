@@ -12,10 +12,10 @@ import { validateCredentials, type CredentialsMode } from "@/lib/validation";
 const FIELD_LABEL_CLASS = "text-sm font-medium text-[#3a3730]";
 const TEXT_INPUT_CLASS =
   "w-full rounded-sm border border-[#d8d4cb] bg-white px-3 py-2 text-sm text-[#1f2420] " +
-  "placeholder:text-[#a9a498] focus:border-[#0f7a63] focus:outline-none focus:ring-2 " +
-  "focus:ring-[#0f7a63]/25 disabled:cursor-not-allowed disabled:bg-[#f1efe9]";
+  "placeholder:text-[#a9a498] focus:border-[var(--zpots-brass)] focus:outline-none focus:ring-2 " +
+  "focus:ring-[var(--zpots-brass)]/25 disabled:cursor-not-allowed disabled:bg-[#f1efe9]";
 const SUBMIT_BUTTON_CLASS =
-  "rounded-sm bg-[#0f7a63] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0c624f] " +
+  "rounded-sm bg-[var(--zpots-brass)] px-4 py-2 text-sm font-semibold text-white hover:brightness-90 " +
   "disabled:cursor-not-allowed disabled:bg-[#c9c6bd] disabled:text-[#6f6b60]";
 const RATE_LIMIT_COOLDOWN_MS = 30_000;
 
