@@ -86,3 +86,73 @@ export function validateNewSpot(input: NewSpotInput): NewSpotValidationResult {
 export function isValidReportReason(reason: string): reason is ReportReason {
   return (REPORT_REASONS as readonly string[]).includes(reason);
 }
+
+/**
+ * Must match the Supabase dashboard's "Minimum password length" setting
+ * (auth-migration.md section 5.2, item 2). Keep both in sync.
+ */
+export const MIN_PASSWORD_LENGTH = 8;
+
+/**
+ * Deliberately loose -- trimmed, non-empty, exactly one `@` with non-empty
+ * local and domain parts and at least one `.` in the domain. Supabase does
+ * the real check (`email_address_invalid`); this only catches obviously
+ * malformed input before a network round trip.
+ */
+export function isValidEmail(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return false;
+
+  const atIndex = trimmed.indexOf("@");
+  if (atIndex <= 0 || atIndex !== trimmed.lastIndexOf("@")) return false;
+
+  const local = trimmed.slice(0, atIndex);
+  const domain = trimmed.slice(atIndex + 1);
+  if (local.length === 0 || domain.length === 0) return false;
+  if (/\s/.test(trimmed)) return false;
+
+  const dotIndex = domain.indexOf(".");
+  return dotIndex > 0 && dotIndex < domain.length - 1;
+}
+
+export type CredentialsMode = "signin" | "signup";
+
+export type CredentialsValidationErrors = { email?: string; password?: string };
+
+export type CredentialsValidationResult =
+  | { valid: true }
+  | { valid: false; errors: CredentialsValidationErrors };
+
+/**
+ * Sign-in mode only checks non-empty email/password (a signing-in user's
+ * existing password may predate a stricter dashboard minimum). Sign-up
+ * mode additionally enforces MIN_PASSWORD_LENGTH. Email is trimmed and
+ * lower-cased before validation -- the password is never trimmed or
+ * altered here or anywhere else.
+ */
+export function validateCredentials(
+  email: string,
+  password: string,
+  mode: CredentialsMode,
+): CredentialsValidationResult {
+  const errors: CredentialsValidationErrors = {};
+
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!isValidEmail(normalizedEmail)) {
+    errors.email = "Enter a valid email address.";
+  }
+
+  if (mode === "signup") {
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+    }
+  } else if (password.length === 0) {
+    errors.password = "Enter your password.";
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { valid: false, errors };
+  }
+
+  return { valid: true };
+}

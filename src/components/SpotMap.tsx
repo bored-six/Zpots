@@ -9,6 +9,8 @@ import ConfirmButton from "@/components/ConfirmButton";
 import { AddSpotIcon } from "@/components/icons/action-icons";
 import { AlertIcon } from "@/components/icons/status-icons";
 import ReportButton from "@/components/ReportButton";
+import SignInPrompt, { type GatedAction } from "@/components/SignInPrompt";
+import type { AuthStatus } from "@/lib/auth";
 import {
   DEFAULT_ZOOM,
   MAX_ZOOM,
@@ -30,6 +32,14 @@ interface SpotMapProps {
    * about rendering spots (no confirm/report wiring) isn't forced to pass it.
    */
   confirmedSpotIds?: ReadonlySet<string>;
+  /**
+   * Required in the type; at runtime `undefined` is treated as
+   * `'signed-out'` (fail-closed) so the frozen static-render test
+   * (SpotMap.test.tsx, which passes no such prop) still renders.
+   */
+  authStatus: AuthStatus;
+  /** The signed-in user's account nickname, forwarded to AddSpotForm as defaultNickname. */
+  nickname?: string;
   /** Rejecting keeps the form open with an inline error; resolving closes it and ends placement mode. */
   onCreateSpot: (input: NewSpotInput) => Promise<void>;
   onConfirmSpot: (spotId: string) => Promise<void>;
@@ -77,15 +87,40 @@ function submitErrorMessage(error: unknown): string {
 export default function SpotMap({
   spots,
   confirmedSpotIds = new Set(),
+  authStatus,
+  nickname,
   onCreateSpot,
   onConfirmSpot,
   onReportSpot,
 }: SpotMapProps) {
+  // Fail-closed default: an absent authStatus (only possible under the
+  // frozen SpotMap.test.tsx, which never exercises a gated action) behaves
+  // exactly like 'signed-out'. Never default to 'signed-in'.
+  const effectiveAuthStatus: AuthStatus = authStatus ?? "signed-out";
+
   const [leafletMap, setLeafletMap] = useState<LeafletMap | null>(null);
   const [isPlacementArmed, setIsPlacementArmed] = useState(false);
   const [tappedLocation, setTappedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [reportedSpotIds, setReportedSpotIds] = useState<ReadonlySet<string>>(new Set());
+  const [gatedAction, setGatedAction] = useState<GatedAction | null>(null);
+
+  function isGateOpen(): boolean {
+    return effectiveAuthStatus === "signed-in";
+  }
+
+  // Sign-out in another tab while placement/the add form is open: close
+  // both, same as Cancel (auth-migration.md section 3.2). This is a
+  // deliberate external-state sync (auth status -> placement state), not a
+  // data fetch.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (effectiveAuthStatus === "signed-out") {
+      setIsPlacementArmed(false);
+      setTappedLocation(null);
+    }
+  }, [effectiveAuthStatus]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Belt-and-suspenders enforcement of the Mindanao restriction: the
   // `maxBounds`/`maxBoundsViscosity` props below get applied by react-leaflet
@@ -125,9 +160,15 @@ export default function SpotMap({
       setIsPlacementArmed(false);
       setTappedLocation(null);
       setSubmitError(null);
-    } else {
-      setIsPlacementArmed(true);
+      return;
     }
+
+    if (!isGateOpen()) {
+      setGatedAction("add");
+      return;
+    }
+
+    setIsPlacementArmed(true);
   }
 
   async function handleAddSpotSubmit(input: NewSpotInput) {
@@ -148,6 +189,11 @@ export default function SpotMap({
   }
 
   async function handleConfirm(spotId: string) {
+    if (!isGateOpen()) {
+      setGatedAction("confirm");
+      return;
+    }
+
     try {
       await onConfirmSpot(spotId);
     } catch {
@@ -157,6 +203,11 @@ export default function SpotMap({
   }
 
   async function handleReport(spotId: string, reason: ReportReason, details?: string) {
+    if (!isGateOpen()) {
+      setGatedAction("report");
+      return;
+    }
+
     try {
       await onReportSpot(spotId, reason, details);
       setReportedSpotIds((prev) => new Set(prev).add(spotId));
@@ -200,6 +251,11 @@ export default function SpotMap({
                     onReport={(reason, details) => handleReport(spot.id, reason, details)}
                   />
                 </div>
+                {!isGateOpen() && (
+                  <p className="mt-1 text-xs text-[var(--zpots-pewter)]">
+                    Sign in to confirm or report.
+                  </p>
+                )}
                 {reportedSpotIds.has(spot.id) && (
                   <p className="zpots-popup-report-ack">Reported — thanks</p>
                 )}
@@ -239,10 +295,13 @@ export default function SpotMap({
               lng={tappedLocation.lng}
               onSubmit={handleAddSpotSubmit}
               onCancel={handleAddSpotCancel}
+              defaultNickname={nickname}
             />
           </div>
         </div>
       )}
+
+      {gatedAction && <SignInPrompt action={gatedAction} onDismiss={() => setGatedAction(null)} />}
     </div>
   );
 }

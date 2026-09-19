@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 
+import type { AuthStatus } from "@/lib/auth";
 import type { Spot } from "@/lib/spots";
 import type { NewSpotInput, ReportReason } from "@/lib/validation";
 
@@ -20,6 +21,8 @@ const SpotMap = dynamic(() => import("@/components/SpotMap"), {
 interface MapViewProps {
   spots: readonly Spot[];
   confirmedSpotIds: ReadonlySet<string>;
+  authStatus: AuthStatus;
+  nickname?: string;
   onCreateSpot: (input: NewSpotInput) => Promise<void>;
   onConfirmSpot: (spotId: string) => Promise<void>;
   onReportSpot: (spotId: string, reason: ReportReason, details?: string) => Promise<void>;
@@ -28,6 +31,8 @@ interface MapViewProps {
 export default function MapView({
   spots,
   confirmedSpotIds,
+  authStatus,
+  nickname,
   onCreateSpot,
   onConfirmSpot,
   onReportSpot,
@@ -36,6 +41,8 @@ export default function MapView({
     <SpotMap
       spots={spots}
       confirmedSpotIds={confirmedSpotIds}
+      authStatus={authStatus}
+      nickname={nickname}
       onCreateSpot={onCreateSpot}
       onConfirmSpot={onConfirmSpot}
       onReportSpot={onReportSpot}

@@ -286,7 +286,7 @@ describe("SpotMap -- auth gating", () => {
 
     await user.click(screen.getByRole("button", { name: /confirm/i }));
 
-    expect(screen.getByText(/sign in to confirm/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /sign in to confirm/i })).toBeInTheDocument();
     expect(props.onConfirmSpot).not.toHaveBeenCalled();
   });
 

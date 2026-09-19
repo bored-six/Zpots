@@ -1,6 +1,9 @@
+"use client";
+
 import type { ReactNode } from "react";
 import Link from "next/link";
 
+import { useAuth } from "@/components/AuthProvider";
 import { SettingsCompassIcon } from "@/components/icons/action-icons";
 import { AzulejoBand, BinderClip } from "@/components/icons/ornaments";
 
@@ -24,6 +27,8 @@ const HEADER_CLASS =
  * they render.
  */
 export default function ClipboardShell({ children, fullBleed = false }: ClipboardShellProps) {
+  const { status } = useAuth();
+
   return (
     <div
       className={
@@ -62,13 +67,23 @@ export default function ClipboardShell({ children, fullBleed = false }: Clipboar
             </p>
           </div>
 
-          <Link
-            href="/settings"
-            aria-label="Settings"
-            className="mt-1 inline-flex shrink-0 items-center justify-center rounded-full border border-[var(--zpots-navy)]/20 p-2 text-[var(--zpots-navy)] transition hover:bg-[var(--zpots-navy)]/10 focus:outline-none focus:ring-2 focus:ring-[var(--zpots-navy)]/30"
-          >
-            <SettingsCompassIcon />
-          </Link>
+          <div className="mt-1 flex shrink-0 items-center gap-3">
+            {status === "signed-out" && (
+              <Link
+                href="/login"
+                className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-[var(--zpots-navy)] underline underline-offset-4 hover:text-[var(--zpots-terracotta)] sm:text-xs"
+              >
+                Sign in
+              </Link>
+            )}
+            <Link
+              href="/settings"
+              aria-label="Settings"
+              className="inline-flex items-center justify-center rounded-full border border-[var(--zpots-navy)]/20 p-2 text-[var(--zpots-navy)] transition hover:bg-[var(--zpots-navy)]/10 focus:outline-none focus:ring-2 focus:ring-[var(--zpots-navy)]/30"
+            >
+              <SettingsCompassIcon />
+            </Link>
+          </div>
         </header>
 
         <AzulejoBand className="block w-full" height={12} />

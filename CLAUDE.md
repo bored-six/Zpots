@@ -9,15 +9,16 @@ Crowdsourced map of local spots in Zamboanga City — street food, hangouts, hid
 ## MVP scope — build these 5 things, nothing else
 
 1. Map of Zamboanga City — pan and zoom
-2. Add a pin — photo + short note + spot name; no account, just an optional nickname
+2. Add a pin — photo + short note + spot name; requires a signed-in account; optional cosmetic nickname
 3. New pins appear immediately, marked **Unconfirmed**
 4. **"Confirm — I've been here"** — 2 distinct confirmations flips it to **Confirmed**
 5. **Report** button on each pin (spam / wrong info / closed)
 
+Browsing the map needs no account — only adding, confirming, or reporting a spot requires signing in (email + password via Supabase Auth; see `.claude/prds/auth-migration.md`).
+
 ## Explicitly out of scope for v1
 
 - "Ask for help nearby" live-location notes
-- Accounts, login, passwords
 - Categories, search, filters
 - Anything not in the 5 items above
 

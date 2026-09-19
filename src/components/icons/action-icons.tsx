@@ -40,6 +40,43 @@ export function AddSpotIcon({ size = 20, className, ...props }: ActionIconProps)
 }
 
 /**
+ * Compass-rose family glyph for "sign in": the same circle rim as
+ * SettingsCompassIcon, but with a single long diamond needle pointing
+ * through an open doorway arch instead of the four tick marks -- reads as
+ * "step through" rather than "settings". No third-party icon pack.
+ */
+export function SignInIcon({ size = 20, className, ...props }: ActionIconProps) {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      width={size}
+      height={size}
+      {...props}
+      className={className}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M12,5 H8 a2,2 0 0 0 -2,2 V25 a2,2 0 0 0 2,2 H12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M16 16 H26 M21 11 L26 16 L21 21"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/**
  * Small compass glyph for the header's link to /settings -- a circle rim
  * with four tick marks at N/E/S/W and a diamond needle, echoing the
  * compass-rose pin mark rather than a generic gear icon.

@@ -25,8 +25,14 @@ export function getSupabaseClient(): SupabaseClient {
 
   client = createClient(url, anonKey, {
     auth: {
-      persistSession: false,
-      autoRefreshToken: false,
+      // persistSession/autoRefreshToken: on -- the auth migration (D1) keeps
+      // plain supabase-js client sessions (localStorage-backed, auto
+      // refreshed) instead of @supabase/ssr. detectSessionInUrl stays off:
+      // nothing in this pass sends the user back with tokens in the URL
+      // (email confirmation off, password reset deferred) -- flip it on
+      // when the reset-password ticket lands.
+      persistSession: true,
+      autoRefreshToken: true,
       detectSessionInUrl: false,
     },
   });

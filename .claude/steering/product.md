@@ -4,12 +4,13 @@
 
 - A spot starts **Unconfirmed** the moment it is created and shows up on the map immediately.
 - It flips to **Confirmed** at **2 or more confirmations from distinct people**. The threshold lives in one place (`isConfirmed` in `src/lib/spots.ts`) — never inline the number `2`.
-- "Distinct people" with no accounts means a best-effort browser-local identity. It is spoofable by design; that tradeoff is accepted for the MVP and should not be papered over as if it were real auth.
+- "Distinct people" is now backed by real Supabase Auth accounts (`confirmations.confirmer_id` is a foreign key to `auth.users`, enforced by a database policy) — not a browser-local id. One vote per account; creating multiple accounts is the remaining bypass, which is a normal, accepted limitation of email/password auth, not a design flaw to paper over.
 
 ## Identity
 
-- No accounts, no passwords, no login. A nickname is optional and purely cosmetic.
-- Never present a nickname as a verified identity anywhere in the UI.
+- Browsing/viewing the map is open to everyone, no account needed. Adding a spot, confirming, and reporting all require signing in (email + password via Supabase Auth — see `.claude/prds/auth-migration.md`).
+- A nickname is optional and purely cosmetic, stored in the account's `user_metadata` and snapshotted onto each pin at creation time.
+- Never present a nickname as a verified identity anywhere in the UI — it is cosmetic only, never proof of who added or confirmed a spot.
 
 ## Adding a spot
 

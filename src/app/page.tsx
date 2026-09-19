@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from "react";
 
+import { useAuth } from "@/components/AuthProvider";
 import ClipboardShell from "@/components/ClipboardShell";
 import MapView from "@/components/MapView";
-import {
-  getLocallyConfirmedSpotIds,
-  markSpotConfirmedLocally,
-} from "@/lib/confirmed-spots-storage";
-import { getLocalConfirmerId } from "@/lib/local-identity";
 import type { Spot } from "@/lib/spots";
-import { confirmSpot, createSpot, fetchSpots, reportSpot } from "@/lib/spots-repo";
+import {
+  confirmSpot,
+  createSpot,
+  fetchMyConfirmedSpotIds,
+  fetchSpots,
+  reportSpot,
+} from "@/lib/spots-repo";
 import type { NewSpotInput, ReportReason } from "@/lib/validation";
 
 function loadErrorMessage(error: unknown): string {
@@ -24,17 +26,13 @@ function loadErrorMessage(error: unknown): string {
  * display here.
  */
 export default function Home() {
+  const { status, user } = useAuth();
   const [spots, setSpots] = useState<Spot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  // Lazy initializer (not an effect): `getLocallyConfirmedSpotIds` already
-  // guards against a missing/throwing `localStorage`, so this is safe to
-  // run during SSR (yields an empty set there) and re-runs correctly when
-  // the client mounts its own instance and can read the real value.
-  const [confirmedSpotIds, setConfirmedSpotIds] = useState<ReadonlySet<string>>(
-    () => getLocallyConfirmedSpotIds(),
-  );
+  const [confirmedSpotIds, setConfirmedSpotIds] = useState<ReadonlySet<string>>(new Set());
 
+  // Pins load for everyone immediately -- this fetch never waits on auth.
   useEffect(() => {
     let isMounted = true;
 
@@ -54,6 +52,34 @@ export default function Home() {
     };
   }, []);
 
+  // The confirmed-spots set now comes from the database, scoped to the
+  // signed-in account -- a sign-out must not leave the previous user's
+  // confirmed set on screen. The synchronous reset below is a deliberate
+  // external-state sync (auth status -> local set), not a data fetch.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    let isMounted = true;
+
+    if (status !== "signed-in") {
+      setConfirmedSpotIds(new Set());
+      return;
+    }
+
+    fetchMyConfirmedSpotIds()
+      .then((ids) => {
+        if (isMounted) setConfirmedSpotIds(ids);
+      })
+      .catch(() => {
+        // Best-effort: a failed fetch just leaves ConfirmButton's disabled
+        // state unset for this session, not a page-level error.
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [status, user?.id]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   async function handleCreateSpot(input: NewSpotInput): Promise<void> {
     const spot = await createSpot(input);
     // Optimistic per the brief ("new pins show up immediately") -- prepend
@@ -62,12 +88,9 @@ export default function Home() {
   }
 
   async function handleConfirmSpot(spotId: string): Promise<void> {
-    const confirmerId = getLocalConfirmerId();
-    const updated = await confirmSpot(spotId, confirmerId);
+    const updated = await confirmSpot(spotId);
     setSpots((prev) => prev.map((spot) => (spot.id === spotId ? updated : spot)));
-    // Bookkeeping lives here, not in spots-repo.ts (spec F9).
-    markSpotConfirmedLocally(spotId);
-    setConfirmedSpotIds(getLocallyConfirmedSpotIds());
+    setConfirmedSpotIds((prev) => new Set(prev).add(spotId));
   }
 
   async function handleReportSpot(
@@ -86,6 +109,8 @@ export default function Home() {
         <MapView
           spots={spots}
           confirmedSpotIds={confirmedSpotIds}
+          authStatus={status}
+          nickname={user?.nickname ?? ""}
           onCreateSpot={handleCreateSpot}
           onConfirmSpot={handleConfirmSpot}
           onReportSpot={handleReportSpot}

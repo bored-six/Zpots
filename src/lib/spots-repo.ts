@@ -1,3 +1,4 @@
+import { getCurrentUser, requireUserId } from "@/lib/auth";
 import { getSupabaseClient } from "@/lib/supabase";
 import { generateUuid } from "@/lib/uuid";
 import {
@@ -65,6 +66,21 @@ function extensionForMime(mime: string): string {
   return ext;
 }
 
+const SESSION_EXPIRED_MESSAGE = "Your session expired. Sign in again to add this spot.";
+
+/**
+ * A Postgres `42501` (insufficient privilege) or PostgREST `401` on a write
+ * means the session died between the click and the request (expired JWT
+ * that autoRefresh could not save, or a policy rejection). Distinct from a
+ * `23505` duplicate, which is a normal, expected outcome.
+ */
+function isSessionExpiredError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = (error as { code?: unknown }).code;
+  const status = (error as { status?: unknown }).status;
+  return code === "42501" || status === 401;
+}
+
 /**
  * Fetches every spot. No `.order()` / `.limit()` / `.range()` is chained
  * after `select('*')` (spec F6) -- sort client-side if the UI needs one.
@@ -91,6 +107,11 @@ export async function createSpot(input: NewSpotInput): Promise<Spot> {
     throw new Error("Invalid spot input.", { cause: validation.errors });
   }
 
+  // Throws before getSupabaseClient() is even called when signed out --
+  // this is what prevents an orphaned photo upload from a signed-out
+  // submit (auth-migration.md section 6.3).
+  await requireUserId();
+
   const photoFile = input.photoFile as File;
   const client = getSupabaseClient();
 
@@ -105,6 +126,9 @@ export async function createSpot(input: NewSpotInput): Promise<Spot> {
   });
 
   if (uploadError) {
+    if (isSessionExpiredError(uploadError)) {
+      throw new Error(SESSION_EXPIRED_MESSAGE, { cause: uploadError });
+    }
     throw new Error("Failed to upload spot photo.", { cause: uploadError });
   }
 
@@ -112,6 +136,9 @@ export async function createSpot(input: NewSpotInput): Promise<Spot> {
     data: { publicUrl },
   } = client.storage.from(PHOTO_BUCKET).getPublicUrl(objectPath);
 
+  // created_by is deliberately absent -- it isn't in the INSERT column
+  // grant, so the DB fills it from auth.uid() and a client-sent value
+  // would be rejected outright (auth-migration.md section 4.4 / D4).
   const payload = {
     id,
     name: input.name.trim(),
@@ -127,6 +154,9 @@ export async function createSpot(input: NewSpotInput): Promise<Spot> {
   const { data, error } = await client.from(SPOTS_TABLE).insert(payload);
 
   if (error) {
+    if (isSessionExpiredError(error)) {
+      throw new Error(SESSION_EXPIRED_MESSAGE, { cause: error });
+    }
     throw new Error("Failed to create spot.", { cause: error });
   }
 
@@ -141,8 +171,13 @@ export async function createSpot(input: NewSpotInput): Promise<Spot> {
  * arithmetically right against the pre-write state. A duplicate
  * (spot_id, confirmer_id) pair is a `23505` unique violation, treated as a
  * no-op read rather than an error.
+ *
+ * Signature change (D9): `confirmerId` is no longer a parameter -- the
+ * confirmer's id comes from `requireUserId()`, which is also what a
+ * signed-out call fails on, before any query runs.
  */
-export async function confirmSpot(spotId: string, confirmerId: string): Promise<Spot> {
+export async function confirmSpot(spotId: string): Promise<Spot> {
+  const confirmerId = await requireUserId();
   const client = getSupabaseClient();
 
   const { data: current, error: readError } = await client
@@ -164,6 +199,11 @@ export async function confirmSpot(spotId: string, confirmerId: string): Promise<
   const isDuplicate = Boolean(insertError) && (insertError as { code?: string }).code === "23505";
 
   if (insertError && !isDuplicate) {
+    // 42501 here means either "not signed in" or "confirmer_id != auth.uid()"
+    // -- it is never a duplicate (that's the 23505 branch above).
+    if (isSessionExpiredError(insertError)) {
+      throw new Error(SESSION_EXPIRED_MESSAGE, { cause: insertError });
+    }
     throw new Error("Failed to record confirmation.", { cause: insertError });
   }
 
@@ -189,7 +229,13 @@ export async function confirmSpot(spotId: string, confirmerId: string): Promise<
   return toSpot(updated as SpotRow);
 }
 
-/** Rejects before any network call for an invalid reason (defense in depth beyond ReportButton). */
+/**
+ * Rejects before any network call for an invalid reason (defense in depth
+ * beyond ReportButton) -- reason validation runs before `requireUserId()`,
+ * so a signed-out visitor never even gets an "auth required" error for a
+ * malformed reason; they get the same validation error a signed-in caller
+ * would.
+ */
 export async function reportSpot(spotId: string, reason: string, details?: string): Promise<void> {
   if (!isValidReportReason(reason)) {
     throw new Error(`Invalid report reason: ${reason}`);
@@ -201,6 +247,10 @@ export async function reportSpot(spotId: string, reason: string, details?: strin
     throw new Error(`Report details must be at most ${MAX_REPORT_DETAILS_LENGTH} characters.`);
   }
 
+  await requireUserId();
+
+  // reported_by is deliberately absent -- same reasoning as spots.created_by
+  // above; the DB fills it from auth.uid().
   const client = getSupabaseClient();
   const { error } = await client.from(REPORTS_TABLE).insert({
     spot_id: spotId,
@@ -209,6 +259,35 @@ export async function reportSpot(spotId: string, reason: string, details?: strin
   });
 
   if (error) {
+    const code = (error as { code?: string }).code;
+    if (code === "23505") {
+      // Already reported this spot from this account -- idempotent, not an
+      // error (auth-migration.md section 4.4: unique (spot_id, reported_by)).
+      return;
+    }
+    if (isSessionExpiredError(error)) {
+      throw new Error(SESSION_EXPIRED_MESSAGE, { cause: error });
+    }
     throw new Error("Failed to submit report.", { cause: error });
   }
+}
+
+/**
+ * Every spot id this account has confirmed, per the database (RLS scopes
+ * `confirmations` rows to the caller). Signed-out visitors get an empty set
+ * without ever calling getSupabaseClient() -- a query in that state would
+ * just 401.
+ */
+export async function fetchMyConfirmedSpotIds(): Promise<Set<string>> {
+  const user = await getCurrentUser();
+  if (!user) return new Set();
+
+  const client = getSupabaseClient();
+  const { data, error } = await client.from(CONFIRMATIONS_TABLE).select("spot_id");
+
+  if (error) {
+    throw new Error("Failed to fetch your confirmations.", { cause: error });
+  }
+
+  return new Set(((data as { spot_id: string }[] | null) ?? []).map((row) => row.spot_id));
 }

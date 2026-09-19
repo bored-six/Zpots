@@ -62,8 +62,11 @@ describe("Settings page -- signed out", () => {
   it("shows a sign-in link to /login?next=/settings and does not redirect", async () => {
     await renderSettingsPage();
 
-    const link = screen.getByRole("link", { name: /sign in/i });
-    expect(link).toHaveAttribute("href", "/login?next=/settings");
+    // The header (ClipboardShell) also renders its own generic "Sign in"
+    // link when signed out -- find the settings page's own, more specific one.
+    const links = screen.getAllByRole("link", { name: /sign in/i });
+    const settingsLink = links.find((link) => link.getAttribute("href") === "/login?next=/settings");
+    expect(settingsLink).toBeDefined();
     expect(replace).not.toHaveBeenCalled();
   });
 

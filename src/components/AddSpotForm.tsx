@@ -17,6 +17,8 @@ interface AddSpotFormProps {
   lng: number;
   onSubmit: (input: NewSpotInput) => void;
   onCancel: () => void;
+  /** Initial value for the nickname field, e.g. the signed-in user's account nickname. */
+  defaultNickname?: string;
 }
 
 const FIELD_LABEL_CLASS = "text-sm font-medium text-[#3a3730]";
@@ -40,10 +42,16 @@ function ErrorText({ message }: { message: string }) {
  * and a required photo. Lat/lng arrive as props (the map already knows
  * where the tap landed) so this form never has to ask for a location.
  */
-export default function AddSpotForm({ lat, lng, onSubmit, onCancel }: AddSpotFormProps) {
+export default function AddSpotForm({
+  lat,
+  lng,
+  onSubmit,
+  onCancel,
+  defaultNickname,
+}: AddSpotFormProps) {
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
-  const [nickname, setNickname] = useState("");
+  const [nickname, setNickname] = useState(defaultNickname ?? "");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<NewSpotValidationErrors>({});
 

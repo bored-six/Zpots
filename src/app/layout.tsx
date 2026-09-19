@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Cinzel, Cormorant_Garamond, Geist, Geist_Mono, Work_Sans } from "next/font/google";
+
+import AuthProvider from "@/components/AuthProvider";
 import "leaflet/dist/leaflet.css";
 import "./globals.css";
 
@@ -46,7 +48,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} ${cormorantGaramond.variable} ${workSans.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }
