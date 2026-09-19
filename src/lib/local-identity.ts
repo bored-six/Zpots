@@ -1,6 +1,7 @@
 import { generateUuid } from "@/lib/uuid";
 
-const STORAGE_KEY = "zpots:confirmer-id";
+export const CONFIRMER_ID_STORAGE_KEY = "zpots:confirmer-id";
+const STORAGE_KEY = CONFIRMER_ID_STORAGE_KEY;
 
 // Matches the `confirmer_id` CHECK constraint on public.confirmations in
 // 0001_init.sql: 8-64 chars, [A-Za-z0-9_-] only. A hand-edited or corrupted

@@ -9,17 +9,18 @@ export type PinStatus = "unconfirmed" | "confirmed";
 const ICON_SIZE = 32;
 
 // The shared silhouette in pin-icons.tsx lives in a 0..32 / 0..32 viewBox
-// with its flag pole tapering to a point at (15, 30) -- 2px in from the
-// bottom edge. That point is the spot the marker actually names, so it
-// (not the box center) has to be the Leaflet anchor.
-const ICON_ANCHOR: [number, number] = [15, 30];
-const POPUP_ANCHOR: [number, number] = [1, -28];
+// with its tail tapering to a point at (16, 30) -- 2px in from the bottom
+// edge, directly below the compass rose's center (16, 16). That point is
+// the spot the marker actually names, so it (not the box center) has to
+// be the Leaflet anchor.
+const ICON_ANCHOR: [number, number] = [16, 30];
+const POPUP_ANCHOR: [number, number] = [0, -28];
 
 const PIN_COLOR: Record<PinStatus, string> = {
-  // Driftwood -- muted, sun-bleached, reads as "not vouched for yet".
-  unconfirmed: "#7a7368",
-  // Seagrass -- deep and settled, reads as "vouched for".
-  confirmed: "#0f7a63",
+  // Pewter -- muted, reads as "not vouched for yet".
+  unconfirmed: "#8b8f99",
+  // Brass/gold -- reads as "vouched for".
+  confirmed: "#c9962c",
 };
 
 /**

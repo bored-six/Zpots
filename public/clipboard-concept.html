@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Zpots — clipboard theme concept</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --board: #6b5744;
+    --paper: #f4efe2;
+    --paper-line: #e4dcc6;
+    --ink: #2c2620;
+    --ink-soft: #6b6152;
+    --seagrass: #0f7a63;
+    --seagrass-dark: #0b5a49;
+    --driftwood: #7a7368;
+    --driftwood-dark: #5c564c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Work Sans', sans-serif;
+    color: var(--ink);
+    background:
+      linear-gradient(var(--board), var(--board)),
+      repeating-linear-gradient(45deg, rgba(0,0,0,0.03) 0, rgba(0,0,0,0.03) 2px, transparent 2px, transparent 6px);
+    min-height: 100vh;
+    padding: 40px 24px;
+  }
+  .label {
+    font-family: 'Special Elite', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 12px;
+    color: rgba(244,239,226,0.55);
+    text-align: center;
+    margin: 0 0 20px;
+  }
+  .board { max-width: 480px; margin: 0 auto; position: relative; }
+  .clip {
+    position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+    width: 96px; height: 46px; z-index: 3;
+  }
+  .sheet {
+    background: var(--paper);
+    border-radius: 3px;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.35), 0 2px 0 rgba(255,255,255,0.4) inset;
+    padding: 34px 26px 26px;
+    position: relative;
+  }
+  .sheet::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: repeating-linear-gradient(to bottom, transparent 0 27px, var(--paper-line) 27px 28px);
+    background-position: 0 60px;
+    opacity: 0.6;
+    pointer-events: none;
+    border-radius: 3px;
+  }
+  .brand { font-family: 'Special Elite', monospace; font-size: 21px; margin: 0 0 2px; position: relative; z-index: 1; }
+  .tagline { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 20px; position: relative; z-index: 1; }
+  .map-area {
+    height: 220px;
+    border-radius: 4px;
+    background:
+      repeating-linear-gradient(0deg, transparent 0 18px, rgba(0,0,0,0.05) 18px 19px),
+      repeating-linear-gradient(90deg, transparent 0 18px, rgba(0,0,0,0.05) 18px 19px),
+      #d9d2bd;
+    border: 1px solid rgba(0,0,0,0.12);
+    position: relative;
+    margin-bottom: 20px;
+    z-index: 1;
+    overflow: hidden;
+  }
+  .map-caption {
+    position: absolute; bottom: 8px; left: 10px;
+    font-size: 10px; color: var(--ink-soft);
+    background: rgba(244,239,226,0.85);
+    padding: 2px 6px; border-radius: 2px;
+  }
+  .fab {
+    position: absolute; top: 10px; right: 10px;
+    background: var(--seagrass); color: #fff;
+    font-weight: 600; font-size: 11.5px;
+    padding: 7px 12px 7px 10px; border-radius: 3px;
+    display: flex; align-items: center; gap: 5px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    z-index: 5;
+  }
+  .fab svg { width: 13px; height: 13px; }
+
+  /* cartoon map pin — a sticker sitting on the board */
+  .map-pin {
+    position: absolute;
+    width: 34px; height: 42px;
+    cursor: pointer;
+    transform: translate(-50%, -100%);
+    filter: drop-shadow(0 3px 3px rgba(0,0,0,0.35));
+    transition: transform 0.12s ease;
+  }
+  .map-pin:hover { transform: translate(-50%, -100%) scale(1.08); }
+  .map-pin.p1 { top: 128px; left: 96px; }
+  .map-pin.p2 { top: 90px; left: 210px; }
+  .map-pin.p3 { top: 160px; left: 260px; }
+
+  .note-card {
+    position: absolute;
+    width: 156px;
+    background: #fffdf6;
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 2px;
+    padding: 10px 10px 9px;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.28);
+    transform: rotate(-2deg);
+    z-index: 6;
+    display: none;
+    top: 40px; left: 100px;
+  }
+  .note-card.showing { display: block; }
+  .note-card::before {
+    content: "";
+    position: absolute; top: -7px; left: 22px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #e0554a, #a3271f);
+    box-shadow: 0 2px 3px rgba(0,0,0,0.4);
+  }
+  .note-card .name { font-family: 'Special Elite', monospace; font-size: 11px; margin: 0 0 3px; }
+  .note-card .note { font-size: 9.5px; color: var(--ink-soft); margin: 0 0 6px; line-height: 1.3; }
+  .note-card .close {
+    position: absolute; top: 4px; right: 6px;
+    font-size: 12px; color: var(--ink-soft); cursor: pointer; border: none; background: none;
+  }
+  .stamp {
+    display: inline-block;
+    font-family: 'Special Elite', monospace;
+    font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 3px 7px; border-radius: 3px; transform: rotate(-3deg);
+    border: 1.5px solid var(--driftwood); color: var(--driftwood);
+  }
+  .stamp.confirmed { border-color: var(--seagrass); color: var(--seagrass); }
+
+  .section-title {
+    font-family: 'Special Elite', monospace; font-size: 13px; margin: 0 0 12px;
+    position: relative; z-index: 1; display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after { content: ""; flex: 1; border-bottom: 1px dashed rgba(0,0,0,0.2); }
+  .field { margin-bottom: 14px; position: relative; z-index: 1; }
+  .field label {
+    display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--ink-soft); margin-bottom: 4px;
+  }
+  .field input, .field textarea {
+    width: 100%; border: none; border-bottom: 1.5px solid var(--driftwood);
+    background: transparent; font-size: 14px; padding: 5px 2px; color: var(--ink); resize: none;
+  }
+  .field input:focus, .field textarea:focus { outline: none; border-bottom-color: var(--seagrass); }
+  .btn-row { display: flex; gap: 10px; margin-top: 20px; position: relative; z-index: 1; }
+  .btn { font-weight: 600; font-size: 13px; padding: 10px 16px; border-radius: 3px; border: none; cursor: pointer; }
+  .btn.primary { background: var(--seagrass); color: #fff; }
+  .btn.ghost { background: transparent; color: var(--ink-soft); border: 1px solid rgba(0,0,0,0.2); }
+  .hint { font-size: 11px; color: var(--ink-soft); text-align: center; margin-top: 10px; position: relative; z-index: 1; }
+</style>
+</head>
+<body>
+  <p class="label">Concept only — not wired up — tap a pin</p>
+  <div class="board">
+    <svg class="clip" viewBox="0 0 96 46" xmlns="http://www.w3.org/2000/svg">
+      <rect x="10" y="18" width="76" height="14" rx="3" fill="#8b8e92" stroke="#6d7074" stroke-width="1"/>
+      <rect x="10" y="18" width="76" height="6" rx="3" fill="#c7cacd"/>
+      <rect x="30" y="0" width="36" height="24" rx="4" fill="none" stroke="#8b8e92" stroke-width="5"/>
+    </svg>
+    <div class="sheet">
+      <p class="brand">Zpots</p>
+      <p class="tagline">local spots, Zamboanga &amp; Mindanao — no accounts, just pins</p>
+
+      <div class="map-area">
+        <div class="fab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Add a spot
+        </div>
+
+        <!-- cartoon pins: confirmed = filled seagrass, unconfirmed = hollow driftwood -->
+        <svg class="map-pin p1" onclick="showNote(event,'n1')" viewBox="0 0 34 42" xmlns="http://www.w3.org/2000/svg">
+          <path d="M17 2C9 2 3 8 3 16c0 11 14 23 14 23s14-12 14-23c0-8-6-14-14-14z" fill="#0f7a63" stroke="#0b5a49" stroke-width="2"/>
+          <circle cx="17" cy="16" r="6" fill="#fffdf6"/>
+          <ellipse cx="13" cy="11" rx="3" ry="2" fill="#ffffff" opacity="0.5"/>
+        </svg>
+        <svg class="map-pin p2" onclick="showNote(event,'n2')" viewBox="0 0 34 42" xmlns="http://www.w3.org/2000/svg">
+          <path d="M17 2C9 2 3 8 3 16c0 11 14 23 14 23s14-12 14-23c0-8-6-14-14-14z" fill="#efece7" stroke="#7a7368" stroke-width="2" stroke-dasharray="3 2.5"/>
+          <circle cx="17" cy="16" r="6" fill="none" stroke="#7a7368" stroke-width="2"/>
+        </svg>
+        <svg class="map-pin p3" onclick="showNote(event,'n3')" viewBox="0 0 34 42" xmlns="http://www.w3.org/2000/svg">
+          <path d="M17 2C9 2 3 8 3 16c0 11 14 23 14 23s14-12 14-23c0-8-6-14-14-14z" fill="#efece7" stroke="#7a7368" stroke-width="2" stroke-dasharray="3 2.5"/>
+          <circle cx="17" cy="16" r="6" fill="none" stroke="#7a7368" stroke-width="2"/>
+        </svg>
+
+        <div class="note-card" id="n1" style="top:34px; left:64px;">
+          <button class="close" onclick="hideNote('n1')">&times;</button>
+          <p class="name">Fort Pilar</p>
+          <p class="note">Quiet walk at sunset, right by the water.</p>
+          <span class="stamp confirmed">Confirmed</span>
+        </div>
+        <div class="note-card" id="n2" style="top:0px; left:178px;">
+          <button class="close" onclick="hideNote('n2')">&times;</button>
+          <p class="name">Sunset Boulevard Fish Balls</p>
+          <p class="note">Cheap, crispy, vinegar dip has a kick.</p>
+          <span class="stamp">Unconfirmed</span>
+        </div>
+        <div class="note-card" id="n3" style="top:70px; left:150px;">
+          <button class="close" onclick="hideNote('n3')">&times;</button>
+          <p class="name">Baragang Halo-Halo</p>
+          <p class="note">Open till late, ask for extra leche flan.</p>
+          <span class="stamp">Unconfirmed</span>
+        </div>
+
+        <span class="map-caption">map tiles render here</span>
+      </div>
+
+      <p class="hint">^ tap any pin above — this is the real map behavior, just mocked</p>
+
+      <p class="section-title">Add a spot</p>
+      <div class="field">
+        <label>Name</label>
+        <input placeholder="What do locals call this place?" />
+      </div>
+      <div class="field">
+        <label>Note</label>
+        <textarea rows="2" placeholder="A short line for someone standing here for the first time."></textarea>
+      </div>
+      <div class="btn-row">
+        <button class="btn ghost">Cancel</button>
+        <button class="btn primary">Add pin</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    function showNote(e, id) {
+      e.stopPropagation();
+      document.querySelectorAll('.note-card').forEach(function(c){ c.classList.remove('showing'); });
+      document.getElementById(id).classList.add('showing');
+    }
+    function hideNote(id) {
+      document.getElementById(id).classList.remove('showing');
+    }
+  </script>
+</body>
+</html>

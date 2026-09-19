@@ -7,7 +7,8 @@
  * kept separate since `local-identity.ts` is a frozen contract.
  */
 
-const STORAGE_KEY = "zpots:confirmed-spots";
+export const CONFIRMED_SPOTS_STORAGE_KEY = "zpots:confirmed-spots";
+const STORAGE_KEY = CONFIRMED_SPOTS_STORAGE_KEY;
 
 /** In-memory fallback for SSR / sandboxed iframes / storage that throws. */
 let memoryFallback: Set<string> = new Set();

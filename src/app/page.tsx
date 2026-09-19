@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import ClipboardShell from "@/components/ClipboardShell";
 import MapView from "@/components/MapView";
 import {
   getLocallyConfirmedSpotIds,
@@ -80,30 +81,32 @@ export default function Home() {
   }
 
   return (
-    <main className="relative h-screen w-screen">
-      <MapView
-        spots={spots}
-        confirmedSpotIds={confirmedSpotIds}
-        onCreateSpot={handleCreateSpot}
-        onConfirmSpot={handleConfirmSpot}
-        onReportSpot={handleReportSpot}
-      />
+    <ClipboardShell fullBleed>
+      <main className="relative h-full w-full">
+        <MapView
+          spots={spots}
+          confirmedSpotIds={confirmedSpotIds}
+          onCreateSpot={handleCreateSpot}
+          onConfirmSpot={handleConfirmSpot}
+          onReportSpot={handleReportSpot}
+        />
 
-      {isLoading && (
-        <div className="pointer-events-none absolute inset-x-0 top-6 z-[1200] flex justify-center">
-          <div className="rounded-sm border border-[#d8d4cb] bg-white px-4 py-2 text-sm font-medium text-[#3a3730] shadow-md">
-            Loading spots…
+        {isLoading && (
+          <div className="pointer-events-none absolute inset-x-0 top-6 z-[1200] flex justify-center">
+            <div className="rounded-sm border border-[#d8d4cb] bg-white px-4 py-2 text-sm font-medium text-[#3a3730] shadow-md">
+              Loading spots…
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {!isLoading && loadError && (
-        <div className="pointer-events-none absolute inset-x-0 top-6 z-[1200] flex justify-center">
-          <div className="rounded-sm border border-[#9a3324]/30 bg-white px-4 py-2 text-sm font-medium text-[#9a3324] shadow-md">
-            {loadError} — the map still works, but pins may be out of date.
+        {!isLoading && loadError && (
+          <div className="pointer-events-none absolute inset-x-0 top-6 z-[1200] flex justify-center">
+            <div className="rounded-sm border border-[#9a3324]/30 bg-white px-4 py-2 text-sm font-medium text-[#9a3324] shadow-md">
+              {loadError} — the map still works, but pins may be out of date.
+            </div>
           </div>
-        </div>
-      )}
-    </main>
+        )}
+      </main>
+    </ClipboardShell>
   );
 }

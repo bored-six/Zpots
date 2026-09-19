@@ -2,6 +2,13 @@
 
 Rolling log of non-obvious discoveries. Newest first. Prune entries older than 60 days.
 
+## [2026-09-19] - Compass Rose theme + Settings page
+
+- `next/font/google` fonts (Cinzel, Cormorant Garamond, Work Sans) need no new npm package -- same pattern as the existing Geist/Geist Mono wiring in `layout.tsx`: import from `next/font/google`, assign a `variable`, add the class to `<html>`, then reference `var(--font-x)` in CSS/inline styles. Cormorant Garamond needed `style: ["italic"]` explicitly since the tagline is italic-only.
+- New compass-rose pin silhouette is symmetric about its vertical axis (unlike the old faceted gem, whose tip sat at x=15 in a 0..32 box), so `ICON_ANCHOR`/`POPUP_ANCHOR` in `pin-icon.ts` moved from `[15,30]`/`[1,-28]` to `[16,30]`/`[0,-28]` -- centered on the new tail's tip. No test hardcoded the old numbers, and `npm test` stayed green after the change.
+- Storage-key exports (`CONFIRMER_ID_STORAGE_KEY`, `CONFIRMED_SPOTS_STORAGE_KEY`) were purely additive (`export const X = "..."; const OLD_NAME = X;`) -- did not require touching either frozen test file, both still pass unmodified.
+- Verified the new chrome server-rendered correctly via `curl localhost:3000` and `localhost:3000/settings` (both 200, expected text present) and by grepping the freshly-compiled dev chunk for the new pin path data vs. a stale cached chunk still holding the old gem shape -- no computer-use/chrome MCP browser tool was available in this session to click through it live, same gap noted in the prior two sessions' entries.
+
 ## [2026-09-19] - Restricting the map to Mindanao
 
 - Leaflet's `maxBounds` only restricts *panning* (the center gets clamped, with `maxBoundsViscosity` controlling how elastic the clamp feels); it does not, by itself, stop a user from zooming out far enough that the *viewport* shows land beyond the bounds' edges. That's `minZoom`'s job. Checked the actual numbers before touching anything: at the existing `MIN_ZOOM = 11`, even a generously wide 2560px browser window only shows ~1.8 degrees of longitude (`2560 / (256*2^11) * 360`), which is already far smaller than Mindanao's own ~7-8 degree width, let alone the full Philippines' ~11 degree span. So `MIN_ZOOM` did not need raising — it already over-satisfies the "can't see outside Mindanao" requirement by a wide margin. Left it unchanged and just added the formula-based test + code comment instead of bumping the number for its own sake.

@@ -1,10 +1,38 @@
 @import "tailwindcss";
 
+/**
+ * Compass Rose + Spanish-colonial Zamboanga palette. Replaces the earlier
+ * Seagrass/Driftwood tokens (see .claude/learnings.md for the swap).
+ * navy = board/chrome, parchment = paper/cards, ink = body text on
+ * parchment, brass = Confirmed accent, pewter = Unconfirmed accent,
+ * cardinal = Report/destructive accent, terracotta = secondary accent
+ * (flourishes, the tagline).
+ */
+:root {
+  --zpots-navy: #1b2a4a;
+  --zpots-parchment: #f1e9d2;
+  --zpots-ink: #241d10;
+  --zpots-brass: #c9962c;
+  --zpots-pewter: #8b8f99;
+  --zpots-cardinal: #8a2a1e;
+  --zpots-terracotta: #a8492f;
+
+  --font-body: var(--font-work-sans), sans-serif;
+  --font-display: var(--font-cinzel), serif;
+  --font-tagline: var(--font-cormorant), serif;
+}
+
 html,
 body {
   height: 100%;
   margin: 0;
   box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--zpots-navy);
+  color: var(--zpots-ink);
 }
 
 /* Leaflet draws a white circular background/border/shadow behind every
@@ -15,12 +43,12 @@ body {
   border: none;
 }
 
-/* Popup shell: square off Leaflet's default rounded card and give the
-   content real breathing room. */
+/* Popup shell: parchment card, square corners, real breathing room. */
 .leaflet-popup-content-wrapper {
   border-radius: 2px;
   padding: 0;
-  box-shadow: 0 2px 10px rgba(15, 23, 20, 0.18);
+  background: var(--zpots-parchment);
+  box-shadow: 0 2px 10px rgba(27, 42, 74, 0.35);
 }
 
 .leaflet-popup-content {
@@ -31,21 +59,22 @@ body {
 
 .leaflet-popup-tip {
   border-radius: 0;
+  background: var(--zpots-parchment);
 }
 
 .zpots-popup-name {
   margin: 0 0 4px;
-  font-family: var(--font-geist-sans), sans-serif;
+  font-family: var(--font-display);
   font-weight: 600;
   font-size: 0.95rem;
-  color: #1f2420;
+  color: var(--zpots-ink);
 }
 
 .zpots-popup-note {
   margin: 0 0 10px;
   font-size: 0.85rem;
   line-height: 1.4;
-  color: #4a4842;
+  color: var(--zpots-ink);
 }
 
 .zpots-popup-status {
@@ -56,23 +85,23 @@ body {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  background: color-mix(in srgb, var(--zpots-status-color, #7a7368) 14%, white);
-  color: var(--zpots-status-color, #7a7368);
+  background: color-mix(in srgb, var(--zpots-status-color, var(--zpots-pewter)) 14%, white);
+  color: var(--zpots-status-color, var(--zpots-pewter));
 }
 
 .zpots-popup-status[data-status="confirmed"] {
-  --zpots-status-color: #0f7a63;
+  --zpots-status-color: var(--zpots-brass);
 }
 
 .zpots-popup-status[data-status="unconfirmed"] {
-  --zpots-status-color: #7a7368;
+  --zpots-status-color: var(--zpots-pewter);
 }
 
 .zpots-popup-credit {
   margin: 8px 0 0;
   font-size: 0.7rem;
   font-style: italic;
-  color: #8a8579;
+  color: var(--zpots-pewter);
 }
 
 .zpots-popup-actions {
@@ -87,5 +116,17 @@ body {
   margin: 8px 0 0;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #0f7a63;
+  color: var(--zpots-cardinal);
+}
+
+/**
+ * Wrought-iron scroll flourish, reused as a small corner-accent background
+ * on the parchment sheet (rather than a second inline SVG overlay -- one
+ * asset, two uses, see ornaments.tsx for the same stroke drawn as a
+ * standalone divider component).
+ */
+.zpots-corner-flourish {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M4 60 C4 40, 4 24, 20 16 C28 12, 36 16, 34 24 C32 30, 24 30, 24 24 C24 18, 32 14, 42 16 C54 18, 60 30, 60 44' fill='none' stroke='%23a8492f' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: contain;
 }
