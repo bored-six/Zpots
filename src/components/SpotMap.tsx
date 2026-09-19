@@ -39,8 +39,10 @@ interface SpotMapProps {
 const FAB_CLASS =
   "absolute right-6 top-6 z-[1000] flex items-center gap-2 rounded-sm px-4 py-3 text-sm font-semibold " +
   "text-white shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2";
-const FAB_IDLE_CLASS = "bg-[#0f7a63] hover:bg-[#0c624f] focus:ring-[#0f7a63]/40";
-const FAB_ARMED_CLASS = "bg-[#7a7368] hover:bg-[#635e54] focus:ring-[#7a7368]/40";
+const FAB_IDLE_CLASS =
+  "bg-[var(--zpots-brass)] hover:brightness-90 focus:ring-[var(--zpots-brass)]/40";
+const FAB_ARMED_CLASS =
+  "bg-[var(--zpots-pewter)] hover:brightness-90 focus:ring-[var(--zpots-pewter)]/40";
 
 const BANNER_CLASS =
   "absolute left-1/2 top-6 z-[1000] -translate-x-1/2 rounded-sm border border-[#d8d4cb] bg-white " +

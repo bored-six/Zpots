@@ -14,13 +14,14 @@ interface ConfirmButtonProps {
 }
 
 const BADGE_CLASS =
-  "inline-flex items-center gap-1.5 rounded-sm border border-[#0f7a63]/30 bg-[#0f7a63]/10 " +
-  "px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#0f7a63]";
+  "inline-flex items-center gap-1.5 rounded-sm border border-[var(--zpots-brass)]/30 " +
+  "bg-[var(--zpots-brass)]/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide " +
+  "text-[var(--zpots-brass)]";
 
 const CTA_CLASS =
-  "inline-flex items-center gap-1.5 rounded-sm bg-[#0f7a63] px-3 py-1.5 text-sm font-semibold " +
-  "text-white hover:bg-[#0c624f] disabled:cursor-not-allowed disabled:bg-[#c9c6bd] " +
-  "disabled:text-[#6f6b60]";
+  "inline-flex items-center gap-1.5 rounded-sm bg-[var(--zpots-brass)] px-3 py-1.5 text-sm " +
+  "font-semibold text-white hover:brightness-90 disabled:cursor-not-allowed " +
+  "disabled:bg-[#c9c6bd] disabled:text-[#6f6b60]";
 
 /**
  * "Confirm -- I've been here" control. Once a spot reaches

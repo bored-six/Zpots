@@ -23,7 +23,7 @@ const REASON_LABELS: Record<ReportReason, string> = {
 const FIELD_LABEL_CLASS = "text-xs font-medium text-[#6f6b60]";
 const CONTROL_CLASS =
   "w-full rounded-sm border border-[#d8d4cb] bg-white px-2.5 py-1.5 text-sm text-[#1f2420] " +
-  "focus:border-[#7a7368] focus:outline-none focus:ring-2 focus:ring-[#7a7368]/25";
+  "focus:border-[var(--zpots-pewter)] focus:outline-none focus:ring-2 focus:ring-[var(--zpots-pewter)]/25";
 
 /**
  * Quiet "Report" trigger that opens into a small reason + optional
@@ -53,7 +53,7 @@ export default function ReportButton({ spotId, onReport }: ReportButtonProps) {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-xs font-medium text-[#7a7368] hover:bg-[#f1efe9]"
+        className="inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-xs font-medium text-[var(--zpots-pewter)] hover:bg-[#f1efe9]"
       >
         <FlagIcon size={14} />
         Report
@@ -108,7 +108,7 @@ export default function ReportButton({ spotId, onReport }: ReportButtonProps) {
         </button>
         <button
           type="submit"
-          className="rounded-sm bg-[#7a7368] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#635e54]"
+          className="rounded-sm bg-[var(--zpots-pewter)] px-3 py-1.5 text-xs font-semibold text-white hover:brightness-90"
         >
           Submit report
         </button>

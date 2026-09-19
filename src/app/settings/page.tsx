@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import ClipboardShell from "@/components/ClipboardShell";
 import { Flourish } from "@/components/icons/ornaments";
@@ -32,10 +32,23 @@ const CLEAR_BUTTON_CLASS =
  * stakes, per settings-page.test.tsx's frozen contract.
  */
 export default function SettingsPage() {
-  const [nickname, setNickname] = useState(() => getStoredNickname());
-  const [confirmedCount, setConfirmedCount] = useState(
-    () => getLocallyConfirmedSpotIds().size,
-  );
+  // Seeded with SSR-safe defaults ("" / 0) so the client's first render
+  // matches what the server rendered -- localStorage doesn't exist during
+  // SSR, so reading it during the initial render (even via a useState
+  // initializer) causes a hydration mismatch. The real values are read
+  // post-mount in the effect below and applied on the next paint.
+  const [nickname, setNickname] = useState("");
+  const [confirmedCount, setConfirmedCount] = useState(0);
+
+  // Deliberate hydration-safe mount read: localStorage is an external,
+  // client-only source with no SSR equivalent, so the real value can only
+  // be read once mounted, after the SSR-matching first paint above.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    setNickname(getStoredNickname());
+    setConfirmedCount(getLocallyConfirmedSpotIds().size);
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function handleNicknameBlur() {
     const trimmed = nickname.trim();
