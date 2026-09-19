@@ -3,9 +3,12 @@ import {
   MAX_NAME_LENGTH,
   MAX_NOTE_LENGTH,
   MAX_NICKNAME_LENGTH,
+  MIN_PASSWORD_LENGTH,
   REPORT_REASONS,
-  validateNewSpot,
+  isValidEmail,
   isValidReportReason,
+  validateCredentials,
+  validateNewSpot,
   type NewSpotInput,
 } from "@/lib/validation";
 
@@ -263,5 +266,74 @@ describe("isValidReportReason", () => {
 
   it("rejects an empty string", () => {
     expect(isValidReportReason("")).toBe(false);
+  });
+});
+
+describe("MIN_PASSWORD_LENGTH", () => {
+  it("is 8, matching the dashboard's minimum password length setting", () => {
+    expect(MIN_PASSWORD_LENGTH).toBe(8);
+  });
+});
+
+describe("isValidEmail", () => {
+  it.each(["a@b.co", "A@B.CO", "foo.bar@example.com", "  a@b.co  "])(
+    "accepts '%s'",
+    (value) => {
+      expect(isValidEmail(value)).toBe(true);
+    },
+  );
+
+  it.each(["", "   ", "a", "a@", "@b.co", "a@b", "a b@c.co"])("rejects '%s'", (value) => {
+    expect(isValidEmail(value)).toBe(false);
+  });
+});
+
+describe("validateCredentials", () => {
+  it("sign-in mode does not enforce MIN_PASSWORD_LENGTH", () => {
+    const result = validateCredentials("a@b.com", "short", "signin");
+    expect(result.valid).toBe(true);
+  });
+
+  it("sign-in mode rejects an empty email or password", () => {
+    const emptyEmail = validateCredentials("", "password1", "signin");
+    expect(emptyEmail.valid).toBe(false);
+    if (!emptyEmail.valid) expect(emptyEmail.errors).toHaveProperty("email");
+
+    const emptyPassword = validateCredentials("a@b.com", "", "signin");
+    expect(emptyPassword.valid).toBe(false);
+    if (!emptyPassword.valid) expect(emptyPassword.errors).toHaveProperty("password");
+  });
+
+  it("sign-up mode enforces MIN_PASSWORD_LENGTH", () => {
+    const result = validateCredentials("a@b.com", "short", "signup");
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.errors).toHaveProperty("password");
+  });
+
+  it("sign-up mode accepts a password at exactly MIN_PASSWORD_LENGTH", () => {
+    const result = validateCredentials("a@b.com", "a".repeat(MIN_PASSWORD_LENGTH), "signup");
+    expect(result.valid).toBe(true);
+  });
+
+  it("sign-up mode rejects an invalid email shape", () => {
+    const result = validateCredentials("not-an-email", "password1", "signup");
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.errors).toHaveProperty("email");
+  });
+
+  it("reports all errors at once", () => {
+    const result = validateCredentials("bad-email", "short", "signup");
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors).toHaveProperty("email");
+      expect(result.errors).toHaveProperty("password");
+    }
+  });
+
+  it("passes a password with surrounding spaces through untrimmed (never validated as empty due to trimming)", () => {
+    const result = validateCredentials("a@b.com", "        ", "signup");
+    // 8 spaces meets the length requirement -- MIN_PASSWORD_LENGTH counts
+    // characters, not trimmed content; the password itself is never trimmed.
+    expect(result.valid).toBe(true);
   });
 });

@@ -159,4 +159,26 @@ describe("AddSpotForm", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit.mock.calls[0][0].nickname).toBe("chabelita");
   });
+
+  it("pre-fills the nickname field from defaultNickname, and the submitted input carries it", async () => {
+    const onSubmit = vi.fn();
+    const { container } = render(
+      <AddSpotForm
+        lat={LAT}
+        lng={LNG}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+        defaultNickname="Kuya Ben"
+      />,
+    );
+
+    expect(getNicknameInput()).toHaveValue("Kuya Ben");
+
+    await userEvent.type(getNameInput(), "Rio Hondo Boardwalk");
+    await userEvent.type(getNoteInput(), "Great sunset view, watch your step.");
+    await userEvent.upload(getPhotoInput(container), makeImageFile());
+    await userEvent.click(getSubmitButton(container));
+
+    expect(onSubmit.mock.calls[0][0].nickname).toBe("Kuya Ben");
+  });
 });

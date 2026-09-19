@@ -93,6 +93,7 @@ function baseProps() {
   return {
     spots: [] as readonly Spot[],
     confirmedSpotIds: new Set<string>(),
+    authStatus: "signed-in" as const,
     onCreateSpot: vi.fn().mockResolvedValue(undefined),
     onConfirmSpot: vi.fn().mockResolvedValue(undefined),
     onReportSpot: vi.fn().mockResolvedValue(undefined),
@@ -262,5 +263,104 @@ describe("SpotMap -- report wiring", () => {
     // The spot's own status/name/note are untouched by a report.
     expect(screen.getByText(unconfirmedSpot.name)).toBeInTheDocument();
     expect(screen.getByText(/unconfirmed/i)).toBeInTheDocument();
+  });
+});
+
+describe("SpotMap -- auth gating", () => {
+  it("signed-out FAB click shows the sign-in prompt, does not arm placement, and never shows 'Tap the map'", async () => {
+    const user = userEvent.setup();
+    const props = baseProps();
+    render(<SpotMap {...props} authStatus="signed-out" spots={[]} />);
+
+    await user.click(screen.getByRole("button", { name: /add a spot/i }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText(/sign in to add a spot/i)).toBeInTheDocument();
+    expect(screen.queryByText(/tap the map/i)).not.toBeInTheDocument();
+  });
+
+  it("signed-out Confirm click opens the prompt and does not call onConfirmSpot", async () => {
+    const user = userEvent.setup();
+    const props = baseProps();
+    render(<SpotMap {...props} authStatus="signed-out" spots={[unconfirmedSpot]} />);
+
+    await user.click(screen.getByRole("button", { name: /confirm/i }));
+
+    expect(screen.getByText(/sign in to confirm/i)).toBeInTheDocument();
+    expect(props.onConfirmSpot).not.toHaveBeenCalled();
+  });
+
+  it("signed-out Report submit opens the prompt, does not call onReportSpot, and shows no 'Reported' ack", async () => {
+    const user = userEvent.setup();
+    const props = baseProps();
+    render(<SpotMap {...props} authStatus="signed-out" spots={[unconfirmedSpot]} />);
+
+    await user.click(screen.getByRole("button", { name: /report/i }));
+    await user.click(screen.getByRole("button", { name: /submit report/i }));
+
+    expect(screen.getByText(/sign in to report/i)).toBeInTheDocument();
+    expect(props.onReportSpot).not.toHaveBeenCalled();
+    expect(screen.queryByText(/reported — thanks/i)).not.toBeInTheDocument();
+  });
+
+  it("the sign-in prompt's 'Sign in' link points to /login?next=/", async () => {
+    const user = userEvent.setup();
+    const props = baseProps();
+    render(<SpotMap {...props} authStatus="signed-out" spots={[]} />);
+
+    await user.click(screen.getByRole("button", { name: /add a spot/i }));
+
+    expect(screen.getByRole("link", { name: /^sign in$/i })).toHaveAttribute("href", "/login?next=/");
+  });
+
+  it("'Not now' closes the prompt", async () => {
+    const user = userEvent.setup();
+    const props = baseProps();
+    render(<SpotMap {...props} authStatus="signed-out" spots={[]} />);
+
+    await user.click(screen.getByRole("button", { name: /add a spot/i }));
+    await user.click(screen.getByRole("button", { name: /not now/i }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("'loading' auth status behaves like signed-out", async () => {
+    const user = userEvent.setup();
+    const props = baseProps();
+    render(<SpotMap {...props} authStatus="loading" spots={[unconfirmedSpot]} />);
+
+    await user.click(screen.getByRole("button", { name: /confirm/i }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(props.onConfirmSpot).not.toHaveBeenCalled();
+  });
+
+  it("forwards nickname as AddSpotForm's defaultNickname", async () => {
+    const user = userEvent.setup();
+    const props = baseProps();
+    render(<SpotMap {...props} nickname="Kuya Ben" spots={[]} />);
+
+    await user.click(screen.getByRole("button", { name: /add a spot/i }));
+    act(() => {
+      emitMapClick(6.91, 122.06);
+    });
+
+    expect(screen.getByLabelText((c) => c.trim().toLowerCase() === "nickname (optional)")).toHaveValue(
+      "Kuya Ben",
+    );
+  });
+
+  it("shows the 'Sign in to confirm or report' hint in a popup when not signed in", () => {
+    const props = baseProps();
+    render(<SpotMap {...props} authStatus="signed-out" spots={[unconfirmedSpot]} />);
+
+    expect(screen.getByText(/sign in to confirm or report/i)).toBeInTheDocument();
+  });
+
+  it("does not show the hint when signed in", () => {
+    const props = baseProps();
+    render(<SpotMap {...props} authStatus="signed-in" spots={[unconfirmedSpot]} />);
+
+    expect(screen.queryByText(/sign in to confirm or report/i)).not.toBeInTheDocument();
   });
 });

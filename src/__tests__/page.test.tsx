@@ -2,41 +2,38 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Spot } from "@/lib/spots";
+import type { AuthStatus, AuthUser } from "@/lib/auth";
 import type { NewSpotInput } from "@/lib/validation";
 
 const fetchSpots = vi.fn();
 const createSpot = vi.fn();
 const confirmSpot = vi.fn();
 const reportSpot = vi.fn();
-const getLocalConfirmerId = vi.fn(() => "confirmer-abc123");
-const getLocallyConfirmedSpotIds = vi.fn(() => new Set<string>());
-const markSpotConfirmedLocally = vi.fn();
+const fetchMyConfirmedSpotIds = vi.fn();
+const useAuthMock = vi.fn();
 
 vi.mock("@/lib/spots-repo", () => ({
   fetchSpots: (...args: unknown[]) => fetchSpots(...args),
   createSpot: (...args: unknown[]) => createSpot(...args),
   confirmSpot: (...args: unknown[]) => confirmSpot(...args),
   reportSpot: (...args: unknown[]) => reportSpot(...args),
+  fetchMyConfirmedSpotIds: (...args: unknown[]) => fetchMyConfirmedSpotIds(...args),
 }));
 
-vi.mock("@/lib/local-identity", () => ({
-  getLocalConfirmerId: (...args: unknown[]) => getLocalConfirmerId(...args),
-}));
-
-vi.mock("@/lib/confirmed-spots-storage", () => ({
-  getLocallyConfirmedSpotIds: (...args: unknown[]) => getLocallyConfirmedSpotIds(...args),
-  markSpotConfirmedLocally: (...args: unknown[]) => markSpotConfirmedLocally(...args),
+vi.mock("@/components/AuthProvider", () => ({
+  useAuth: () => useAuthMock(),
 }));
 
 // Thin stand-in for the real map -- Leaflet/react-leaflet is exercised by
 // SpotMap.test.tsx / SpotMap.wiring.test.tsx already. Here we only care
-// that page.tsx wires fetch/create/confirm/report through to whatever
-// receives these props, so the stub just surfaces them as clickable
-// triggers and a serialized dump of what it was given.
+// that page.tsx wires fetch/create/confirm/report/authStatus/nickname
+// through to whatever receives these props.
 vi.mock("@/components/MapView", () => ({
   default: (props: {
     spots: readonly Spot[];
     confirmedSpotIds: ReadonlySet<string>;
+    authStatus: AuthStatus;
+    nickname?: string;
     onCreateSpot: (input: NewSpotInput) => Promise<void>;
     onConfirmSpot: (spotId: string) => Promise<void>;
     onReportSpot: (spotId: string, reason: string, details?: string) => Promise<void>;
@@ -46,6 +43,8 @@ vi.mock("@/components/MapView", () => ({
       <div data-testid="map-view-confirmed-ids">
         {Array.from(props.confirmedSpotIds).join(",")}
       </div>
+      <div data-testid="map-view-auth-status">{props.authStatus}</div>
+      <div data-testid="map-view-nickname">{props.nickname}</div>
       <button
         type="button"
         onClick={() =>
@@ -84,10 +83,14 @@ const seedSpot: Spot = {
   createdAt: "2026-01-01T00:00:00.000Z",
 };
 
+function authValue(status: AuthStatus, user: AuthUser | null = null) {
+  return { status, user, signOut: vi.fn() };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
-  getLocalConfirmerId.mockReturnValue("confirmer-abc123");
-  getLocallyConfirmedSpotIds.mockReturnValue(new Set<string>());
+  fetchMyConfirmedSpotIds.mockResolvedValue(new Set<string>());
+  useAuthMock.mockReturnValue(authValue("signed-out"));
 });
 
 afterEach(() => {
@@ -141,6 +144,16 @@ describe("Home page -- live data wiring", () => {
     expect(screen.getByTestId("map-view")).toBeInTheDocument();
   });
 
+  it("fetchSpots runs regardless of auth status", async () => {
+    useAuthMock.mockReturnValue(authValue("loading"));
+    fetchSpots.mockResolvedValue([seedSpot]);
+
+    const Home = (await import("@/app/page")).default;
+    render(<Home />);
+
+    await waitFor(() => expect(fetchSpots).toHaveBeenCalledTimes(1));
+  });
+
   it("wires onCreateSpot to createSpot and prepends the returned spot to what MapView receives", async () => {
     fetchSpots.mockResolvedValue([]);
     const created: Spot = {
@@ -168,7 +181,7 @@ describe("Home page -- live data wiring", () => {
     });
   });
 
-  it("wires onConfirmSpot to confirmSpot(spotId, getLocalConfirmerId()), updates the spot, and records it locally (spec F9)", async () => {
+  it("wires onConfirmSpot to confirmSpot(spotId) -- exactly one argument (D9)", async () => {
     fetchSpots.mockResolvedValue([seedSpot]);
     const updated: Spot = { ...seedSpot, confirmations: 1, status: "unconfirmed" };
     confirmSpot.mockResolvedValue(updated);
@@ -180,8 +193,27 @@ describe("Home page -- live data wiring", () => {
     await waitFor(() => expect(screen.getByTestId("map-view-spot-ids")).toHaveTextContent("spot-1"));
     await user.click(screen.getByRole("button", { name: "trigger-confirm" }));
 
-    expect(confirmSpot).toHaveBeenCalledWith("spot-1", "confirmer-abc123");
-    expect(markSpotConfirmedLocally).toHaveBeenCalledWith("spot-1");
+    expect(confirmSpot).toHaveBeenCalledWith("spot-1");
+    expect(confirmSpot.mock.calls[0]).toHaveLength(1);
+  });
+
+  it("adds the confirmed id to the in-memory confirmedSpotIds set after a successful confirm (no refetch)", async () => {
+    useAuthMock.mockReturnValue(authValue("signed-in", { id: "u1", email: "a@b.com", nickname: "" }));
+    fetchSpots.mockResolvedValue([seedSpot]);
+    fetchMyConfirmedSpotIds.mockResolvedValue(new Set<string>());
+    const updated: Spot = { ...seedSpot, confirmations: 1, status: "unconfirmed" };
+    confirmSpot.mockResolvedValue(updated);
+
+    const Home = (await import("@/app/page")).default;
+    const user = userEvent.setup();
+    render(<Home />);
+
+    await waitFor(() => expect(fetchMyConfirmedSpotIds).toHaveBeenCalled());
+    await user.click(screen.getByRole("button", { name: "trigger-confirm" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("map-view-confirmed-ids")).toHaveTextContent("spot-1");
+    });
   });
 
   it("wires onReportSpot to reportSpot with the exact reason/details passed through", async () => {
@@ -196,5 +228,60 @@ describe("Home page -- live data wiring", () => {
     await user.click(screen.getByRole("button", { name: "trigger-report" }));
 
     expect(reportSpot).toHaveBeenCalledWith("spot-1", "spam", "bad actor");
+  });
+});
+
+describe("Home page -- auth wiring", () => {
+  it("passes authStatus straight through to MapView", async () => {
+    useAuthMock.mockReturnValue(authValue("loading"));
+    fetchSpots.mockResolvedValue([]);
+
+    const Home = (await import("@/app/page")).default;
+    render(<Home />);
+
+    await waitFor(() => expect(screen.getByTestId("map-view-auth-status")).toHaveTextContent("loading"));
+  });
+
+  it("passes the signed-in user's nickname through to MapView", async () => {
+    useAuthMock.mockReturnValue(
+      authValue("signed-in", { id: "u1", email: "a@b.com", nickname: "Kuya Ben" }),
+    );
+    fetchSpots.mockResolvedValue([]);
+
+    const Home = (await import("@/app/page")).default;
+    render(<Home />);
+
+    await waitFor(() => expect(screen.getByTestId("map-view-nickname")).toHaveTextContent("Kuya Ben"));
+  });
+
+  it("fetches the confirmed set only when signed in", async () => {
+    useAuthMock.mockReturnValue(authValue("signed-out"));
+    fetchSpots.mockResolvedValue([]);
+
+    const Home = (await import("@/app/page")).default;
+    render(<Home />);
+
+    await waitFor(() => expect(screen.getByTestId("map-view")).toBeInTheDocument());
+    expect(fetchMyConfirmedSpotIds).not.toHaveBeenCalled();
+  });
+
+  it("empties the confirmed set on sign-out (does not leave the previous user's confirmed spots on screen)", async () => {
+    fetchSpots.mockResolvedValue([seedSpot]);
+    fetchMyConfirmedSpotIds.mockResolvedValue(new Set(["spot-1"]));
+    useAuthMock.mockReturnValue(authValue("signed-in", { id: "u1", email: "a@b.com", nickname: "" }));
+
+    const Home = (await import("@/app/page")).default;
+    const { rerender } = render(<Home />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("map-view-confirmed-ids")).toHaveTextContent("spot-1"),
+    );
+
+    useAuthMock.mockReturnValue(authValue("signed-out"));
+    rerender(<Home />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("map-view-confirmed-ids")).toHaveTextContent(""),
+    );
   });
 });

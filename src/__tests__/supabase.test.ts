@@ -80,4 +80,32 @@ describe("getSupabaseClient", () => {
     const { getSupabaseClient } = await import("@/lib/supabase");
     expect(() => getSupabaseClient()).toThrow();
   });
+
+  it("creates the client with persistSession/autoRefreshToken on and detectSessionInUrl off (auth migration D1/1.3)", async () => {
+    process.env[URL_KEY] = "https://example.supabase.co";
+    process.env[ANON_KEY] = "test-anon-key";
+
+    vi.doMock("@supabase/supabase-js", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("@supabase/supabase-js")>();
+      return { ...actual, createClient: vi.fn(actual.createClient) };
+    });
+
+    const { createClient } = await import("@supabase/supabase-js");
+    const { getSupabaseClient } = await import("@/lib/supabase");
+    getSupabaseClient();
+
+    expect(createClient).toHaveBeenCalledWith(
+      "https://example.supabase.co",
+      "test-anon-key",
+      expect.objectContaining({
+        auth: expect.objectContaining({
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: false,
+        }),
+      }),
+    );
+
+    vi.doUnmock("@supabase/supabase-js");
+  });
 });
