@@ -1,7 +1,7 @@
 # PRD: Pergamino — a map Zpots draws itself
 
 **Ticket:** None (ad-hoc request, 2026-09-20)
-**Status:** In Progress (waves 1-3 complete and reviewed; blocked on the archive checkpoints)
+**Status:** Complete (live in the app; one label-collision polish item open)
 **Created:** 2026-09-20
 **Last Updated:** 2026-09-20
 **Supersedes (partially):** the raster-tile + CSS-tint decision in `.claude/prds/ciudad-latina-redesign.md`
@@ -849,3 +849,7 @@ the `.pmtiles` archive is not hosted. Until it is, every map mount probes the co
 a 404, and falls back to the tinted raster with the "Mapa simple" chip. That is the designed
 degraded state and it is verified working in the live dev app, with our own Cinzel lettering
 already drawing over the raster ground.
+
+| 2026-09-20 | T3.6 added after live visual check: the tile-pane tint is now scoped to `[data-basemap="raster"]`, set by `BasemapLayer` on the map container. | `protomaps-leaflet` subclasses `L.GridLayer`, so the vector canvas rendered into the same pane and was being pushed through the raster fallback's sepia filter, washing out a palette chosen outright. Not caught by any test; found by looking at the real map. |
+| 2026-09-20 | T4.1 resolved against the T1.6 decision: the 4.2MB archive is committed to `public/basemap/` rather than uploaded to Supabase Storage. | The decision assumed 8-40MB. At 4.2MB the plan's own fallback is the better trade, and the only credential on the machine is the public anon key, which cannot create a bucket or upload. The env var keeps the move reversible. |
+| 2026-09-20 | T5.1 verified: desktop and 375px, both the full map and the card inset report `pergamino` mode with no fallback chip. | Checkpoint. |

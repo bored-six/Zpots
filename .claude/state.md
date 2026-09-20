@@ -2,7 +2,7 @@
 
 **Feature:** Pergamino drawn map
 **PRD:** `.claude/prds/pergamino-map.md`
-**Phase:** waves 1-3 complete; blocked on the archive checkpoints
+**Phase:** complete and running; one polish item open
 **Last updated:** 2026-09-20
 
 ## Decisions made
@@ -61,12 +61,24 @@ and already renders our own Cinzel lettering over it.
 
 ## Blockers
 
-- **T2.3 needs the `pmtiles` CLI**, which is not installed. `brew install pmtiles`, then cut the
-  Zamboanga extract from the Protomaps planet build. This is a system change, left to the user.
-- **T4.1 needs the archive uploaded to Supabase Storage** and `NEXT_PUBLIC_BASEMAP_PMTILES_URL`
-  set, then a range request verified. Until then every map mount probes
-  `/basemap/zamboanga.pmtiles`, gets a 404, and falls back. That is the designed behavior, not a
-  fault, but it does mean nobody has seen the drawn map in the real app yet.
+None. The drawn map is live in the running app.
+
+## Open polish item
+
+- At 375px, four landmark labels around the waterfront (Plaza Pershing, Puerto, Paseo del Mar,
+  Fort Pilar) overlap each other and the pins. The zoom bounds in `zamboanga-places.ts` were
+  tuned for a wider view. Needs either collision avoidance in `PlaceLabelsLayer` or tighter
+  per-place `minZoom` values.
+
+## Hosting deviation from the T1.6 decision
+
+The decision was Supabase Storage, taken when the archive was estimated at 8-40MB. The real cut
+is **4.2MB**, and the machine only carries the public anon key, which cannot create a bucket or
+upload an object. Rather than handle an admin credential, the archive was committed to
+`public/basemap/zamboanga.pmtiles`, which the plan already named as the fallback and which the
+size comfortably allows. `.git` is 8.5MB total. `BASEMAP_PMTILES_URL` still reads
+`NEXT_PUBLIC_BASEMAP_PMTILES_URL` first, so moving to Supabase later is one env var and a
+`git rm`, with no code change.
 
 ## Known nits, for the review round
 
