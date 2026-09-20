@@ -1,40 +1,35 @@
 import type { Metadata } from "next";
-import { Cinzel, Cormorant_Garamond, Geist, Geist_Mono, Work_Sans } from "next/font/google";
+import { Alegreya, Alegreya_Sans, Cinzel } from "next/font/google";
 
 import AuthProvider from "@/components/AuthProvider";
 import "leaflet/dist/leaflet.css";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-// Compass Rose + Spanish-colonial Zamboanga theme fonts (see
-// .claude/learnings.md for why these three and not the earlier
-// Fraunces/Work Sans recommendation in structure.md).
+// "Ciudad Latina" theme fonts (see .claude/learnings.md for why these
+// three, replacing the earlier Compass Rose font set). Alegreya is a
+// Latin-American calligraphic serif by Huerta Tipografica (Argentina) --
+// that lineage is the point of choosing it for Zamboanga's
+// Spanish-colonial "Latin City" identity.
 const cinzel = Cinzel({
   variable: "--font-cinzel",
   subsets: ["latin"],
-  weight: ["500", "600"],
-});
-
-const cormorantGaramond = Cormorant_Garamond({
-  variable: "--font-cormorant",
-  subsets: ["latin"],
   weight: ["600"],
-  style: ["italic"],
+  display: "swap",
 });
 
-const workSans = Work_Sans({
-  variable: "--font-work-sans",
+const alegreya = Alegreya({
+  variable: "--font-alegreya",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["500", "600", "700"],
+  style: ["normal", "italic"],
+  display: "swap",
+});
+
+const alegreyaSans = Alegreya_Sans({
+  variable: "--font-alegreya-sans",
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -46,9 +41,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} ${cormorantGaramond.variable} ${workSans.variable} h-full antialiased`}
+      className={`${cinzel.variable} ${alegreya.variable} ${alegreyaSans.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col bg-cream text-ink font-body">
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

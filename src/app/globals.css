@@ -1,25 +1,39 @@
 @import "tailwindcss";
 
 /**
- * Compass Rose + Spanish-colonial Zamboanga palette. Replaces the earlier
- * Seagrass/Driftwood tokens (see .claude/learnings.md for the swap).
- * navy = board/chrome, parchment = paper/cards, ink = body text on
- * parchment, brass = Confirmed accent, pewter = Unconfirmed accent,
- * cardinal = Report/destructive accent, terracotta = secondary accent
- * (flourishes, the tagline).
+ * "Ciudad Latina" theme -- Fort Pilar coral stone, vinta sail stripes,
+ * azulejo tiles, Chavacano micro-copy. Replaces the earlier navy/parchment
+ * Compass Rose palette (see .claude/learnings.md for the swap history).
+ * cream / cream-deep = page and card surfaces, stone = borders/dividers,
+ * ink = body text, tinta = deepest chrome (modal scrim, footer),
+ * terracotta = primary action, teal = confirmed state/focus/links,
+ * cardinal = report/destructive only, vinta-* = the sail stripe only.
  */
-:root {
-  --zpots-navy: #1b2a4a;
-  --zpots-parchment: #f1e9d2;
-  --zpots-ink: #241d10;
-  --zpots-brass: #c9962c;
-  --zpots-pewter: #8b8f99;
-  --zpots-cardinal: #8a2a1e;
-  --zpots-terracotta: #a8492f;
+@theme {
+  --color-cream: #f6eedc;
+  --color-cream-deep: #ecdfc3;
+  --color-stone: #cdb693;
+  --color-stone-deep: #7a6448;
+  --color-ink: #2a2017;
+  --color-tinta: #1f1813;
+  --color-terracotta: #b5482c;
+  --color-terracotta-deep: #8f3620;
+  --color-teal: #1f6f78;
+  --color-teal-deep: #165259;
+  --color-cardinal: #9b2d20;
+  --color-vinta-red: #c8342b;
+  --color-vinta-yellow: #e8b63a;
+  --color-vinta-blue: #2c62a8;
+  --color-vinta-green: #2e8b57;
+}
 
-  --font-body: var(--font-work-sans), sans-serif;
-  --font-display: var(--font-cinzel), serif;
-  --font-tagline: var(--font-cormorant), serif;
+/* `inline` because these point at the CSS variables next/font injects on
+   <html> in layout.tsx, not literal values -- Tailwind should pass them
+   through rather than try to resolve them at build time. */
+@theme inline {
+  --font-wordmark: var(--font-cinzel), serif;
+  --font-display: var(--font-alegreya), serif;
+  --font-body: var(--font-alegreya-sans), sans-serif;
 }
 
 html,
@@ -29,10 +43,41 @@ body {
   box-sizing: border-box;
 }
 
-body {
+/**
+ * Sail-stripe rule: red / yellow / blue / green in equal quarters, standing
+ * in for a vinta's painted hull. Used only as this 4px divider -- never as
+ * text or fill elsewhere, so it reads as a motif instead of a flag.
+ */
+.vinta-rule {
+  height: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--color-vinta-red) 0 25%,
+    var(--color-vinta-yellow) 25% 50%,
+    var(--color-vinta-blue) 50% 75%,
+    var(--color-vinta-green) 75% 100%
+  );
+}
+
+.leaflet-container {
+  background: var(--color-cream-deep);
   font-family: var(--font-body);
-  background: var(--zpots-navy);
-  color: var(--zpots-ink);
+}
+
+/* Tint lives on the tile pane only -- markers and popups are drawn in
+   other Leaflet panes, so this filter leaves them crisp. */
+.leaflet-tile-pane {
+  filter: sepia(0.38) saturate(0.72) contrast(0.92) brightness(1.04) hue-rotate(-6deg);
+}
+
+.leaflet-control-attribution {
+  background: color-mix(in srgb, var(--color-cream) 85%, transparent);
+  color: var(--color-stone-deep);
+  font-size: 10px;
+}
+
+.leaflet-control-attribution a {
+  color: var(--color-teal);
 }
 
 /* Leaflet draws a white circular background/border/shadow behind every
@@ -40,15 +85,33 @@ body {
    so that default chrome would just show through as a mismatched box. */
 .zpots-pin-icon {
   background: none;
-  border: none;
+  border: 0;
 }
 
-/* Popup shell: parchment card, square corners, real breathing room. */
+.zpots-pin-icon svg {
+  display: block;
+  transform-origin: 50% 94%;
+  transition: transform 120ms ease-out;
+}
+
+.zpots-pin-icon:hover svg,
+.leaflet-marker-icon:focus-visible.zpots-pin-icon svg {
+  transform: scale(1.18);
+}
+
+.zpots-pin-icon--confirmed svg {
+  filter: drop-shadow(0 1px 1px rgb(31 24 19 / 0.35));
+}
+
+/* Popup shell: warm card, soft corners, real breathing room. Task 4 owns
+   the fuller layout pass (VintaRule top edge, status pill, actions row);
+   this just moves the existing rules onto the new tokens so nothing is
+   left pointing at a variable that no longer exists. */
 .leaflet-popup-content-wrapper {
-  border-radius: 2px;
+  border-radius: 6px;
   padding: 0;
-  background: var(--zpots-parchment);
-  box-shadow: 0 2px 10px rgba(27, 42, 74, 0.35);
+  background: var(--color-cream);
+  box-shadow: 0 6px 18px rgb(31 24 19 / 0.22);
 }
 
 .leaflet-popup-content {
@@ -59,22 +122,22 @@ body {
 
 .leaflet-popup-tip {
   border-radius: 0;
-  background: var(--zpots-parchment);
+  background: var(--color-cream);
 }
 
 .zpots-popup-name {
   margin: 0 0 4px;
   font-family: var(--font-display);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.95rem;
-  color: var(--zpots-ink);
+  color: var(--color-ink);
 }
 
 .zpots-popup-note {
   margin: 0 0 10px;
   font-size: 0.85rem;
   line-height: 1.4;
-  color: var(--zpots-ink);
+  color: var(--color-ink);
 }
 
 .zpots-popup-status {
@@ -85,23 +148,23 @@ body {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  background: color-mix(in srgb, var(--zpots-status-color, var(--zpots-pewter)) 14%, white);
-  color: var(--zpots-status-color, var(--zpots-pewter));
+  background: color-mix(in srgb, var(--status-color, var(--color-stone-deep)) 14%, white);
+  color: var(--status-color, var(--color-stone-deep));
 }
 
 .zpots-popup-status[data-status="confirmed"] {
-  --zpots-status-color: var(--zpots-brass);
+  --status-color: var(--color-teal);
 }
 
 .zpots-popup-status[data-status="unconfirmed"] {
-  --zpots-status-color: var(--zpots-pewter);
+  --status-color: var(--color-stone-deep);
 }
 
 .zpots-popup-credit {
   margin: 8px 0 0;
   font-size: 0.7rem;
   font-style: italic;
-  color: var(--zpots-pewter);
+  color: var(--color-stone-deep);
 }
 
 .zpots-popup-actions {
@@ -116,17 +179,5 @@ body {
   margin: 8px 0 0;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--zpots-cardinal);
-}
-
-/**
- * Wrought-iron scroll flourish, reused as a small corner-accent background
- * on the parchment sheet (rather than a second inline SVG overlay -- one
- * asset, two uses, see ornaments.tsx for the same stroke drawn as a
- * standalone divider component).
- */
-.zpots-corner-flourish {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M4 60 C4 40, 4 24, 20 16 C28 12, 36 16, 34 24 C32 30, 24 30, 24 24 C24 18, 32 14, 42 16 C54 18, 60 30, 60 44' fill='none' stroke='%23a8492f' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-size: contain;
+  color: var(--color-cardinal);
 }
