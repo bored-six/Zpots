@@ -47,7 +47,7 @@ beforeEach(() => {
 // feedCerca
 // ---------------------------------------------------------------------------
 describe("feedCerca", () => {
-  it("calls rpc('feed_cerca', { lat, lng, page_size, page_offset }) with default paging on the first page", async () => {
+  it("calls rpc('feed_cerca', { origin_lat, origin_lng, page_size, page_offset }) with default paging on the first page", async () => {
     const rpcMock = vi.fn().mockResolvedValue({ data: [], error: null });
     vi.mocked(getSupabaseClient).mockReturnValue({ rpc: rpcMock } as never);
 
@@ -55,7 +55,7 @@ describe("feedCerca", () => {
 
     expect(rpcMock).toHaveBeenCalledWith(
       "feed_cerca",
-      expect.objectContaining({ lat: 6.91, lng: 122.07, page_size: 10, page_offset: 0 }),
+      expect.objectContaining({ origin_lat: 6.91, origin_lng: 122.07, page_size: 10, page_offset: 0 }),
     );
   });
 

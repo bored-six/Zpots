@@ -28,8 +28,8 @@ export async function feedCerca(
 ): Promise<SpotCard[]> {
   const client = getSupabaseClient();
   const { data, error } = await client.rpc("feed_cerca", {
-    lat,
-    lng,
+    origin_lat: lat,
+    origin_lng: lng,
     page_size: pageSize,
     page_offset: pageOffset,
   });
