@@ -25,12 +25,22 @@ import {
   TILE_URL,
   ZAMBOANGA_CENTER,
 } from "@/lib/map-config";
-import { createPinIcon } from "@/lib/pin-icon";
-import type { Spot } from "@/lib/spots";
+import { createPhotoPinIcon, createPinIcon } from "@/lib/pin-icon";
+import type { MapSource, MapSpot, Spot } from "@/lib/spots";
 import type { NewSpotInput, ReportReason } from "@/lib/validation";
 
 interface SpotMapProps {
-  spots: readonly Spot[];
+  /**
+   * Write-mode spots (tap-to-place, confirm, report). Omitted entirely by
+   * the read-only Mi mapa caller, which passes `mapSpots` instead.
+   */
+  spots?: readonly Spot[];
+  /**
+   * Read-only personal-map spots (Mi mapa, social-spots.md), each tagged
+   * with why it's on the caller's map. Renders alongside `spots` if both
+   * are somehow passed, but in practice a caller picks one or the other.
+   */
+  mapSpots?: readonly MapSpot[];
   /**
    * Spot ids this browser has already confirmed (spec F9) -- feeds
    * `ConfirmButton`'s `confirmedByMe`. Optional so a caller that only cares
@@ -45,10 +55,22 @@ interface SpotMapProps {
   authStatus: AuthStatus;
   /** The signed-in user's account nickname, forwarded to AddSpotForm as defaultNickname. */
   nickname?: string;
-  /** Rejecting keeps the form open with an inline error; resolving closes it and ends placement mode. */
-  onCreateSpot: (input: NewSpotInput) => Promise<void>;
-  onConfirmSpot: (spotId: string) => Promise<void>;
-  onReportSpot: (spotId: string, reason: ReportReason, details?: string) => Promise<void>;
+  /**
+   * Rejecting keeps the form open with an inline error; resolving closes it
+   * and ends placement mode. The add-spot FAB itself only renders when this
+   * is provided -- Mi mapa has no tap-to-place flow, so it simply omits it.
+   */
+  onCreateSpot?: (input: NewSpotInput) => Promise<void>;
+  /** Omit to hide the Confirm control on `mapSpots` popups (Mi mapa doesn't wire this yet). */
+  onConfirmSpot?: (spotId: string) => Promise<void>;
+  /** Omit to hide the Report control on `mapSpots` popups (Mi mapa doesn't wire this yet). */
+  onReportSpot?: (spotId: string, reason: ReportReason, details?: string) => Promise<void>;
+  /** Opens this `mapSpots` entry's popup once its Marker mounts (the `?spot=` deep link). */
+  openSpotId?: string;
+  /** When provided, saved-source `mapSpots` popups get a Quita ghost button that calls this. */
+  onUnsave?: (spotId: string) => void;
+  /** Restricts which `mapSpots` sources render; omitted shows every source passed in. */
+  sourceFilter?: ReadonlySet<MapSource>;
 }
 
 const FAB_CLASS =
@@ -74,6 +96,21 @@ function submitErrorMessage(error: unknown): string {
 }
 
 /**
+ * Mi mapa pin-by-source rule (social-spots.md): `mine` is the spot's own
+ * photo inside the compass frame, `been` is the solid confirmed pin, and
+ * `saved` is the hollow unconfirmed pin -- deliberately independent of the
+ * spot's actual confirmation status, since a saved-but-unconfirmed spot and
+ * an unconfirmed spot you dropped yourself should still look different.
+ */
+function iconForMapSpot(spot: MapSpot) {
+  if (spot.source === "mine") {
+    if (spot.photoUrl) return createPhotoPinIcon(spot.photoUrl, spot.status);
+    return createPinIcon(spot.status);
+  }
+  return createPinIcon(spot.source === "been" ? "confirmed" : "unconfirmed");
+}
+
+/**
  * Renders the map, its markers/popups, and the tap-to-place flow for adding
  * a new spot. Placement is a deliberate two-step gesture (arm via the
  * floating action button, then tap a location) so an ordinary pan/zoom
@@ -81,17 +118,25 @@ function submitErrorMessage(error: unknown): string {
  */
 export default function SpotMap({
   spots,
+  mapSpots,
   confirmedSpotIds = new Set(),
   authStatus,
   nickname,
   onCreateSpot,
   onConfirmSpot,
   onReportSpot,
+  openSpotId,
+  onUnsave,
+  sourceFilter,
 }: SpotMapProps) {
   // Fail-closed default: an absent authStatus (only possible under the
   // frozen SpotMap.test.tsx, which never exercises a gated action) behaves
   // exactly like 'signed-out'. Never default to 'signed-in'.
   const effectiveAuthStatus: AuthStatus = authStatus ?? "signed-out";
+  const effectiveSpots = spots ?? [];
+  const visibleMapSpots = sourceFilter
+    ? (mapSpots ?? []).filter((spot) => sourceFilter.has(spot.source))
+    : (mapSpots ?? []);
 
   const [leafletMap, setLeafletMap] = useState<LeafletMap | null>(null);
   const [isPlacementArmed, setIsPlacementArmed] = useState(false);
@@ -178,6 +223,7 @@ export default function SpotMap({
   }
 
   async function handleAddSpotSubmit(input: NewSpotInput) {
+    if (!onCreateSpot) return;
     setSubmitError(null);
     try {
       await onCreateSpot(input);
@@ -200,6 +246,8 @@ export default function SpotMap({
       return;
     }
 
+    if (!onConfirmSpot) return;
+
     try {
       await onConfirmSpot(spotId);
     } catch {
@@ -213,6 +261,8 @@ export default function SpotMap({
       setGatedAction("report");
       return;
     }
+
+    if (!onReportSpot) return;
 
     try {
       await onReportSpot(spotId, reason, details);
@@ -237,7 +287,7 @@ export default function SpotMap({
         className="h-full w-full"
       >
         <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
-        {spots.map((spot) => (
+        {effectiveSpots.map((spot) => (
           <Marker key={spot.id} position={[spot.lat, spot.lng]} icon={createPinIcon(spot.status)}>
             <Popup>
               <div className="zpots-popup">
@@ -278,9 +328,75 @@ export default function SpotMap({
             </Popup>
           </Marker>
         ))}
+        {visibleMapSpots.map((spot) => (
+          <Marker
+            key={spot.id}
+            position={[spot.lat, spot.lng]}
+            icon={iconForMapSpot(spot)}
+            ref={(marker) => {
+              if (marker && openSpotId && spot.id === openSpotId) {
+                marker.openPopup();
+              }
+            }}
+          >
+            <Popup>
+              <div className="zpots-popup">
+                <VintaRule />
+                <div className="px-4 py-3.5">
+                  <SpotPhoto photoUrl={spot.photoUrl} name={spot.name} />
+                  <p className="zpots-popup-name">{spot.name}</p>
+                  <p className="zpots-popup-note">{spot.note}</p>
+                  <span className="zpots-popup-status" data-status={spot.status}>
+                    {spot.status === "confirmed" ? (
+                      <Bilingual k="statusConfirmed" />
+                    ) : (
+                      <Bilingual k="statusUnconfirmed" />
+                    )}
+                  </span>
+                  <p className="zpots-popup-confirmations">
+                    {spot.confirmations} confirmation{spot.confirmations === 1 ? "" : "s"}
+                  </p>
+                  {spot.nickname && <p className="zpots-popup-credit">by {spot.nickname}</p>}
+                  {(onConfirmSpot || onReportSpot) && (
+                    <div className="zpots-popup-actions">
+                      {onConfirmSpot && (
+                        <ConfirmButton
+                          spot={{ ...spot, confirmedByMe: confirmedSpotIds.has(spot.id) }}
+                          onConfirm={() => handleConfirm(spot.id)}
+                        />
+                      )}
+                      {onReportSpot && (
+                        <ReportButton
+                          spotId={spot.id}
+                          onReport={(reason, details) => handleReport(spot.id, reason, details)}
+                        />
+                      )}
+                    </div>
+                  )}
+                  {onUnsave && spot.source === "saved" && (
+                    <button
+                      type="button"
+                      onClick={() => onUnsave(spot.id)}
+                      aria-label={bilingualLabel("unsave")}
+                      className="mt-2 inline-flex min-h-9 items-center justify-center rounded border border-stone px-3 py-1.5 text-sm font-medium text-ink hover:bg-cream-deep"
+                    >
+                      <Bilingual k="unsave" />
+                    </button>
+                  )}
+                  {!isGateOpen() && (onConfirmSpot || onReportSpot) && (
+                    <p className="mt-1 text-xs text-stone-deep">Sign in to confirm or report.</p>
+                  )}
+                  {reportedSpotIds.has(spot.id) && (
+                    <p className="zpots-popup-report-ack">Reported — thanks</p>
+                  )}
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
       </MapContainer>
 
-      {!tappedLocation && (
+      {!tappedLocation && onCreateSpot && (
         <button
           type="button"
           onClick={handleFabClick}

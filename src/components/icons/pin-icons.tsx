@@ -75,6 +75,46 @@ export function UnconfirmedPin({ size = 22, className, ...props }: PinIconProps)
 }
 
 /**
+ * Frame for a photo pin (Mi mapa "mine" pins, social-spots.md): the same
+ * compass-rose-and-tail silhouette as the other two pins, but drawn
+ * stroke-only (fill="none" throughout, including the compass points'
+ * bases near the center) so nothing here paints over the circular window
+ * at (16,16) -- `createPhotoPinIcon` layers the spot's own photo, clipped
+ * to a circle, directly behind this frame in the divIcon markup, and it
+ * needs that whole window left transparent to actually show through.
+ */
+export function PhotoPinFrame({ size = 22, className, ...props }: PinIconProps) {
+  return (
+    <svg
+      viewBox={VIEW_BOX}
+      width={size}
+      height={size}
+      {...props}
+      className={className}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d={`${COMPASS_POINTS} ${PIN_TAIL}`}
+        fill="none"
+        stroke="#f6eedc"
+        strokeOpacity={0.95}
+        strokeWidth={3.2}
+        strokeLinejoin="round"
+      />
+      <path
+        d={`${COMPASS_POINTS} ${PIN_TAIL}`}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+      <circle cx={16} cy={16} r={8.5} fill="none" stroke="currentColor" strokeWidth={1.6} />
+    </svg>
+  );
+}
+
+/**
  * Confirmed pin: the identical compass rose and tail, filled solid with a
  * cardinal-colored center dot (the brass fill + cardinal accent from the
  * approved mockup) -- distinguishable from the unconfirmed outline by fill
