@@ -19,7 +19,7 @@ import SpotPhoto from "@/components/SpotPhoto";
 import type { AuthStatus } from "@/lib/auth";
 import { isWithinZamboangaCity } from "@/lib/city-bounds";
 import { CITY_OUTLINE_BOUNDS } from "@/lib/city-outline";
-import { bilingualLabel } from "@/lib/copy";
+import { bilingualLabel, COPY } from "@/lib/copy";
 import { hasUsableMapSize } from "@/lib/leaflet-safe-view";
 import {
   DEFAULT_ZOOM,
@@ -168,6 +168,8 @@ const BANNER_TEXT_CLASS = "px-4 py-2";
 const RASTER_CHIP_CLASS =
   "zpots-shadow absolute bottom-4 left-4 z-[1000] w-fit rounded-full border border-stone " +
   "bg-cream px-3 py-1 text-xs font-medium text-ink";
+/** Id of the sr-only span carrying `simpleMapWhy`, referenced by the chip's `aria-describedby`. */
+const RASTER_CHIP_WHY_ID = "raster-chip-why";
 
 const OVERLAY_CLASS =
   "absolute inset-0 z-[1100] flex items-center justify-center bg-tinta/55 p-4";
@@ -512,8 +514,15 @@ export default function SpotMap({
       </MapContainer>
 
       {basemapMode === "raster" && (
-        <div className={RASTER_CHIP_CLASS}>
+        <div
+          className={RASTER_CHIP_CLASS}
+          title={COPY.simpleMapWhy.en}
+          aria-describedby={RASTER_CHIP_WHY_ID}
+        >
           <Bilingual k="simpleMap" />
+          <span id={RASTER_CHIP_WHY_ID} className="sr-only">
+            {COPY.simpleMapWhy.en}
+          </span>
         </div>
       )}
 

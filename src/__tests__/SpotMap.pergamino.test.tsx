@@ -115,6 +115,24 @@ describe("SpotMap x Pergamino wiring", () => {
     expect(chavacano).toHaveAttribute("aria-hidden", "true");
   });
 
+  it("gives the raster chip a title and an accessible description explaining why it's showing", () => {
+    render(<SpotMap spots={[]} authStatus="signed-out" />);
+
+    act(() => {
+      modeChangeRef.current?.("raster");
+    });
+
+    const chip = screen.getByText(COPY.simpleMap.en).closest("div");
+    expect(chip).not.toBeNull();
+    expect(chip).toHaveAttribute("title", COPY.simpleMapWhy.en);
+
+    const describedById = chip?.getAttribute("aria-describedby");
+    expect(describedById).toBeTruthy();
+    const description = document.getElementById(describedById as string);
+    expect(description).not.toBeNull();
+    expect(description).toHaveTextContent(COPY.simpleMapWhy.en);
+  });
+
   it('renders no chip anywhere in the tree when basemapMode is "pergamino"', () => {
     render(<SpotMap spots={[]} authStatus="signed-out" />);
 

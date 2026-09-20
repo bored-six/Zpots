@@ -6,6 +6,7 @@ import {
   PERGAMINO_WEIGHTS,
   roadClass,
 } from "@/lib/pergamino-style";
+import { PERGAMINO_TOKEN_NAMES } from "@/lib/pergamino-palette";
 
 describe("roadClass -- OSM/Protomaps kind + kind_detail -> RoadClass mapping (test 7)", () => {
   it("kind: highway -> major, regardless of kind_detail", () => {
@@ -218,6 +219,21 @@ describe("PERGAMINO_LAYERS -- unique ids, correct draw order (test 12)", () => {
     expect(roadMinor?.match?.({ kind: "highway" })).toBe(false);
     expect(roadMajor?.match?.({ kind: "highway" })).toBe(true);
     expect(roadMajor?.match?.({ kind: "pedestrian" })).toBe(false);
+  });
+});
+
+describe("PERGAMINO_LAYERS -- every referenced token is a real palette token (test 4)", () => {
+  it("every fillToken/strokeToken referenced by PERGAMINO_LAYERS is a member of PERGAMINO_TOKEN_NAMES", () => {
+    const tokenNames = new Set<string>(PERGAMINO_TOKEN_NAMES);
+
+    for (const layer of PERGAMINO_LAYERS) {
+      if (layer.fillToken !== undefined) {
+        expect(tokenNames.has(layer.fillToken)).toBe(true);
+      }
+      if (layer.strokeToken !== undefined) {
+        expect(tokenNames.has(layer.strokeToken)).toBe(true);
+      }
+    }
   });
 });
 

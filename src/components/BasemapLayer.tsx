@@ -128,42 +128,60 @@ export default function BasemapLayer({ map, onModeChange }: BasemapLayerProps) {
 
     ensureGlobalLeaflet();
 
+    // Lands the component in the same state a failed probe already
+    // produces: the tinted raster TileLayer, with onModeChange("raster")
+    // fired exactly once. Shared by the failed-probe branch and the
+    // catch below so a rejected `import("protomaps-leaflet")` -- a CDN
+    // blip, an ad blocker, a stale chunk after a redeploy -- never leaves
+    // the user looking at a blank map instead of the old one.
+    function fallBackToRaster() {
+      if (cancelled) return;
+      setMode("raster");
+      onModeChange?.("raster");
+    }
+
     async function attach() {
-      const [probeResult, protomaps] = await Promise.all([
-        probeBasemapArchive(BASEMAP_PMTILES_URL),
-        import("protomaps-leaflet"),
-      ]);
+      try {
+        const [probeResult, protomaps] = await Promise.all([
+          probeBasemapArchive(BASEMAP_PMTILES_URL),
+          import("protomaps-leaflet"),
+        ]);
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      if (probeResult === "unavailable") {
-        setMode("raster");
-        onModeChange?.("raster");
-        return;
+        if (probeResult === "unavailable") {
+          fallBackToRaster();
+          return;
+        }
+
+        const palette = readPergaminoPalette();
+        const paintRules = buildPaintRules(protomaps, palette);
+
+        // The dynamically-imported module's own return type structurally
+        // matches Leaflet's Layer (it extends L.GridLayer internally), but
+        // crossing a lazily-imported third-party boundary is exactly the
+        // place an explicit cast belongs rather than fighting inference.
+        const layer = protomaps.leafletLayer({
+          url: BASEMAP_PMTILES_URL,
+          paintRules,
+          labelRules: [],
+          maxDataZoom: BASEMAP_MAX_DATA_ZOOM,
+          attribution: BASEMAP_ATTRIBUTION,
+          backgroundColor: palette["--color-pergamino-sea"],
+        }) as unknown as LeafletLayerInstance;
+
+        if (cancelled) return;
+
+        layer.addTo(currentMap);
+        attachedLayer = layer;
+        setMode("pergamino");
+        onModeChange?.("pergamino");
+      } catch {
+        // probeBasemapArchive never throws (it resolves "unavailable"
+        // instead), so a rejection here can only be the dynamic import --
+        // or, defensively, anything else unexpected during attach.
+        fallBackToRaster();
       }
-
-      const palette = readPergaminoPalette();
-      const paintRules = buildPaintRules(protomaps, palette);
-
-      // The dynamically-imported module's own return type structurally
-      // matches Leaflet's Layer (it extends L.GridLayer internally), but
-      // crossing a lazily-imported third-party boundary is exactly the
-      // place an explicit cast belongs rather than fighting inference.
-      const layer = protomaps.leafletLayer({
-        url: BASEMAP_PMTILES_URL,
-        paintRules,
-        labelRules: [],
-        maxDataZoom: BASEMAP_MAX_DATA_ZOOM,
-        attribution: BASEMAP_ATTRIBUTION,
-        backgroundColor: palette["--color-pergamino-sea"],
-      }) as unknown as LeafletLayerInstance;
-
-      if (cancelled) return;
-
-      layer.addTo(currentMap);
-      attachedLayer = layer;
-      setMode("pergamino");
-      onModeChange?.("pergamino");
     }
 
     attach();
