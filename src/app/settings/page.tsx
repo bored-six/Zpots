@@ -6,31 +6,36 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/AuthProvider";
 import ClipboardShell from "@/components/ClipboardShell";
-import { Flourish } from "@/components/icons/ornaments";
+import { AzulejoBand } from "@/components/icons/ornaments";
 import { updateNickname, type AuthUser } from "@/lib/auth";
 import { fetchMyConfirmedSpotIds } from "@/lib/spots-repo";
 import { MAX_NICKNAME_LENGTH } from "@/lib/validation";
 
 const FIELD_LABEL_CLASS =
-  "text-xs font-semibold uppercase tracking-[0.12em] text-[var(--zpots-pewter)]";
+  "text-xs font-bold uppercase tracking-[0.12em] text-stone-deep";
 const INPUT_CLASS =
-  "w-full rounded-sm border border-[var(--zpots-navy)]/20 bg-white px-3 py-2 text-sm text-[var(--zpots-ink)] " +
-  "focus:border-[var(--zpots-brass)] focus:outline-none focus:ring-2 focus:ring-[var(--zpots-brass)]/30";
+  "w-full min-h-11 rounded border border-stone bg-cream px-3 py-2 text-sm text-ink " +
+  "focus:outline-none";
 const SECTION_HEADING_CLASS =
-  "text-sm font-semibold uppercase tracking-[0.12em] text-[var(--zpots-navy)]";
+  "text-xs font-bold uppercase tracking-[0.12em] text-stone-deep";
 const SIGN_OUT_BUTTON_CLASS =
-  "inline-flex items-center gap-2 rounded-sm border border-[var(--zpots-cardinal)] px-4 py-2 text-sm " +
-  "font-semibold text-[var(--zpots-cardinal)] transition hover:bg-[var(--zpots-cardinal)] hover:text-white";
+  "inline-flex min-h-10 items-center gap-2 rounded border border-cardinal px-4 py-2 text-sm " +
+  "font-bold text-cardinal transition hover:bg-cardinal hover:text-cream";
+// A 1px AzulejoBand at 40% opacity stands in for the plain hairline
+// dividers between settings sections (spec Task 4, "Settings page").
+function SectionDivider() {
+  return <AzulejoBand height={1} className="block w-full opacity-40" />;
+}
 
 function Attribution() {
   return (
-    <p className="text-sm text-[var(--zpots-ink)]/70">
+    <p className="text-sm text-ink/70">
       Map tiles &copy;{" "}
       <a
         href="https://www.openstreetmap.org/copyright"
         target="_blank"
         rel="noreferrer"
-        className="underline hover:text-[var(--zpots-navy)]"
+        className="underline hover:text-ink"
       >
         OpenStreetMap
       </a>{" "}
@@ -43,7 +48,7 @@ function BackHomeLink() {
   return (
     <Link
       href="/"
-      className="mt-2 inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-[var(--zpots-navy)] underline underline-offset-2 hover:text-[var(--zpots-terracotta)]"
+      className="mt-2 inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-ink underline underline-offset-2 hover:text-terracotta"
     >
       &larr; Back home
     </Link>
@@ -54,12 +59,12 @@ function LoadingView() {
   return (
     <div className="flex flex-col gap-2">
       <h1
-        className="text-xl font-semibold text-[var(--zpots-navy)]"
+        className="text-xl font-semibold text-ink"
         style={{ fontFamily: "var(--font-display)" }}
       >
         Settings
       </h1>
-      <p className="text-sm text-[var(--zpots-ink)]/70">Loading your account…</p>
+      <p className="text-sm text-ink/70">Loading your account…</p>
     </div>
   );
 }
@@ -69,23 +74,23 @@ function SignedOutView() {
     <div className="flex flex-col gap-8">
       <div>
         <h1
-          className="text-xl font-semibold text-[var(--zpots-navy)]"
+          className="text-xl font-semibold text-ink"
           style={{ fontFamily: "var(--font-display)" }}
         >
           Settings
         </h1>
-        <p className="mt-1 text-sm text-[var(--zpots-ink)]/70">
+        <p className="mt-1 text-sm text-ink/70">
           Sign in to set a nickname and see the spots you&rsquo;ve confirmed.
         </p>
         <Link
           href="/login?next=/settings"
-          className="mt-3 inline-flex w-fit items-center gap-1.5 rounded-sm bg-[var(--zpots-brass)] px-4 py-2 text-sm font-semibold text-white hover:brightness-90"
+          className="mt-3 inline-flex w-fit items-center gap-1.5 rounded bg-terracotta px-4 py-2 text-sm font-bold text-cream hover:bg-terracotta-deep"
         >
           Sign in
         </Link>
       </div>
 
-      <Flourish />
+      <SectionDivider />
 
       <div className="flex flex-col gap-2">
         <Attribution />
@@ -151,20 +156,20 @@ function SignedInView({ user, signOut }: { user: AuthUser; signOut: () => Promis
     <div className="flex flex-col gap-8">
       <div>
         <h1
-          className="text-xl font-semibold text-[var(--zpots-navy)]"
+          className="text-xl font-semibold text-ink"
           style={{ fontFamily: "var(--font-display)" }}
         >
           Settings
         </h1>
       </div>
 
-      <Flourish />
+      <SectionDivider />
 
       <section className="flex flex-col gap-2">
         <h2 className={SECTION_HEADING_CLASS}>Account</h2>
-        <p className="text-sm text-[var(--zpots-ink)]/70">{user.email}</p>
+        <p className="text-sm text-ink/70">{user.email}</p>
         {signOutError && (
-          <p className="text-xs text-[var(--zpots-cardinal)]">{signOutError}</p>
+          <p className="text-xs text-cardinal">{signOutError}</p>
         )}
         <button
           type="button"
@@ -175,11 +180,11 @@ function SignedInView({ user, signOut }: { user: AuthUser; signOut: () => Promis
         </button>
       </section>
 
-      <Flourish />
+      <SectionDivider />
 
       <section className="flex flex-col gap-2">
         <h2 className={SECTION_HEADING_CLASS}>Nickname</h2>
-        <p className="text-sm text-[var(--zpots-ink)]/70">
+        <p className="text-sm text-ink/70">
           Optional and purely cosmetic -- never a verified identity, just a
           byline other people can see on spots you&rsquo;ve added.
         </p>
@@ -200,30 +205,30 @@ function SignedInView({ user, signOut }: { user: AuthUser; signOut: () => Promis
           placeholder="e.g. Kuya Ben"
         />
         {nicknameStatus === "saving" && (
-          <p className="text-xs text-[var(--zpots-pewter)]">Saving…</p>
+          <p className="text-xs text-stone-deep">Saving…</p>
         )}
         {nicknameStatus === "saved" && (
-          <p className="text-xs text-[var(--zpots-pewter)]">Saved.</p>
+          <p className="text-xs text-stone-deep">Saved.</p>
         )}
         {nicknameStatus === "error" && (
-          <p className="text-xs text-[var(--zpots-cardinal)]">
+          <p className="text-xs text-cardinal">
             Couldn&rsquo;t save your nickname. Try again.
           </p>
         )}
       </section>
 
-      <Flourish />
+      <SectionDivider />
 
       <section className="flex flex-col gap-2">
         <h2 className={SECTION_HEADING_CLASS}>Your confirmations</h2>
-        <p className="text-sm text-[var(--zpots-ink)]/70">
+        <p className="text-sm text-ink/70">
           You&rsquo;ve confirmed{" "}
-          <span className="font-semibold text-[var(--zpots-navy)]">{confirmedCount}</span>{" "}
+          <span className="font-semibold text-ink">{confirmedCount}</span>{" "}
           {confirmedCount === 1 ? "spot" : "spots"}.
         </p>
       </section>
 
-      <Flourish />
+      <SectionDivider />
 
       <div className="flex flex-col gap-2">
         <Attribution />

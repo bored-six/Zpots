@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 
+import Bilingual from "@/components/Bilingual";
 import type { AuthStatus } from "@/lib/auth";
 import type { Spot } from "@/lib/spots";
 import type { NewSpotInput, ReportReason } from "@/lib/validation";
@@ -12,8 +13,8 @@ import type { NewSpotInput, ReportReason } from "@/lib/validation";
 const SpotMap = dynamic(() => import("@/components/SpotMap"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full w-full items-center justify-center text-sm text-[var(--zpots-pewter)]">
-      Loading map…
+    <div className="flex h-full w-full items-center justify-center text-sm text-stone-deep">
+      <Bilingual k="loading" />
     </div>
   ),
 });

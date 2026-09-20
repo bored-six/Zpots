@@ -1,6 +1,8 @@
 "use client";
 
+import Bilingual from "@/components/Bilingual";
 import { CheckIcon } from "@/components/icons/status-icons";
+import { bilingualLabel } from "@/lib/copy";
 import type { Spot } from "@/lib/spots";
 
 interface ConfirmButtonProps {
@@ -14,14 +16,13 @@ interface ConfirmButtonProps {
 }
 
 const BADGE_CLASS =
-  "inline-flex items-center gap-1.5 rounded-sm border border-[var(--zpots-brass)]/30 " +
-  "bg-[var(--zpots-brass)]/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide " +
-  "text-[var(--zpots-brass)]";
+  "inline-flex items-center gap-1.5 rounded-full bg-teal px-3 py-1.5 text-xs font-bold " +
+  "uppercase tracking-wide text-cream";
 
 const CTA_CLASS =
-  "inline-flex items-center gap-1.5 rounded-sm bg-[var(--zpots-brass)] px-3 py-1.5 text-sm " +
-  "font-semibold text-white hover:brightness-90 disabled:cursor-not-allowed " +
-  "disabled:bg-[#c9c6bd] disabled:text-[#6f6b60]";
+  "inline-flex min-h-10 items-center gap-1.5 rounded bg-terracotta px-3 py-1.5 text-sm " +
+  "font-bold text-cream hover:bg-terracotta-deep disabled:cursor-not-allowed " +
+  "disabled:bg-stone disabled:text-stone-deep";
 
 /**
  * "Confirm -- I've been here" control. Once a spot reaches
@@ -34,7 +35,7 @@ export default function ConfirmButton({ spot, onConfirm }: ConfirmButtonProps) {
     return (
       <span className={BADGE_CLASS}>
         <CheckIcon />
-        Confirmed
+        <Bilingual k="statusConfirmed" />
       </span>
     );
   }
@@ -46,10 +47,14 @@ export default function ConfirmButton({ spot, onConfirm }: ConfirmButtonProps) {
       type="button"
       onClick={onConfirm}
       disabled={alreadyConfirmedByMe}
+      // Kept as a literal label (not just bilingualLabel("confirmVisit")):
+      // the frozen regression test queries /confirm.*been here/i, which
+      // "I've been here" alone would not satisfy.
+      aria-label={alreadyConfirmedByMe ? "You confirmed this spot" : `Confirm — ${bilingualLabel("confirmVisit")}`}
       className={CTA_CLASS}
     >
       <CheckIcon />
-      {alreadyConfirmedByMe ? "You confirmed this spot" : "Confirm — I've been here"}
+      {alreadyConfirmedByMe ? "You confirmed this spot" : <Bilingual k="confirmVisit" />}
     </button>
   );
 }

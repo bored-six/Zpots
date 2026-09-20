@@ -10,24 +10,23 @@ import { AlertIcon } from "@/components/icons/status-icons";
 import { authErrorMessage, signIn, signInWithGoogle, signUp } from "@/lib/auth";
 import { validateCredentials, type CredentialsMode } from "@/lib/validation";
 
-const FIELD_LABEL_CLASS = "text-sm font-medium text-[#3a3730]";
+const FIELD_LABEL_CLASS = "text-xs font-bold uppercase tracking-[0.12em] text-stone-deep";
 const TEXT_INPUT_CLASS =
-  "w-full rounded-sm border border-[#d8d4cb] bg-white px-3 py-2 text-sm text-[#1f2420] " +
-  "placeholder:text-[#a9a498] focus:border-[var(--zpots-brass)] focus:outline-none focus:ring-2 " +
-  "focus:ring-[var(--zpots-brass)]/25 disabled:cursor-not-allowed disabled:bg-[#f1efe9]";
+  "w-full min-h-11 rounded border border-stone bg-cream px-3 py-2 text-sm text-ink " +
+  "placeholder:text-stone-deep focus:outline-none disabled:cursor-not-allowed disabled:bg-cream-deep";
 const SUBMIT_BUTTON_CLASS =
-  "rounded-sm bg-[var(--zpots-brass)] px-4 py-2 text-sm font-semibold text-white hover:brightness-90 " +
-  "disabled:cursor-not-allowed disabled:bg-[#c9c6bd] disabled:text-[#6f6b60]";
+  "inline-flex min-h-10 items-center rounded bg-terracotta px-4 py-2 text-sm font-bold text-cream " +
+  "hover:bg-terracotta-deep disabled:cursor-not-allowed disabled:bg-stone disabled:text-stone-deep";
 const GOOGLE_BUTTON_CLASS =
-  "flex w-full items-center justify-center gap-2 rounded-sm border border-[#d8d4cb] bg-white px-4 py-2 " +
-  "text-sm font-semibold text-[#1f2420] hover:border-[var(--zpots-brass)] hover:bg-[#faf8f3] " +
-  "disabled:cursor-not-allowed disabled:bg-[#f1efe9] disabled:text-[#a9a498]";
+  "flex w-full min-h-10 items-center justify-center gap-2 rounded border border-stone bg-cream px-4 py-2 " +
+  "text-sm font-bold text-ink hover:bg-cream-deep " +
+  "disabled:cursor-not-allowed disabled:bg-cream-deep disabled:text-stone-deep";
 const RATE_LIMIT_COOLDOWN_MS = 30_000;
 
 function ErrorBanner({ message }: { message: string }) {
   const [firstLine, ...rest] = message.split("\n");
   return (
-    <div className="flex items-start gap-1.5 text-sm font-medium text-[#9a3324]">
+    <div className="flex items-start gap-1.5 text-sm font-medium text-cardinal">
       <AlertIcon className="mt-0.5 shrink-0" />
       <div>
         <p>{firstLine}</p>
@@ -194,7 +193,7 @@ function LoginForm() {
   if (authStatus === "signed-in") {
     return (
       <ClipboardShell>
-        <p className="text-sm text-[var(--zpots-ink)]/70">Taking you back…</p>
+        <p className="text-sm text-ink/70">Taking you back…</p>
       </ClipboardShell>
     );
   }
@@ -204,7 +203,7 @@ function LoginForm() {
       <div className="flex flex-col gap-6">
         <div>
           <h1
-            className="text-xl font-semibold text-[var(--zpots-navy)]"
+            className="text-xl font-semibold text-ink"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {mode === "signup" ? "Create an account" : "Sign in"}
@@ -213,7 +212,7 @@ function LoginForm() {
 
         {needsEmailConfirmation ? (
           <div className="flex flex-col gap-3">
-            <p className="text-sm text-[var(--zpots-ink)]/70">
+            <p className="text-sm text-ink/70">
               Check your inbox — we sent a confirmation link to <strong>{email}</strong>. Come
               back and sign in once you&rsquo;ve confirmed.
             </p>
@@ -223,7 +222,7 @@ function LoginForm() {
                 setNeedsEmailConfirmation(false);
                 setMode("signin");
               }}
-              className="w-fit text-sm font-semibold text-[var(--zpots-navy)] underline underline-offset-2"
+              className="w-fit text-sm font-semibold text-ink underline underline-offset-2"
             >
               Back to sign in
             </button>
@@ -237,7 +236,7 @@ function LoginForm() {
                   <button
                     type="button"
                     onClick={toggleMode}
-                    className="w-fit text-sm font-semibold text-[var(--zpots-navy)] underline underline-offset-2"
+                    className="w-fit text-sm font-semibold text-ink underline underline-offset-2"
                   >
                     Sign in instead
                   </button>
@@ -256,9 +255,9 @@ function LoginForm() {
             </button>
 
             <div className="flex items-center gap-3" role="separator" aria-hidden="true">
-              <div className="h-px flex-1 bg-[#d8d4cb]" />
-              <span className="text-xs font-medium uppercase tracking-wide text-[#8a8579]">or</span>
-              <div className="h-px flex-1 bg-[#d8d4cb]" />
+              <div className="h-px flex-1 bg-stone" />
+              <span className="text-xs font-medium uppercase tracking-wide text-stone-deep">o / or</span>
+              <div className="h-px flex-1 bg-stone" />
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -279,7 +278,7 @@ function LoginForm() {
                 className={TEXT_INPUT_CLASS}
               />
               {fieldErrors.email && (
-                <p className="text-sm font-medium text-[#9a3324]">{fieldErrors.email}</p>
+                <p className="text-sm font-medium text-cardinal">{fieldErrors.email}</p>
               )}
             </div>
 
@@ -300,10 +299,10 @@ function LoginForm() {
                 className={TEXT_INPUT_CLASS}
               />
               {fieldErrors.password && (
-                <p className="text-sm font-medium text-[#9a3324]">{fieldErrors.password}</p>
+                <p className="text-sm font-medium text-cardinal">{fieldErrors.password}</p>
               )}
               {mode === "signup" && (
-                <p className="text-xs text-[#8a8579]">
+                <p className="text-xs text-stone-deep">
                   Pick something you&rsquo;ll remember — password reset isn&rsquo;t available yet.
                 </p>
               )}
@@ -313,7 +312,7 @@ function LoginForm() {
               <button
                 type="button"
                 onClick={toggleMode}
-                className="text-sm font-medium text-[var(--zpots-navy)] underline underline-offset-2"
+                className="text-sm font-medium text-ink underline underline-offset-2"
               >
                 {mode === "signup" ? "Already have an account? Sign in" : "New here? Create an account"}
               </button>

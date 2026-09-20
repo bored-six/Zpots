@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useId, useRef } from "react";
 
+import Bilingual from "@/components/Bilingual";
 import { SignInIcon } from "@/components/icons/action-icons";
 
 export type GatedAction = "add" | "confirm" | "report";
@@ -13,12 +14,12 @@ interface SignInPromptProps {
 }
 
 // Mirrors SpotMap's OVERLAY_CLASS/CARD_CLASS (same z-index, same dimmed
-// backdrop + parchment card language as the add-spot form) so this prompt
-// reads as one system with it, per auth-migration.md section 3.3.
+// backdrop + warm card language as the add-spot form) so this prompt reads
+// as one system with it, per auth-migration.md section 3.3.
 const OVERLAY_CLASS =
-  "absolute inset-0 z-[1100] flex items-center justify-center bg-[#1f2420]/40 p-4";
+  "absolute inset-0 z-[1100] flex items-center justify-center bg-tinta/55 p-4";
 const CARD_CLASS =
-  "flex max-h-full w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-sm bg-white p-5 shadow-xl";
+  "zpots-shadow flex max-h-full w-full max-w-sm flex-col gap-4 overflow-y-auto rounded border border-stone bg-cream p-5";
 
 const COPY: Record<GatedAction, { heading: string; body: string }> = {
   add: {
@@ -66,38 +67,42 @@ export default function SignInPrompt({ action, onDismiss }: SignInPromptProps) {
         className={CARD_CLASS}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center gap-2 text-[var(--zpots-navy)]">
+        <p className="text-xs font-bold uppercase tracking-[0.12em] text-stone-deep">
+          <Bilingual k="signInFirst" />
+        </p>
+
+        <div className="flex items-center gap-2 text-ink">
           <SignInIcon />
           <h2
             id={headingId}
             ref={headingRef}
             tabIndex={-1}
-            className="text-lg font-semibold text-[var(--zpots-navy)] focus:outline-none"
+            className="text-lg font-bold text-ink focus:outline-none"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {copy.heading}
           </h2>
         </div>
 
-        <p className="text-sm text-[#3a3730]">{copy.body}</p>
+        <p className="text-sm text-ink">{copy.body}</p>
 
         <div className="mt-1 flex flex-col gap-2">
           <Link
             href="/login?next=/"
-            className="inline-flex items-center justify-center rounded-sm bg-[var(--zpots-brass)] px-4 py-2 text-sm font-semibold text-white hover:brightness-90"
+            className="inline-flex min-h-10 items-center justify-center rounded bg-terracotta px-4 py-2 text-sm font-bold text-cream hover:bg-terracotta-deep"
           >
             Sign in
           </Link>
           <Link
             href="/login?mode=signup&next=/"
-            className="inline-flex items-center justify-center rounded-sm border border-[var(--zpots-navy)]/20 px-4 py-2 text-sm font-semibold text-[var(--zpots-navy)] hover:bg-[var(--zpots-navy)]/5"
+            className="inline-flex min-h-10 items-center justify-center rounded border border-stone px-4 py-2 text-sm font-bold text-ink hover:bg-cream-deep"
           >
             Create an account
           </Link>
           <button
             type="button"
             onClick={onDismiss}
-            className="mt-1 text-sm font-medium text-[#8a8579] hover:text-[#3a3730]"
+            className="mt-1 text-sm font-medium text-stone-deep hover:text-ink"
           >
             Not now
           </button>

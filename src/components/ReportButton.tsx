@@ -2,7 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 
+import Bilingual from "@/components/Bilingual";
 import { FlagIcon } from "@/components/icons/status-icons";
+import { bilingualLabel } from "@/lib/copy";
 import {
   MAX_REPORT_DETAILS_LENGTH,
   REPORT_REASONS,
@@ -20,10 +22,11 @@ const REASON_LABELS: Record<ReportReason, string> = {
   closed: "Closed",
 };
 
-const FIELD_LABEL_CLASS = "text-xs font-medium text-[#6f6b60]";
+const FIELD_LABEL_CLASS =
+  "text-xs font-bold uppercase tracking-[0.12em] text-stone-deep";
 const CONTROL_CLASS =
-  "w-full rounded-sm border border-[#d8d4cb] bg-white px-2.5 py-1.5 text-sm text-[#1f2420] " +
-  "focus:border-[var(--zpots-pewter)] focus:outline-none focus:ring-2 focus:ring-[var(--zpots-pewter)]/25";
+  "w-full min-h-11 rounded border border-stone bg-cream px-2.5 py-1.5 text-sm text-ink " +
+  "focus:outline-none";
 
 /**
  * Quiet "Report" trigger that opens into a small reason + optional
@@ -53,10 +56,11 @@ export default function ReportButton({ spotId, onReport }: ReportButtonProps) {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-xs font-medium text-[var(--zpots-pewter)] hover:bg-[#f1efe9]"
+        aria-label={bilingualLabel("report")}
+        className="inline-flex min-h-10 items-center gap-1.5 rounded border border-cardinal px-2.5 py-1.5 text-xs font-bold uppercase tracking-wide text-cardinal hover:bg-cream-deep"
       >
         <FlagIcon size={14} />
-        Report
+        <Bilingual k="report" />
       </button>
     );
   }
@@ -64,7 +68,7 @@ export default function ReportButton({ spotId, onReport }: ReportButtonProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex w-full max-w-xs flex-col gap-3 rounded-sm border border-[#e4e1d8] bg-white p-3"
+      className="flex w-full max-w-xs flex-col gap-3 rounded border border-stone bg-cream p-3"
     >
       <div className="flex flex-col gap-1">
         <label htmlFor={`report-reason-${spotId}`} className={FIELD_LABEL_CLASS}>
@@ -102,13 +106,14 @@ export default function ReportButton({ spotId, onReport }: ReportButtonProps) {
         <button
           type="button"
           onClick={close}
-          className="rounded-sm px-3 py-1.5 text-xs font-medium text-[#6f6b60] hover:bg-[#f1efe9]"
+          aria-label={bilingualLabel("cancel")}
+          className="rounded border border-stone px-3 py-1.5 text-xs font-bold text-ink hover:bg-cream-deep"
         >
-          Cancel
+          <Bilingual k="cancel" />
         </button>
         <button
           type="submit"
-          className="rounded-sm bg-[var(--zpots-pewter)] px-3 py-1.5 text-xs font-semibold text-white hover:brightness-90"
+          className="rounded bg-terracotta px-3 py-1.5 text-xs font-bold text-cream hover:bg-terracotta-deep"
         >
           Submit report
         </button>

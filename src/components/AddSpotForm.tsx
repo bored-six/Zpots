@@ -2,7 +2,9 @@
 
 import { useState, type ChangeEvent, type FormEvent } from "react";
 
+import Bilingual from "@/components/Bilingual";
 import { AlertIcon } from "@/components/icons/status-icons";
+import { bilingualLabel } from "@/lib/copy";
 import {
   MAX_NAME_LENGTH,
   MAX_NICKNAME_LENGTH,
@@ -21,16 +23,16 @@ interface AddSpotFormProps {
   defaultNickname?: string;
 }
 
-const FIELD_LABEL_CLASS = "text-sm font-medium text-[#3a3730]";
-const FIELD_HELP_CLASS = "text-xs text-[#8a8579]";
+const FIELD_LABEL_CLASS =
+  "text-xs font-bold uppercase tracking-[0.12em] text-stone-deep";
+const FIELD_HELP_CLASS = "text-xs text-stone-deep";
 const TEXT_INPUT_CLASS =
-  "w-full rounded-sm border border-[#d8d4cb] bg-white px-3 py-2 text-sm text-[#1f2420] " +
-  "placeholder:text-[#a9a498] focus:border-[var(--zpots-brass)] focus:outline-none focus:ring-2 " +
-  "focus:ring-[var(--zpots-brass)]/25";
+  "w-full min-h-11 rounded border border-stone bg-cream px-3 py-2 text-sm text-ink " +
+  "placeholder:text-stone-deep focus:outline-none";
 
 function ErrorText({ message }: { message: string }) {
   return (
-    <p className="flex items-center gap-1.5 text-sm font-medium text-[#9a3324]">
+    <p className="flex items-center gap-1.5 text-[0.8125rem] font-medium text-cardinal">
       <AlertIcon className="shrink-0" />
       <span>{message}</span>
     </p>
@@ -91,6 +93,13 @@ export default function AddSpotForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-4">
+      <h2
+        className="text-xl font-bold text-ink"
+        style={{ fontFamily: "var(--font-display)" }}
+      >
+        <Bilingual k="addSpot" />
+      </h2>
+
       <div className="flex flex-col gap-1.5">
         <label htmlFor="spot-name" className={FIELD_LABEL_CLASS}>
           Name
@@ -143,13 +152,15 @@ export default function AddSpotForm({
         <label htmlFor="spot-photo" className={FIELD_LABEL_CLASS}>
           Photo
         </label>
-        <input
-          id="spot-photo"
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
-          onChange={handlePhotoChange}
-          className="block w-full text-sm text-[#3a3730] file:mr-3 file:rounded-sm file:border-0 file:bg-[var(--zpots-brass)] file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:brightness-90"
-        />
+        <div className="rounded border border-dashed border-stone bg-cream p-3 hover:bg-cream-deep">
+          <input
+            id="spot-photo"
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            onChange={handlePhotoChange}
+            className="block w-full text-sm text-ink file:mr-3 file:rounded file:border-0 file:bg-terracotta file:px-3 file:py-2 file:text-sm file:font-bold file:text-cream hover:file:bg-terracotta-deep"
+          />
+        </div>
         <p className={FIELD_HELP_CLASS}>JPEG, PNG, WEBP, or GIF, under 5MB.</p>
         {errors.photoFile && <ErrorText message={errors.photoFile} />}
       </div>
@@ -158,13 +169,14 @@ export default function AddSpotForm({
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-sm px-4 py-2 text-sm font-medium text-[#3a3730] hover:bg-[#f1efe9]"
+          aria-label={bilingualLabel("cancel")}
+          className="inline-flex min-h-10 items-center rounded border border-stone px-4 py-2 text-sm font-bold text-ink hover:bg-cream-deep"
         >
-          Cancel
+          <Bilingual k="cancel" />
         </button>
         <button
           type="submit"
-          className="rounded-sm bg-[var(--zpots-brass)] px-4 py-2 text-sm font-semibold text-white hover:brightness-90"
+          className="inline-flex min-h-10 items-center rounded bg-terracotta px-4 py-2 text-sm font-bold text-cream hover:bg-terracotta-deep"
         >
           Add pin
         </button>

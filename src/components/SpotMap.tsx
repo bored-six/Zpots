@@ -5,13 +5,16 @@ import { useEffect, useState } from "react";
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 
 import AddSpotForm from "@/components/AddSpotForm";
+import Bilingual from "@/components/Bilingual";
 import ConfirmButton from "@/components/ConfirmButton";
 import { AddSpotIcon } from "@/components/icons/action-icons";
 import { AlertIcon } from "@/components/icons/status-icons";
+import { VintaRule } from "@/components/icons/ornaments";
 import ReportButton from "@/components/ReportButton";
 import SignInPrompt, { type GatedAction } from "@/components/SignInPrompt";
 import type { AuthStatus } from "@/lib/auth";
 import { isWithinZamboangaCity } from "@/lib/city-bounds";
+import { bilingualLabel } from "@/lib/copy";
 import {
   DEFAULT_ZOOM,
   MAX_BOUNDS,
@@ -48,21 +51,22 @@ interface SpotMapProps {
 }
 
 const FAB_CLASS =
-  "absolute right-6 top-6 z-[1000] flex items-center gap-2 rounded-sm px-4 py-3 text-sm font-semibold " +
-  "text-white shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2";
-const FAB_IDLE_CLASS =
-  "bg-[var(--zpots-brass)] hover:brightness-90 focus:ring-[var(--zpots-brass)]/40";
-const FAB_ARMED_CLASS =
-  "bg-[var(--zpots-pewter)] hover:brightness-90 focus:ring-[var(--zpots-pewter)]/40";
+  "zpots-shadow absolute right-4 top-4 z-[1000] flex min-h-10 items-center gap-2 rounded-full " +
+  "px-4 py-3 text-sm font-bold text-cream focus:outline-none";
+const FAB_IDLE_CLASS = "bg-terracotta hover:bg-terracotta-deep";
+const FAB_ARMED_CLASS = "bg-teal hover:bg-teal-deep";
 
 const BANNER_CLASS =
-  "absolute left-1/2 top-6 z-[1000] -translate-x-1/2 rounded-sm border border-[#d8d4cb] bg-white " +
-  "px-4 py-2 text-sm font-medium text-[#3a3730] shadow-md";
+  "zpots-shadow absolute left-1/2 top-4 z-[1000] flex -translate-x-1/2 items-stretch " +
+  "overflow-hidden rounded-[6px] border border-stone bg-cream-deep text-sm font-medium text-ink";
+const BANNER_TEXT_CLASS = "px-4 py-2";
 
 const OVERLAY_CLASS =
-  "absolute inset-0 z-[1100] flex items-center justify-center bg-[#1f2420]/40 p-4";
+  "absolute inset-0 z-[1100] flex items-center justify-center bg-tinta/55 p-4";
 const CARD_CLASS =
-  "flex max-h-full w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-sm bg-white p-5 shadow-xl";
+  "zpots-shadow flex max-h-full w-full max-w-sm flex-col overflow-y-auto rounded-[6px] " +
+  "border border-stone bg-cream";
+const CARD_BODY_CLASS = "flex flex-col gap-4 p-5";
 
 /**
  * "Unconfirmed pin" or "Confirmed pin" -- the status pill's own label.
@@ -247,30 +251,45 @@ export default function SpotMap({
           <Marker key={spot.id} position={[spot.lat, spot.lng]} icon={createPinIcon(spot.status)}>
             <Popup>
               <div className="zpots-popup">
-                <p className="zpots-popup-name">{spot.name}</p>
-                <p className="zpots-popup-note">{spot.note}</p>
-                <span className="zpots-popup-status" data-status={spot.status}>
-                  {statusLabel(spot)}
-                </span>
-                {spot.nickname && <p className="zpots-popup-credit">by {spot.nickname}</p>}
-                <div className="zpots-popup-actions">
-                  <ConfirmButton
-                    spot={{ ...spot, confirmedByMe: confirmedSpotIds.has(spot.id) }}
-                    onConfirm={() => handleConfirm(spot.id)}
-                  />
-                  <ReportButton
-                    spotId={spot.id}
-                    onReport={(reason, details) => handleReport(spot.id, reason, details)}
-                  />
-                </div>
-                {!isGateOpen() && (
-                  <p className="mt-1 text-xs text-[var(--zpots-pewter)]">
-                    Sign in to confirm or report.
+                <VintaRule />
+                <div className="px-4 py-3.5">
+                  {spot.photoUrl && (
+                    // next/image needs a known width/height or `fill` with a
+                    // sized parent; a Leaflet popup sizes itself around its
+                    // content, so a plain <img> is the simpler, correct fit.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={spot.photoUrl}
+                      alt={`Photo of ${spot.name}`}
+                      className="zpots-popup-photo"
+                    />
+                  )}
+                  <p className="zpots-popup-name">{spot.name}</p>
+                  <p className="zpots-popup-note">{spot.note}</p>
+                  <span className="zpots-popup-status" data-status={spot.status}>
+                    {statusLabel(spot)}
+                  </span>
+                  <p className="zpots-popup-confirmations">
+                    {spot.confirmations} confirmation{spot.confirmations === 1 ? "" : "s"}
                   </p>
-                )}
-                {reportedSpotIds.has(spot.id) && (
-                  <p className="zpots-popup-report-ack">Reported — thanks</p>
-                )}
+                  {spot.nickname && <p className="zpots-popup-credit">by {spot.nickname}</p>}
+                  <div className="zpots-popup-actions">
+                    <ConfirmButton
+                      spot={{ ...spot, confirmedByMe: confirmedSpotIds.has(spot.id) }}
+                      onConfirm={() => handleConfirm(spot.id)}
+                    />
+                    <ReportButton
+                      spotId={spot.id}
+                      onReport={(reason, details) => handleReport(spot.id, reason, details)}
+                    />
+                  </div>
+                  {!isGateOpen() && (
+                    <p className="mt-1 text-xs text-stone-deep">Sign in to confirm or report.</p>
+                  )}
+                  {reportedSpotIds.has(spot.id) && (
+                    <p className="zpots-popup-report-ack">Reported — thanks</p>
+                  )}
+                </div>
               </div>
             </Popup>
           </Marker>
@@ -282,38 +301,51 @@ export default function SpotMap({
           type="button"
           onClick={handleFabClick}
           aria-pressed={isPlacementArmed}
+          aria-label={bilingualLabel(isPlacementArmed ? "cancel" : "addSpot")}
           className={`${FAB_CLASS} ${isPlacementArmed ? FAB_ARMED_CLASS : FAB_IDLE_CLASS}`}
         >
           <AddSpotIcon />
-          {isPlacementArmed ? "Cancel" : "Add a spot"}
+          {isPlacementArmed ? <Bilingual k="cancel" /> : <Bilingual k="addSpot" />}
         </button>
       )}
 
       {showOutsideCityBanner && (
-        // TODO(Task 4): COPY.outsideCity -- src/lib/copy.ts doesn't exist yet.
-        <div className={BANNER_CLASS}>Pins can only be placed inside Zamboanga City</div>
+        <div className={BANNER_CLASS}>
+          <VintaRule orientation="vertical" />
+          <span className={BANNER_TEXT_CLASS}>
+            <Bilingual k="outsideCity" />
+          </span>
+        </div>
       )}
 
       {!showOutsideCityBanner && isPlacementArmed && !tappedLocation && (
-        <div className={BANNER_CLASS}>Tap the map to place your pin.</div>
+        <div className={BANNER_CLASS}>
+          <VintaRule orientation="vertical" />
+          <span className={BANNER_TEXT_CLASS}>
+            <Bilingual k="tapToPlace" />
+          </span>
+        </div>
       )}
 
       {tappedLocation && (
         <div className={OVERLAY_CLASS}>
           <div className={CARD_CLASS}>
-            {submitError && (
-              <p className="flex items-center gap-1.5 text-sm font-medium text-[#9a3324]">
-                <AlertIcon className="shrink-0" />
-                <span>{submitError}</span>
-              </p>
-            )}
-            <AddSpotForm
-              lat={tappedLocation.lat}
-              lng={tappedLocation.lng}
-              onSubmit={handleAddSpotSubmit}
-              onCancel={handleAddSpotCancel}
-              defaultNickname={nickname}
-            />
+            <VintaRule />
+            <div className={CARD_BODY_CLASS}>
+              {submitError && (
+                <p className="flex items-center gap-1.5 text-sm font-medium text-cardinal">
+                  <AlertIcon className="shrink-0" />
+                  <span>{submitError}</span>
+                </p>
+              )}
+              <AddSpotForm
+                lat={tappedLocation.lat}
+                lng={tappedLocation.lng}
+                onSubmit={handleAddSpotSubmit}
+                onCancel={handleAddSpotCancel}
+                defaultNickname={nickname}
+              />
+            </div>
           </div>
         </div>
       )}

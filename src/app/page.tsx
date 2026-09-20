@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/AuthProvider";
+import Bilingual from "@/components/Bilingual";
 import ClipboardShell from "@/components/ClipboardShell";
 import MapView from "@/components/MapView";
 import type { Spot } from "@/lib/spots";
@@ -117,16 +118,16 @@ export default function Home() {
         />
 
         {isLoading && (
-          <div className="pointer-events-none absolute inset-x-0 top-6 z-[1200] flex justify-center">
-            <div className="rounded-sm border border-[#d8d4cb] bg-white px-4 py-2 text-sm font-medium text-[#3a3730] shadow-md">
-              Loading spots…
+          <div className="pointer-events-none absolute inset-x-0 top-4 z-[1200] flex justify-center">
+            <div className="zpots-shadow rounded-[6px] border border-stone bg-cream-deep px-4 py-2 text-sm font-medium text-ink">
+              <Bilingual k="loading" /> spots…
             </div>
           </div>
         )}
 
         {!isLoading && loadError && (
-          <div className="pointer-events-none absolute inset-x-0 top-6 z-[1200] flex justify-center">
-            <div className="rounded-sm border border-[#9a3324]/30 bg-white px-4 py-2 text-sm font-medium text-[#9a3324] shadow-md">
+          <div className="pointer-events-none absolute inset-x-0 top-4 z-[1200] flex justify-center">
+            <div className="zpots-shadow rounded-[6px] border border-cardinal/30 bg-cream-deep px-4 py-2 text-sm font-medium text-cardinal">
               {loadError} — the map still works, but pins may be out of date.
             </div>
           </div>

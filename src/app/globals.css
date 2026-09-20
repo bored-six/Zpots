@@ -43,6 +43,18 @@ body {
   box-sizing: border-box;
 }
 
+/* One focus treatment everywhere -- teal outline, never the browser
+   default blue ring or an ad-hoc box-shadow per component. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-teal);
+  outline-offset: 2px;
+}
+
 /**
  * Sail-stripe rule: red / yellow / blue / green in equal quarters, standing
  * in for a vinta's painted hull. Used only as this 4px divider -- never as
@@ -57,6 +69,27 @@ body {
     var(--color-vinta-blue) 50% 75%,
     var(--color-vinta-green) 75% 100%
   );
+}
+
+/* Vertical form -- used as the banner pill's left edge (VintaRule
+   orientation="vertical" in ornaments.tsx). Same stripes, rotated axis. */
+.vinta-rule--vertical {
+  width: 4px;
+  height: auto;
+  align-self: stretch;
+  background: linear-gradient(
+    180deg,
+    var(--color-vinta-red) 0 25%,
+    var(--color-vinta-yellow) 25% 50%,
+    var(--color-vinta-blue) 50% 75%,
+    var(--color-vinta-green) 75% 100%
+  );
+}
+
+/* One warm shadow for every floating surface (FAB, popup, modal card) --
+   nothing else in the app casts a shadow. */
+.zpots-shadow {
+  box-shadow: 0 6px 18px rgb(31 24 19 / 0.22);
 }
 
 .leaflet-container {
@@ -103,20 +136,23 @@ body {
   filter: drop-shadow(0 1px 1px rgb(31 24 19 / 0.35));
 }
 
-/* Popup shell: warm card, soft corners, real breathing room. Task 4 owns
-   the fuller layout pass (VintaRule top edge, status pill, actions row);
-   this just moves the existing rules onto the new tokens so nothing is
-   left pointing at a variable that no longer exists. */
+/* Popup shell: warm card, soft corners, a VintaRule across the top edge
+   (rendered as a child element in SpotMap.tsx, not CSS) and real breathing
+   room. */
 .leaflet-popup-content-wrapper {
   border-radius: 6px;
   padding: 0;
   background: var(--color-cream);
+  border: 1px solid var(--color-stone);
   box-shadow: 0 6px 18px rgb(31 24 19 / 0.22);
+  overflow: hidden;
 }
 
 .leaflet-popup-content {
   margin: 0;
-  padding: 14px 16px;
+  /* Padding lives on the inner wrapper in SpotMap.tsx instead of here, so
+     the VintaRule top edge can bleed to the card's full width. */
+  padding: 0;
   min-width: 200px;
 }
 
@@ -125,45 +161,62 @@ body {
   background: var(--color-cream);
 }
 
+.zpots-popup-photo {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0 0 10px;
+  border-radius: 4px;
+  border: 1px solid var(--color-stone);
+  object-fit: cover;
+}
+
 .zpots-popup-name {
   margin: 0 0 4px;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 1.25rem;
   color: var(--color-ink);
 }
 
 .zpots-popup-note {
   margin: 0 0 10px;
-  font-size: 0.85rem;
+  font-size: 0.9375rem;
   line-height: 1.4;
   color: var(--color-ink);
 }
 
 .zpots-popup-status {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 2px;
+  padding: 3px 10px;
+  border-radius: 999px;
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  background: color-mix(in srgb, var(--status-color, var(--color-stone-deep)) 14%, white);
-  color: var(--status-color, var(--color-stone-deep));
 }
 
 .zpots-popup-status[data-status="confirmed"] {
-  --status-color: var(--color-teal);
+  background: var(--color-teal);
+  color: var(--color-cream);
 }
 
 .zpots-popup-status[data-status="unconfirmed"] {
-  --status-color: var(--color-stone-deep);
+  background: transparent;
+  border: 1px solid var(--color-stone-deep);
+  color: var(--color-stone-deep);
 }
 
 .zpots-popup-credit {
   margin: 8px 0 0;
-  font-size: 0.7rem;
+  font-size: 0.8125rem;
   font-style: italic;
+  color: var(--color-stone-deep);
+}
+
+.zpots-popup-confirmations {
+  margin: 4px 0 0;
+  font-size: 0.8125rem;
   color: var(--color-stone-deep);
 }
 
