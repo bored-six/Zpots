@@ -1,7 +1,7 @@
 # PRD: Social spots — feed, saves, personal map, profiles (v2)
 
 **Ticket:** None (ad-hoc request, 2026-09-20)
-**Status:** Planning (awaiting user "go")
+**Status:** Complete (code); Wave 5 pending: user applies migrations 0003 + 0004
 **Created:** 2026-09-20
 **Last Updated:** 2026-09-20
 **Author:** Fable (planner). Coder / tester / reviewer agents execute.
@@ -311,3 +311,6 @@ colors, or layout. Visuals are checked in the browser by the orchestrator.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-09-20 | PRD created, replacing the Paseo draft | Name was a real place; map made personal per user |
+| 2026-09-20 | Built waves 0-4 (commits 07e5eaa..dc00b27) | 867 tests, build clean, reviewer approved after one rejection |
+| 2026-09-20 | Added city-shaped mask (`CityMask`, `city-outline.ts`, `data/zamboanga-city-outline.ts`) on every map | User: map must visibly cut off at the city |
+| 2026-09-20 | Deviations accepted: deep link past page 1 falls back to top; distance line English only; Gente Siguiendo via `profilesByIds`; `uploadAvatar` + `updateAvatarUrl` split | Test contracts / scope |

@@ -64,3 +64,15 @@ Rolling log of non-obvious discoveries. Newest first. Prune entries older than 6
 - **Bounds live in three places on purpose:** `src/lib/city-bounds.ts` (client), `supabase/migrations/0003_zamboanga_bounds.sql` (check constraint), and `migration-bounds.test.ts` guards that the two sets of numbers never drift.
 - **Anti-pattern: two coder agents in one git working tree.** Their `git add`/`commit` calls raced on the shared index and merged two tasks into one commit; it had to be split by hand afterwards. Run parallel coders in separate worktrees, or serialize commits.
 - **Dev database has junk "probe" pins** (placed in the sea, fake `x.supabase.co` photo URLs) left over from earlier testing. They are what you see when the popup photo fails to load.
+
+## 2026-09-20 - Social spots build (feed, saves, personal map, profiles, follows)
+
+- **`next/dynamic` only code-splits a real `import()`:** wrapping a component with `dynamic(() => Promise.resolve({ default: X }))` in the same file that imports react-leaflet at top level still evaluates Leaflet during prerender and breaks `npm run build` with "window is not defined". Put the Leaflet part in its own file and `dynamic(() => import("./Inner"), { ssr: false })`, like `MapView.tsx`.
+- **`useSearchParams()` needs a Suspense boundary** in any statically prerendered page, or the build fails. `app/page.tsx` and `login/page.tsx` wrap the client component in `<Suspense>`.
+- **Offset paging can overlap:** `feed_cerca` pages by offset ordered by distance, so a spot inserted between fetches shifts rows. The deck de-dupes appended pages by id. The time-ordered lanes use keyset paging and do not have this problem.
+- **Optimistic toggles need a per-item request token:** a double tap on Save fires two requests; reverting on any rejection can undo a duplicate that succeeded. Only the latest request's outcome is applied.
+- **Vitest mock proxies throw on reading a missing export**, not just on calling it. When a component starts importing `Polygon`/`useMap` from react-leaflet, every per-file react-leaflet mock must export stand-ins, or the whole file fails. Fixed in the mocks, not with feature detection in the component.
+- **`vi.clearAllMocks()` keeps queued `mockResolvedValueOnce` values**, which leak into the next test. Use `vi.resetAllMocks()` in `beforeEach`.
+- **Test-driven contract quirks to know:** `uploadAvatar` only uploads and returns a URL; `updateAvatarUrl` persists it. `handle_available(handle)` takes the arg named `handle`. `feedNuevo` never touches auth.
+- **Known limitation:** a `?spot=` deep link to a spot beyond the first feed page falls back to the top card; the adversarial test documents it.
+- **Migrations 0003 and 0004 are still unapplied.** Until 0004 runs, every feed function 404s and the deck shows "Could not load". Expected, not a bug.
