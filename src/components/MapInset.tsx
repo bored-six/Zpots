@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect } from "react";
 import { MapContainer, Marker, TileLayer, useMap } from "react-leaflet";
 
+import CityMask from "@/components/CityMask";
 import type { LatLng } from "@/lib/geo";
 import { TILE_ATTRIBUTION, TILE_URL } from "@/lib/map-config";
 import { createPinIcon } from "@/lib/pin-icon";
@@ -74,6 +75,7 @@ function MapInsetInner({ center, status, onExpand, size = DEFAULT_SIZE, fill = f
         className="h-full w-full"
       >
         <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+        <CityMask />
         <Marker position={[center.lat, center.lng]} icon={createPinIcon(status)} />
         <FlyToCenter center={center} />
       </MapContainer>

@@ -6,6 +6,7 @@ import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 
 import AddSpotForm from "@/components/AddSpotForm";
 import Bilingual from "@/components/Bilingual";
+import CityMask from "@/components/CityMask";
 import ConfirmButton from "@/components/ConfirmButton";
 import { AddSpotIcon } from "@/components/icons/action-icons";
 import { AlertIcon } from "@/components/icons/status-icons";
@@ -15,6 +16,7 @@ import SignInPrompt, { type GatedAction } from "@/components/SignInPrompt";
 import SpotPhoto from "@/components/SpotPhoto";
 import type { AuthStatus } from "@/lib/auth";
 import { isWithinZamboangaCity } from "@/lib/city-bounds";
+import { CITY_OUTLINE_BOUNDS } from "@/lib/city-outline";
 import { bilingualLabel } from "@/lib/copy";
 import {
   DEFAULT_ZOOM,
@@ -71,6 +73,13 @@ interface SpotMapProps {
   onUnsave?: (spotId: string) => void;
   /** Restricts which `mapSpots` sources render; omitted shows every source passed in. */
   sourceFilter?: ReadonlySet<MapSource>;
+  /**
+   * Fits the initial view to CITY_OUTLINE_BOUNDS once on mount instead of
+   * the usual ZAMBOANGA_CENTER/DEFAULT_ZOOM -- Mi mapa's own view of the
+   * whole city, per the city-outline mask work. Never applied when
+   * `openSpotId` is set (that deep link opens its own popup instead).
+   */
+  fitToCity?: boolean;
 }
 
 const FAB_CLASS =
@@ -128,6 +137,7 @@ export default function SpotMap({
   openSpotId,
   onUnsave,
   sourceFilter,
+  fitToCity = false,
 }: SpotMapProps) {
   // Fail-closed default: an absent authStatus (only possible under the
   // frozen SpotMap.test.tsx, which never exercises a gated action) behaves
@@ -176,6 +186,18 @@ export default function SpotMap({
   useEffect(() => {
     if (!leafletMap) return;
     leafletMap.setMaxBounds(MAX_BOUNDS);
+  }, [leafletMap]);
+
+  // Mi mapa's whole-city view: fit to the actual outline shape (not just
+  // the center/zoom every other caller opens with) once on mount, only
+  // when the caller opts in and isn't already deep-linking to a spot's own
+  // popup via openSpotId. Deliberately depends on `leafletMap` alone --
+  // `fitToCity`/`openSpotId` are read once at that moment, not re-run on
+  // every later identity change of either.
+  useEffect(() => {
+    if (!leafletMap || !fitToCity || openSpotId) return;
+    leafletMap.fitBounds(CITY_OUTLINE_BOUNDS, { padding: [16, 16] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leafletMap]);
 
   // Only listens once the real Leaflet Map instance is available (never
@@ -287,6 +309,7 @@ export default function SpotMap({
         className="h-full w-full"
       >
         <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+        <CityMask />
         {effectiveSpots.map((spot) => (
           <Marker key={spot.id} position={[spot.lat, spot.lng]} icon={createPinIcon(spot.status)}>
             <Popup>

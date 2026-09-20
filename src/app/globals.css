@@ -112,7 +112,25 @@ select:focus-visible,
 /* Tint lives on the tile pane only -- markers and popups are drawn in
    other Leaflet panes, so this filter leaves them crisp. */
 .leaflet-tile-pane {
-  filter: sepia(0.38) saturate(0.72) contrast(0.92) brightness(1.04) hue-rotate(-6deg);
+  filter: sepia(0.55) saturate(0.55) brightness(1.06) contrast(0.9) hue-rotate(-8deg);
+}
+
+/* CityMask's mask Polygon (world ring, city outline as its hole) -- creams
+   out everything past the city boundary. Sits on its own "cityMask" pane
+   (created in CityMask.tsx), above the tile pane and below markers/popups. */
+.zpots-city-mask {
+  fill: var(--color-cream);
+  fill-opacity: 0.92;
+  stroke: none;
+}
+
+/* The boundary stroke itself, drawn as a separate shape from the mask so
+   it can carry its own dashed outline without affecting the fill. */
+.zpots-city-outline {
+  fill: none;
+  stroke: var(--color-stone-deep);
+  stroke-width: 1.5px;
+  stroke-dasharray: 4 2;
 }
 
 .leaflet-control-attribution {
