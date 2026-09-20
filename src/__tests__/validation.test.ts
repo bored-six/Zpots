@@ -137,12 +137,27 @@ describe("validateNewSpot - nickname (optional)", () => {
 });
 
 describe("validateNewSpot - lat/lng bounds", () => {
-  it("accepts lat at the exact boundary of 90", () => {
-    expect(validateNewSpot(validInput({ lat: 90 })).valid).toBe(true);
+  // lat 90 / -90 and lng 180 / -180 are still inclusive range boundaries
+  // (that intent is preserved: they must NOT get the -90..90 / -180..180
+  // range error), but every one of them is geographically outside
+  // Zamboanga City, so with the redesign's city restriction in place they
+  // must now come back invalid with the city-only message instead of valid.
+  it("lat at the exact boundary of 90 is inside the -90..90 range but outside Zamboanga City -- city error, not range error", () => {
+    const result = validateNewSpot(validInput({ lat: 90 }));
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.lat).toBe("Pins can only be placed inside Zamboanga City.");
+      expect(result.errors.lat).not.toBe("Latitude must be between -90 and 90.");
+    }
   });
 
-  it("accepts lat at the exact boundary of -90", () => {
-    expect(validateNewSpot(validInput({ lat: -90 })).valid).toBe(true);
+  it("lat at the exact boundary of -90 is inside the -90..90 range but outside Zamboanga City -- city error, not range error", () => {
+    const result = validateNewSpot(validInput({ lat: -90 }));
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.lat).toBe("Pins can only be placed inside Zamboanga City.");
+      expect(result.errors.lat).not.toBe("Latitude must be between -90 and 90.");
+    }
   });
 
   it("rejects lat just past 90", () => {
@@ -157,12 +172,25 @@ describe("validateNewSpot - lat/lng bounds", () => {
     if (!result.valid) expect(result.errors).toHaveProperty("lat");
   });
 
-  it("accepts lng at the exact boundary of 180", () => {
-    expect(validateNewSpot(validInput({ lng: 180 })).valid).toBe(true);
+  // Same reasoning as the lat 90/-90 cases above: lng 180 / -180 are still
+  // inclusive range boundaries, but they're outside Zamboanga City, so the
+  // redesign flips them from valid to invalid-with-the-city-message.
+  it("lng at the exact boundary of 180 is inside the -180..180 range but outside Zamboanga City -- city error, not range error", () => {
+    const result = validateNewSpot(validInput({ lng: 180 }));
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.lng).toBe("Pins can only be placed inside Zamboanga City.");
+      expect(result.errors.lng).not.toBe("Longitude must be between -180 and 180.");
+    }
   });
 
-  it("accepts lng at the exact boundary of -180", () => {
-    expect(validateNewSpot(validInput({ lng: -180 })).valid).toBe(true);
+  it("lng at the exact boundary of -180 is inside the -180..180 range but outside Zamboanga City -- city error, not range error", () => {
+    const result = validateNewSpot(validInput({ lng: -180 }));
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.lng).toBe("Pins can only be placed inside Zamboanga City.");
+      expect(result.errors.lng).not.toBe("Longitude must be between -180 and 180.");
+    }
   });
 
   it("rejects lng just past 180", () => {
