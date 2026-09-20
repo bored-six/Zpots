@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 
 import Bilingual from "@/components/Bilingual";
 import MapInset from "@/components/MapInset";
@@ -18,8 +18,22 @@ import type { SpotCard } from "@/lib/spots";
  * its own map inset; desktop (>= 1024px) adds a second column, a
  * full-height map that pans to whichever card is active (`MapInset` with
  * `fill`).
+ *
+ * `SpotsDeck` reads `useSearchParams()` (the `?spot=` deep link), which
+ * requires a Suspense boundary for the prerendered shell (Next.js
+ * static-bailout rule) -- same reasoning as login/page.tsx and
+ * mapa/page.tsx's identical wrapper. The fallback essentially never shows
+ * in practice since this whole page is client-rendered anyway.
  */
 export default function Home() {
+  return (
+    <Suspense fallback={null}>
+      <HomeContent />
+    </Suspense>
+  );
+}
+
+function HomeContent() {
   const [activeCard, setActiveCard] = useState<SpotCard | null>(null);
 
   return (

@@ -49,6 +49,12 @@ vi.mock("react-leaflet", async () => {
     Popup: ({ children }: { children?: React.ReactNode }) => (
       <div data-testid="popup">{children}</div>
     ),
+    Polygon: () => <div data-testid="polygon" />,
+    Polyline: () => <div data-testid="polyline" />,
+    useMap: () => ({
+      createPane: vi.fn(() => ({ style: {} }) as unknown as HTMLElement),
+      getPane: vi.fn(() => ({ style: {} }) as unknown as HTMLElement),
+    }),
   };
 });
 

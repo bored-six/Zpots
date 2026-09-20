@@ -61,13 +61,19 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
   const [lane, setLane] = useState<Lane>("cerca");
   const [cards, setCards] = useState<SpotCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set());
   const [hoyEntries, setHoyEntries] = useState<HoyEntry[]>([]);
+  const [retryToken, setRetryToken] = useState(0);
 
   const fetchingMoreRef = useRef(false);
+  /** Per-spot-id monotonic counter (B3): lets a save/unsave rejection tell
+   * whether a newer call for the *same* spot already settled, so a stale
+   * failure never reverts a state a later, successful call already set. */
+  const saveTokensRef = useRef<Map<string, number>>(new Map());
 
   const showSignInGate = lane === "siguiendo" && auth.status === "signed-out";
 
@@ -91,7 +97,8 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
   );
 
   // Load the active lane's first page whenever the lane, sign-in state, or
-  // (for Cerca) the resolved coordinates change.
+  // (for Cerca) the resolved coordinates change -- or Retry is pressed
+  // after a failed load (retryToken).
   useEffect(() => {
     let cancelled = false;
     fetchingMoreRef.current = false;
@@ -102,10 +109,12 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
         setActiveIndex(0);
         setHasMore(false);
         setLoading(false);
+        setLoadError(false);
         return;
       }
 
       setLoading(true);
+      setLoadError(false);
       try {
         let result: SpotCard[];
         if (lane === "cerca") {
@@ -119,6 +128,11 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
         setCards(result);
         setActiveIndex(consumeDeepLink(result) ?? 0);
         setHasMore(result.length >= PAGE_SIZE);
+      } catch {
+        if (cancelled) return;
+        setCards([]);
+        setHasMore(false);
+        setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -129,7 +143,7 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
     return () => {
       cancelled = true;
     };
-  }, [lane, auth.status, location.coords.lat, location.coords.lng, consumeDeepLink]);
+  }, [lane, auth.status, location.coords.lat, location.coords.lng, consumeDeepLink, retryToken]);
 
   // Hoy row + this account's saved/confirmed ids -- independent of lane,
   // refreshed whenever sign-in state changes.
@@ -182,8 +196,14 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
       if (next.length === 0) {
         setHasMore(false);
       } else {
-        setCards((prev) => [...prev, ...next]);
-        const deepLinkIndex = consumeDeepLink([...cards, ...next]);
+        // De-dupe by id (B2): offset-based paging can overlap when a spot
+        // is created between two fetches, shifting every later row by one
+        // and returning a spot id the deck already has loaded.
+        const existingIds = new Set(cards.map((card) => card.id));
+        const deduped = next.filter((card) => !existingIds.has(card.id));
+        const merged = [...cards, ...deduped];
+        setCards(merged);
+        const deepLinkIndex = consumeDeepLink(merged);
         if (deepLinkIndex != null) setActiveIndex(deepLinkIndex);
       }
       fetchingMoreRef.current = false;
@@ -207,11 +227,23 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
     if (index !== -1) setActiveIndex(index);
   }
 
+  /** Bumps and returns this spot's save/unsave sequence token (B3). */
+  function nextSaveToken(spotId: string): number {
+    const next = (saveTokensRef.current.get(spotId) ?? 0) + 1;
+    saveTokensRef.current.set(spotId, next);
+    return next;
+  }
+
   async function handleSave(spotId: string) {
+    const token = nextSaveToken(spotId);
     setSavedIds((prev) => new Set(prev).add(spotId));
     try {
       await saveSpot(spotId);
     } catch {
+      // Only revert if no newer save/unsave call for this same spot has
+      // started since -- a stale rejection must not clobber a later,
+      // successful (duplicate double-tap) call's outcome.
+      if (saveTokensRef.current.get(spotId) !== token) return;
       setSavedIds((prev) => {
         const next = new Set(prev);
         next.delete(spotId);
@@ -221,6 +253,7 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
   }
 
   async function handleUnsave(spotId: string) {
+    const token = nextSaveToken(spotId);
     setSavedIds((prev) => {
       const next = new Set(prev);
       next.delete(spotId);
@@ -229,6 +262,7 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
     try {
       await unsaveSpot(spotId);
     } catch {
+      if (saveTokensRef.current.get(spotId) !== token) return;
       setSavedIds((prev) => new Set(prev).add(spotId));
     }
   }
@@ -317,6 +351,21 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
           <div className="flex h-full items-center justify-center text-sm text-stone-deep">
             <Bilingual k="loading" />
           </div>
+        ) : loadError ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+            <StoneArch width={140} height={14} />
+            <p className="text-sm font-medium text-stone-deep">
+              <Bilingual k="couldNotLoad" />
+            </p>
+            <button
+              type="button"
+              onClick={() => setRetryToken((token) => token + 1)}
+              aria-label="Retry"
+              className="min-h-10 rounded bg-terracotta px-4 py-2 text-sm font-bold text-cream hover:bg-terracotta-deep"
+            >
+              Retry
+            </button>
+          </div>
         ) : cards.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
             <StoneArch width={140} height={14} />
@@ -339,6 +388,7 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
                   isOnMyMap={
                     savedIds.has(card.id) || confirmedIds.has(card.id) || card.author.id === auth.user?.id
                   }
+                  authStatus={auth.status}
                 />
               </div>
             ))}

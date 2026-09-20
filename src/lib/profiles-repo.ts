@@ -272,6 +272,24 @@ export async function followingIds(): Promise<Set<string>> {
 }
 
 /**
+ * Resolves full profiles for a set of ids in one query (`.in()`). Resolves
+ * an empty array without touching the client for an empty id list -- mirrors
+ * `searchProfiles`'s blank-query short circuit.
+ */
+export async function profilesByIds(ids: string[]): Promise<Profile[]> {
+  if (ids.length === 0) return [];
+
+  const client = getSupabaseClient();
+  const { data, error } = await client.from(PROFILES_TABLE).select("*").in("id", ids);
+
+  if (error) {
+    throw new Error("Failed to fetch profiles.", { cause: error });
+  }
+
+  return ((data as ProfileRow[] | null) ?? []).map(toProfile);
+}
+
+/**
  * Searches by handle or display name (ilike, up to `limit` results).
  * Resolves an empty array without touching the client for a blank query.
  */

@@ -7,7 +7,7 @@ import { useEffect, useState, type ChangeEvent } from "react";
 import Avatar from "@/components/Avatar";
 import { useAuth } from "@/components/AuthProvider";
 import ClipboardShell from "@/components/ClipboardShell";
-import { updateNickname, type AuthUser } from "@/lib/auth";
+import type { AuthUser } from "@/lib/auth";
 import type { Profile } from "@/lib/profiles";
 import {
   getMyProfile,
@@ -18,7 +18,6 @@ import {
   uploadAvatar,
 } from "@/lib/profiles-repo";
 import { fetchMyConfirmedSpotIds } from "@/lib/spots-repo";
-import { MAX_NICKNAME_LENGTH } from "@/lib/validation";
 
 /** Mirrors `profiles_handle_format` in 0004_social_spots.sql. */
 const HANDLE_PATTERN = /^[a-z0-9_]{3,20}$/;
@@ -96,7 +95,7 @@ function SignedOutView() {
           Settings
         </h1>
         <p className="mt-1 text-sm text-ink/70">
-          Sign in to set a nickname and see the spots you&rsquo;ve confirmed.
+          Sign in to edit your handle and see the spots you&rsquo;ve confirmed.
         </p>
         <Link
           href="/login?next=/settings"
@@ -119,11 +118,6 @@ function SignedOutView() {
 function SignedInView({ user, signOut }: { user: AuthUser; signOut: () => Promise<void> }) {
   const router = useRouter();
 
-  const [nickname, setNickname] = useState(user.nickname);
-  const [lastSavedNickname, setLastSavedNickname] = useState(user.nickname);
-  const [nicknameStatus, setNicknameStatus] = useState<"idle" | "saving" | "saved" | "error">(
-    "idle",
-  );
   const [confirmedCount, setConfirmedCount] = useState<number | "—">(0);
   const [signOutError, setSignOutError] = useState<string | null>(null);
 
@@ -267,21 +261,6 @@ function SignedInView({ user, signOut }: { user: AuthUser; signOut: () => Promis
       setAvatarError("Couldn't update your avatar. Try again.");
     } finally {
       setAvatarUploading(false);
-    }
-  }
-
-  async function handleNicknameBlur() {
-    const trimmed = nickname.trim();
-    if (trimmed === lastSavedNickname) return;
-
-    setNicknameStatus("saving");
-    try {
-      await updateNickname(trimmed);
-      setNickname(trimmed);
-      setLastSavedNickname(trimmed);
-      setNicknameStatus("saved");
-    } catch {
-      setNicknameStatus("error");
     }
   }
 
@@ -432,43 +411,6 @@ function SignedInView({ user, signOut }: { user: AuthUser; signOut: () => Promis
         {displayNameStatus === "error" && (
           <p className="text-xs text-cardinal">
             Couldn&rsquo;t save your display name. Try again.
-          </p>
-        )}
-      </section>
-
-      <SectionDivider />
-
-      <section className="flex flex-col gap-2">
-        <h2 className={SECTION_HEADING_CLASS}>Nickname</h2>
-        <p className="text-sm text-ink/70">
-          Optional and purely cosmetic -- never a verified identity, just a
-          byline other people can see on spots you&rsquo;ve added.
-        </p>
-        <label htmlFor="nickname" className={FIELD_LABEL_CLASS}>
-          Nickname
-        </label>
-        <input
-          id="nickname"
-          type="text"
-          value={nickname}
-          maxLength={MAX_NICKNAME_LENGTH}
-          onChange={(e) => {
-            setNickname(e.target.value);
-            setNicknameStatus("idle");
-          }}
-          onBlur={handleNicknameBlur}
-          className={INPUT_CLASS}
-          placeholder="e.g. Kuya Ben"
-        />
-        {nicknameStatus === "saving" && (
-          <p className="text-xs text-stone-deep">Saving…</p>
-        )}
-        {nicknameStatus === "saved" && (
-          <p className="text-xs text-stone-deep">Saved.</p>
-        )}
-        {nicknameStatus === "error" && (
-          <p className="text-xs text-cardinal">
-            Couldn&rsquo;t save your nickname. Try again.
           </p>
         )}
       </section>

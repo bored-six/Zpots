@@ -198,7 +198,11 @@ describe("Gente page -- empty-section copy (fix round)", () => {
 
     await renderGentePage();
 
-    expect(await screen.findByText(new RegExp(COPY.noPeopleYet.en, "i"))).toBeInTheDocument();
+    // feedNuevo also resolving empty means Gente nueva is empty too, so
+    // this same copy legitimately renders twice (asserted precisely in the
+    // "Gente nueva is empty" case below) -- findAllByText here, not
+    // findByText, so this test isn't tripped up by its own fixture.
+    expect((await screen.findAllByText(new RegExp(COPY.noPeopleYet.en, "i"))).length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText(new RegExp(COPY.nobodyToday.en, "i"))).not.toBeInTheDocument();
   });
 

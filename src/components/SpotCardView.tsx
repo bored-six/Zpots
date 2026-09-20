@@ -2,14 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import Avatar from "@/components/Avatar";
 import Bilingual from "@/components/Bilingual";
 import ConfirmButton from "@/components/ConfirmButton";
 import MapInset from "@/components/MapInset";
 import ReportButton from "@/components/ReportButton";
+import SignInPrompt from "@/components/SignInPrompt";
 import { BookmarkFilledIcon, BookmarkIcon } from "@/components/icons/social-icons";
 import SpotPhoto from "@/components/SpotPhoto";
+import type { AuthStatus } from "@/lib/auth";
 import { bilingualLabel, COPY } from "@/lib/copy";
 import { formatDistance } from "@/lib/geo";
 import type { Spot, SpotCard } from "@/lib/spots";
@@ -33,6 +36,13 @@ interface SpotCardViewProps {
    * a caller that doesn't track this yet still gets a working card.
    */
   isOnMyMap?: boolean;
+  /**
+   * Gates the Save action behind `SignInPrompt` (action="save") when
+   * signed out, per social-spots.md ("Readable signed-out ... Everything
+   * else gates"). Optional -- defaults to "signed-in" so a caller that
+   * doesn't track auth status still gets a working, ungated Save button.
+   */
+  authStatus?: AuthStatus;
 }
 
 const SAVE_BUTTON_BASE_CLASS =
@@ -56,8 +66,11 @@ export default function SpotCardView({
   onBeenHere,
   onReport,
   isOnMyMap = false,
+  authStatus = "signed-in",
 }: SpotCardViewProps) {
   const [insetExpanded, setInsetExpanded] = useState(false);
+  const [showSaveGate, setShowSaveGate] = useState(false);
+  const router = useRouter();
 
   const spotBase: Spot = card;
   // Only the English phrase is rendered here (unlike the rest of this
@@ -68,16 +81,19 @@ export default function SpotCardView({
     card.distanceM != null ? COPY.distanceAway.en.replace("{n}", formatDistance(card.distanceM)) : null;
 
   function handleInsetTap() {
-    // A soft (client-side) navigation would need `useRouter()`, which
-    // requires an app-router context this card doesn't otherwise depend
-    // on -- a full navigation is a fine trade-off for a rare tap that's
-    // already switching to a different page (`/mapa`).
     if (isOnMyMap) {
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.assign(`/mapa?spot=${card.id}`);
+      router.push(`/mapa?spot=${card.id}`);
       return;
     }
     setInsetExpanded((current) => !current);
+  }
+
+  function handleSaveClick() {
+    if (authStatus === "signed-out") {
+      setShowSaveGate(true);
+      return;
+    }
+    onSave();
   }
 
   return (
@@ -143,7 +159,7 @@ export default function SpotCardView({
           ) : (
             <button
               type="button"
-              onClick={onSave}
+              onClick={handleSaveClick}
               aria-label={bilingualLabel("save")}
               className={`${SAVE_BUTTON_BASE_CLASS} ${SAVE_BUTTON_UNSAVED_CLASS}`}
             >
@@ -157,6 +173,8 @@ export default function SpotCardView({
           <ReportButton spotId={card.id} onReport={onReport} />
         </div>
       </div>
+
+      {showSaveGate && <SignInPrompt action="save" onDismiss={() => setShowSaveGate(false)} />}
     </div>
   );
 }

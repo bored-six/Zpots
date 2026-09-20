@@ -6,8 +6,11 @@ import { ZAMBOANGA_CITY_OUTLINE } from "@/data/zamboanga-city-outline";
 // Serialize-only stand-ins: react-leaflet's real Polygon/Polyline need a
 // live Leaflet map context we don't have in jsdom, so we replace them with
 // divs that dump every prop they were given as JSON, and assert on that
-// JSON rather than on any rendered path/svg output.
+// JSON rather than on any rendered path/svg output. `useMap` is a minimal
+// fake -- just enough surface (`getPane`/`createPane`) for CityMask's own
+// pane-creation effect to run without a real Leaflet map instance.
 vi.mock("react-leaflet", () => {
+  const panes: Record<string, { style: { zIndex: string } }> = {};
   return {
     Polygon: (props: Record<string, unknown>) => (
       <div data-testid="polygon" data-props={JSON.stringify(props)} />
@@ -15,6 +18,14 @@ vi.mock("react-leaflet", () => {
     Polyline: (props: Record<string, unknown>) => (
       <div data-testid="polyline" data-props={JSON.stringify(props)} />
     ),
+    useMap: () => ({
+      getPane: (name: string) => panes[name],
+      createPane: (name: string) => {
+        const pane = { style: { zIndex: "" } };
+        panes[name] = pane;
+        return pane;
+      },
+    }),
   };
 });
 

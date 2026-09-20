@@ -59,6 +59,13 @@ export const COPY = {
   // Profile page ("Not found" state) -- added while implementing
   // src/app/u/[handle]/page.tsx, not in the PRD's own Copy table.
   profileNotFound: { cv: "Nuay ese perfil", en: "Profile not found" },
+
+  // Fix round: Mi mapa's legend and the deck's "feed failed" / Gente's
+  // empty-section copy.
+  mine: { cv: "Mios", en: "Mine" },
+  been: { cv: "Ya anda", en: "Been" },
+  couldNotLoad: { cv: "No puede carga", en: "Could not load" },
+  noPeopleYet: { cv: "Nuay pa gente", en: "No people yet" },
 } as const;
 
 export type CopyKey = keyof typeof COPY;

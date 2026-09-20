@@ -295,7 +295,7 @@ export default function ProfilePage() {
         )}
       </div>
 
-      {showSignIn && <SignInPrompt action="confirm" onDismiss={() => setShowSignIn(false)} />}
+      {showSignIn && <SignInPrompt action="follow" onDismiss={() => setShowSignIn(false)} />}
     </ClipboardShell>
   );
 }

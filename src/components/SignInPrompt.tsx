@@ -6,7 +6,7 @@ import { useEffect, useId, useRef } from "react";
 import Bilingual from "@/components/Bilingual";
 import { SignInIcon } from "@/components/icons/action-icons";
 
-export type GatedAction = "add" | "confirm" | "report";
+export type GatedAction = "add" | "confirm" | "report" | "follow" | "save";
 
 interface SignInPromptProps {
   action: GatedAction;
@@ -33,6 +33,14 @@ const COPY: Record<GatedAction, { heading: string; body: string }> = {
   report: {
     heading: "Sign in to report",
     body: "Reports are a signal for a human to look at, not an instant delete.",
+  },
+  follow: {
+    heading: "Sign in to follow",
+    body: "Following is tied to an account so it's clear whose spots you're seeing.",
+  },
+  save: {
+    heading: "Sign in to save",
+    body: "Saved spots live on your account's map, so they're there next time you sign in.",
   },
 };
 

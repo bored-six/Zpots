@@ -25,13 +25,9 @@ const SpotMap = dynamic(() => import("@/components/SpotMap"), {
   ),
 });
 
-// FLAG FOR REVIEW: "mine"/"been" have no copy.ts entries yet (only "saved"
-// does) -- these two pairs are placeholders pending a real COPY key added
-// by whoever owns copy.ts, same native-review caveat as the rest of the
-// Chavacano copy in that file.
 const LEGEND_ITEMS: ReadonlyArray<{ source: MapSource; cv: string; en: string }> = [
-  { source: "mine", cv: "Mios", en: "Mine" },
-  { source: "been", cv: "Ya anda", en: "Been" },
+  { source: "mine", cv: COPY.mine.cv, en: COPY.mine.en },
+  { source: "been", cv: COPY.been.cv, en: COPY.been.en },
   { source: "saved", cv: COPY.saved.cv, en: COPY.saved.en },
 ];
 

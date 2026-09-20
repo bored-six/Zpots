@@ -113,14 +113,12 @@ describe("SignInPrompt", () => {
   // exist on GatedAction yet, so both cases below are expected to fail red
   // until the fix round adds them.
   it("shows the 'follow' copy -- heading 'Sign in to follow'", () => {
-    // @ts-expect-error -- "follow" isn't a member of GatedAction yet (fix round).
     render(<SignInPrompt action="follow" onDismiss={vi.fn()} />);
 
     expect(screen.getByRole("heading", { name: /sign in to follow/i })).toBeInTheDocument();
   });
 
   it("shows the 'save' copy -- heading 'Sign in to save'", () => {
-    // @ts-expect-error -- "save" isn't a member of GatedAction yet (fix round).
     render(<SignInPrompt action="save" onDismiss={vi.fn()} />);
 
     expect(screen.getByRole("heading", { name: /sign in to save/i })).toBeInTheDocument();

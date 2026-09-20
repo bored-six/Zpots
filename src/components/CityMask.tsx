@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import * as ReactLeaflet from "react-leaflet";
+import { Polygon, Polyline, useMap } from "react-leaflet";
 
 import { ZAMBOANGA_CITY_OUTLINE } from "@/data/zamboanga-city-outline";
 
@@ -29,40 +28,17 @@ const CITY_OUTLINE_POSITIONS: [number, number][] = ZAMBOANGA_CITY_OUTLINE.map(([
 const CITY_MASK_PANE = "cityMask";
 
 export default function CityMask() {
-  // `useMap`/`Polygon`/`Polyline` are absent from several SpotMap test
-  // files' react-leaflet mocks (frozen or scoped to props those tests
-  // actually assert on, none of which exercise mask shapes), and
-  // CityMask.test.tsx's own mock has Polygon/Polyline but not useMap.
-  // Whether each export exists is fixed by which build of "react-leaflet"
-  // resolved -- decided once at module load and never toggled during a
-  // mounted CityMask's lifetime -- so gating on it here never actually
-  // violates the real Rules of Hooks. `"x" in ReactLeaflet` (not a direct
-  // property read) matters: Vitest's mocked-module proxy throws on reading
-  // a name its factory never returned, but the `in` operator only invokes
-  // the proxy's `has` trap, which safely reports false instead.
-  // This call site is stable for the whole life of any mounted CityMask;
-  // the linter just can't prove that statically.
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const map = "useMap" in ReactLeaflet ? ReactLeaflet.useMap() : undefined;
-  const [paneReady, setPaneReady] = useState(() => !map);
+  const map = useMap();
 
-  // Flips paneReady once the pane exists so children (which look up
-  // `map.getPane(pane)` on their own mount) never render before it does.
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    if (!map) return;
-    if (!map.getPane(CITY_MASK_PANE)) {
-      const pane = map.createPane(CITY_MASK_PANE);
-      pane.style.zIndex = "350";
-    }
-    setPaneReady(true);
-  }, [map]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  const hasShapes = "Polygon" in ReactLeaflet && "Polyline" in ReactLeaflet;
-  if (!paneReady || !hasShapes) return null;
-
-  const { Polygon, Polyline } = ReactLeaflet;
+  // Created directly during render (not in an effect): `map` is already a
+  // real, live Leaflet map instance by the time CityMask renders (it comes
+  // from MapContainer's own context, set up before children render), and
+  // `createPane`/`getPane` are idempotent -- so the pane always exists
+  // before the Polygon below, which references it by name, ever mounts.
+  if (!map.getPane(CITY_MASK_PANE)) {
+    const pane = map.createPane(CITY_MASK_PANE);
+    pane.style.zIndex = "350";
+  }
 
   return (
     <>

@@ -43,6 +43,10 @@ vi.mock("react-leaflet", async () => {
   };
 });
 
+vi.mock("@/components/CityMask", () => ({
+  default: () => <div data-testid="city-mask" />,
+}));
+
 function authValue(status: AuthStatus, user: AuthUser | null = null) {
   return { status, user, signOut: vi.fn() };
 }

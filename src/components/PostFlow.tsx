@@ -4,11 +4,11 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import { useRouter } from "next/navigation";
 import type { LeafletMouseEvent, Map as LeafletMap } from "leaflet";
 import { MapContainer, Marker, TileLayer } from "react-leaflet";
-
 import Link from "next/link";
 
 import { useAuth } from "@/components/AuthProvider";
 import Bilingual from "@/components/Bilingual";
+import CityMask from "@/components/CityMask";
 import { AlertIcon } from "@/components/icons/status-icons";
 import { CameraIcon } from "@/components/icons/nav-icons";
 import { bilingualLabel } from "@/lib/copy";
@@ -305,6 +305,7 @@ export default function PostFlow() {
               className="h-full w-full grayscale"
             >
               <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+              <CityMask />
               {tappedLocation && (
                 <Marker
                   position={[tappedLocation.lat, tappedLocation.lng]}

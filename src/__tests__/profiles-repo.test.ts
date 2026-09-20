@@ -23,9 +23,6 @@ import {
   isFollowing,
   isHandleAvailable,
   searchProfiles,
-  // Not implemented yet (fix round) -- gente-page.md's "Siguiendo" rewrite
-  // needs a bulk-by-id profile lookup distinct from `getProfileByHandle`.
-  // @ts-expect-error -- profilesByIds doesn't exist on profiles-repo yet.
   profilesByIds,
 } from "@/lib/profiles-repo";
 
