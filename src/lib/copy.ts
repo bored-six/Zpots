@@ -66,6 +66,11 @@ export const COPY = {
   been: { cv: "Ya anda", en: "Been" },
   couldNotLoad: { cv: "No puede carga", en: "Could not load" },
   noPeopleYet: { cv: "Nuay pa gente", en: "No people yet" },
+
+  // Preview spots (src/lib/preview-spots.ts): the famous-places fallback
+  // shown in the deck and on Mi mapa when there is nothing real yet.
+  preview: { cv: "Vista previa", en: "Preview" },
+  previewHint: { cv: "Lugares famoso de Zamboanga para empeza", en: "Famous Zamboanga spots to start with" },
 } as const;
 
 export type CopyKey = keyof typeof COPY;

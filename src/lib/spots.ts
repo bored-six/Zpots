@@ -46,10 +46,16 @@ export interface SpotAuthor {
 export interface SpotCard extends Spot {
   author: SpotAuthor;
   distanceM?: number;
+  /** Photo attribution line (preview spots only -- user uploads carry none). */
+  photoCredit?: string;
 }
 
 /** Why a spot appears on the caller's personal map (`my_map()`). */
-export type MapSource = "mine" | "saved" | "been";
+/**
+ * Why a spot is on Mi mapa. `preview` is client-only (src/lib/preview-
+ * spots.ts): never returned by `my_map()`, never filterable via the legend.
+ */
+export type MapSource = "mine" | "saved" | "been" | "preview";
 
 /** A `SpotCard` tagged with why it's on the caller's personal map. */
 export interface MapSpot extends SpotCard {

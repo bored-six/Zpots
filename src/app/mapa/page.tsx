@@ -8,6 +8,7 @@ import { useAuth } from "@/components/AuthProvider";
 import Bilingual from "@/components/Bilingual";
 import ClipboardShell from "@/components/ClipboardShell";
 import { COPY } from "@/lib/copy";
+import { previewBounds, previewMapSpots } from "@/lib/preview-spots";
 import { myMap, unsaveSpot } from "@/lib/saves-repo";
 import type { MapSource, MapSpot } from "@/lib/spots";
 
@@ -33,6 +34,16 @@ const LEGEND_ITEMS: ReadonlyArray<{ source: MapSource; cv: string; en: string }>
 
 const ALL_SOURCES: ReadonlySet<MapSource> = new Set(["mine", "been", "saved"]);
 
+// Famous-places preview pins (src/lib/preview-spots.ts): what the map shows
+// signed-out, and signed-in until the account has a real pin of its own.
+const PREVIEW_MAP_SPOTS = previewMapSpots();
+const PREVIEW_BOUNDS = previewBounds();
+
+// Leaflet's panes sit at z-index 400 in the page's own stacking context, so
+// anything overlaid on the map needs to clear them -- same z as SpotMap's
+// own banners.
+const OVERLAY_CLASS = "pointer-events-none absolute inset-0 z-[1000] flex items-end justify-center p-4 pb-6";
+
 const GATE_CARD_CLASS =
   "zpots-shadow max-w-sm rounded-[6px] border border-stone bg-cream-deep px-5 py-4 text-center text-sm text-ink";
 
@@ -47,15 +58,26 @@ function LoadingView() {
 }
 
 function SignedOutView() {
+  // Same flex-column + `min-h-0 flex-1` skeleton as SignedInView: the map
+  // needs a definite height at mount, or `fitToCity` fits the outline into
+  // a zero-size container and lands at max zoom with every pin off-screen.
   return (
-    <main className="relative flex h-full w-full items-center justify-center p-4">
-      <div className={GATE_CARD_CLASS}>
-        <p className="font-bold uppercase tracking-[0.12em] text-stone-deep">
-          <Bilingual k="signInFirst" />
-        </p>
-        <p className="mt-2">
-          <Bilingual k="emptyMap" />
-        </p>
+    <main className="relative flex h-full w-full flex-col">
+      <div className="relative min-h-0 flex-1">
+        <SpotMap authStatus="signed-out" mapSpots={PREVIEW_MAP_SPOTS} fitBounds={PREVIEW_BOUNDS} />
+        <div className={OVERLAY_CLASS}>
+          <div className={`${GATE_CARD_CLASS} pointer-events-auto`}>
+            <p className="font-bold uppercase tracking-[0.12em] text-stone-deep">
+              <Bilingual k="signInFirst" />
+            </p>
+            <p className="mt-2">
+              <Bilingual k="emptyMap" />
+            </p>
+            <p className="mt-2 text-xs">
+              <Bilingual k="previewHint" />
+            </p>
+          </div>
+        </div>
       </div>
     </main>
   );
@@ -104,8 +126,12 @@ function SignedInView() {
     }
   }
 
-  const visibleSpots = (spots ?? []).filter((spot) => visibleSources.has(spot.source));
   const isEmpty = spots !== null && spots.length === 0;
+  // An empty personal map shows the preview pins instead; they sit outside
+  // the legend's source filter on purpose (nothing to toggle them off with).
+  const visibleSpots = isEmpty
+    ? PREVIEW_MAP_SPOTS
+    : (spots ?? []).filter((spot) => visibleSources.has(spot.source));
 
   return (
     <div className="relative flex h-full w-full flex-col">
@@ -134,12 +160,18 @@ function SignedInView() {
           openSpotId={openSpotId}
           onUnsave={handleUnsave}
           fitToCity
+          fitBounds={isEmpty ? PREVIEW_BOUNDS : undefined}
         />
         {isEmpty && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
-            <p className={`${GATE_CARD_CLASS} pointer-events-auto`}>
-              <Bilingual k="emptyMap" />
-            </p>
+          <div className={OVERLAY_CLASS}>
+            <div className={`${GATE_CARD_CLASS} pointer-events-auto`}>
+              <p>
+                <Bilingual k="emptyMap" />
+              </p>
+              <p className="mt-2 text-xs">
+                <Bilingual k="previewHint" />
+              </p>
+            </div>
           </div>
         )}
       </div>

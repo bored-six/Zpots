@@ -175,9 +175,16 @@ describe("SpotsDeck -- lanes", () => {
     expect(feedSiguiendo).not.toHaveBeenCalled();
   });
 
-  it("shows the empty-lane copy when a lane has no cards", async () => {
-    feedCerca.mockResolvedValue([]);
+  // Preview round: an empty Cerca/Nuevo now shows the famous-places
+  // preview cards (see SpotsDeck.preview.test.tsx), so the honest
+  // "No spots yet" arch is only reachable from a signed-in, empty
+  // Siguiendo lane.
+  it("shows the empty-lane copy when Siguiendo has no cards", async () => {
+    useAuthMock.mockReturnValue(authValue("signed-in", { id: "user-1", email: "a@b.com", nickname: "" }));
+    feedSiguiendo.mockResolvedValue([]);
+    const user = userEvent.setup();
     render(<SpotsDeck />);
+    await user.click(await screen.findByRole("button", { name: new RegExp(COPY.siguiendo.en, "i") }));
 
     expect(await screen.findByText(new RegExp(COPY.noSpotsYet.en, "i"))).toBeInTheDocument();
   });

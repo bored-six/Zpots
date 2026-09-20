@@ -11,6 +11,7 @@ import { StoneArch } from "@/components/icons/ornaments";
 import SpotCardView from "@/components/SpotCardView";
 import { bilingualLabel } from "@/lib/copy";
 import { feedCerca, feedNuevo, feedSiguiendo, hoyRow, type FeedCursor, type HoyEntry } from "@/lib/feed-repo";
+import { isPreviewSpot, previewCards } from "@/lib/preview-spots";
 import { mySavedIds, saveSpot, unsaveSpot } from "@/lib/saves-repo";
 import type { SpotCard } from "@/lib/spots";
 import { confirmSpot, fetchMyConfirmedSpotIds, reportSpot } from "@/lib/spots-repo";
@@ -62,6 +63,8 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
   const [cards, setCards] = useState<SpotCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  /** True while the deck is showing the famous-places preview instead of a real (empty) lane. */
+  const [isPreview, setIsPreview] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
@@ -106,6 +109,7 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
     async function loadFirstPage() {
       if (lane === "siguiendo" && auth.status === "signed-out") {
         setCards([]);
+        setIsPreview(false);
         setActiveIndex(0);
         setHasMore(false);
         setLoading(false);
@@ -115,6 +119,7 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
 
       setLoading(true);
       setLoadError(false);
+      setIsPreview(false);
       try {
         let result: SpotCard[];
         if (lane === "cerca") {
@@ -125,6 +130,17 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
           result = await feedSiguiendo(PAGE_SIZE);
         }
         if (cancelled) return;
+        if (result.length === 0 && lane !== "siguiendo") {
+          // Preview fallback: a public lane with nothing in it yet shows the
+          // famous-places preview (src/lib/preview-spots.ts) so a first
+          // visit still has something to swipe. Siguiendo stays empty on
+          // purpose (you follow nobody), and a failed load stays an error.
+          setCards(previewCards({ lat: location.coords.lat, lng: location.coords.lng }));
+          setIsPreview(true);
+          setActiveIndex(0);
+          setHasMore(false);
+          return;
+        }
         setCards(result);
         setActiveIndex(consumeDeepLink(result) ?? 0);
         setHasMore(result.length >= PAGE_SIZE);
@@ -235,6 +251,7 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
   }
 
   async function handleSave(spotId: string) {
+    if (isPreviewSpot(spotId)) return;
     const token = nextSaveToken(spotId);
     setSavedIds((prev) => new Set(prev).add(spotId));
     try {
@@ -253,6 +270,7 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
   }
 
   async function handleUnsave(spotId: string) {
+    if (isPreviewSpot(spotId)) return;
     const token = nextSaveToken(spotId);
     setSavedIds((prev) => {
       const next = new Set(prev);
@@ -268,6 +286,7 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
   }
 
   async function handleBeenHere(spotId: string) {
+    if (isPreviewSpot(spotId)) return;
     try {
       const updated = await confirmSpot(spotId);
       setConfirmedIds((prev) => new Set(prev).add(spotId));
@@ -285,6 +304,7 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
   }
 
   async function handleReport(spotId: string, reason: ReportReason, details?: string) {
+    if (isPreviewSpot(spotId)) return;
     try {
       await reportSpot(spotId, reason, details);
     } catch {
@@ -326,6 +346,12 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
       {lane === "cerca" && location.isFallback && (
         <p className="px-4 py-1 text-xs text-stone-deep">
           <Bilingual k="usingCenter" />
+        </p>
+      )}
+
+      {isPreview && !loading && (
+        <p className="border-b border-stone bg-cream-deep px-4 py-1 text-xs text-stone-deep">
+          <Bilingual k="previewHint" />
         </p>
       )}
 

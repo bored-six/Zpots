@@ -160,9 +160,16 @@ describe("adversarial", () => {
       expect(feedCerca).toHaveBeenCalledTimes(2);
     });
 
+    // Preview round: an empty Cerca now renders the famous-places preview
+    // cards instead of the empty-lane arch (SpotsDeck.preview.test.tsx
+    // covers that); the arch is only reachable from a signed-in, empty
+    // Siguiendo lane, which is what this now exercises.
     it("an empty first page renders the empty-lane state without crashing", async () => {
-      feedCerca.mockResolvedValue([]);
+      useAuthMock.mockReturnValue(authValue("signed-in", { id: "user-1", email: "a@b.com", nickname: "" }));
+      feedSiguiendo.mockResolvedValue([]);
+      const user = userEvent.setup();
       render(<SpotsDeck />);
+      await user.click(await screen.findByRole("button", { name: /following/i }));
 
       expect(await screen.findByText(/no spots yet/i)).toBeInTheDocument();
       expect(screen.queryByTestId("spot-card")).not.toBeInTheDocument();

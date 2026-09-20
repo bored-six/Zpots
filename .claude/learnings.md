@@ -76,3 +76,12 @@ Rolling log of non-obvious discoveries. Newest first. Prune entries older than 6
 - **Test-driven contract quirks to know:** `uploadAvatar` only uploads and returns a URL; `updateAvatarUrl` persists it. `handle_available(handle)` takes the arg named `handle`. `feedNuevo` never touches auth.
 - **Known limitation:** a `?spot=` deep link to a spot beyond the first feed page falls back to the top card; the adversarial test documents it.
 - **Migrations 0003 and 0004 are still unapplied.** Until 0004 runs, every feed function 404s and the deck shows "Could not load". Expected, not a bug.
+
+## 2026-09-20 - Preview spots (famous-places fallback)
+
+- **Preview spots are client-only constants** (`src/lib/preview-spots.ts`), never DB rows: the `spots.photo_url` CHECK only accepts the `spot-photos` bucket, and their ids do not exist server-side. Every consumer tells them apart by the `preview-` id prefix (`isPreviewSpot`) or `source: "preview"` on the map. The card hides Save/Been/Report and the profile link; the deck short-circuits its handlers as a second guard.
+- **When they show:** deck Cerca/Nuevo lanes only when the first page is empty (never on a failed load, never in Siguiendo); Mi mapa signed-out, and signed-in until `my_map()` returns a real pin. Once the dev DB has any spot the deck fallback disappears, so verify it by mocking the feed, not against the running server.
+- **`fitToCity` on a percentage-height wrapper fits into a zero-size container** and lands at max zoom with every pin off-screen. Any map page needs the flex-column + `min-h-0 flex-1` skeleton `SignedInView` uses.
+- **Fit-to-city leaves downtown below the fold:** the outline is tall (6.78 to 7.48 lat) and clamps to MIN_ZOOM 12 centered mid-city. `SpotMap`'s new `fitBounds` prop (compared by value, capped at zoom 15) frames the preview cluster instead; it is declared after the fit-to-city effect so it wins on the same mount.
+- **Photos are hot-linked from Wikimedia Commons** (CC BY-SA, attribution in `photoCredit`, rendered on the card and in the popup). `SpotPhoto`'s onError placeholder covers a dead link; `next.config` needs no `remotePatterns` because the app uses plain `<img>`.
+- **Full-suite timeouts while `next dev` and the browser pane are running** (AddSpotForm, profile-page, settings-page) pass alone; the CPU contention, not the code, is the cause.

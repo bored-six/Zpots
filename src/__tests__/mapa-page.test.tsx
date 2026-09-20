@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthStatus, AuthUser } from "@/lib/auth";
 import type { MapSpot } from "@/lib/spots";
 import { COPY } from "@/lib/copy";
+import { PREVIEW_SPOTS, previewBounds } from "@/lib/preview-spots";
 
 const myMap = vi.fn();
 const unsaveSpot = vi.fn();
@@ -27,10 +28,16 @@ vi.mock("@/lib/saves-repo", () => ({
 // the write-mode SpotMap, but this test only cares what mapa/page.tsx feeds
 // it: the filtered spot list, the deep-link target, and the unsave handler.
 vi.mock("@/components/SpotMap", () => ({
-  default: (props: { mapSpots: MapSpot[]; openSpotId?: string; onUnsave: (spotId: string) => void }) => (
+  default: (props: {
+    mapSpots: MapSpot[];
+    openSpotId?: string;
+    onUnsave: (spotId: string) => void;
+    fitBounds?: [[number, number], [number, number]];
+  }) => (
     <div data-testid="spot-map">
       <div data-testid="spot-map-ids">{props.mapSpots.map((s) => `${s.id}:${s.source}`).join(",")}</div>
       <div data-testid="spot-map-open-id">{props.openSpotId ?? ""}</div>
+      <div data-testid="spot-map-fit">{props.fitBounds ? JSON.stringify(props.fitBounds) : ""}</div>
       {props.mapSpots.map((s) => (
         <button key={s.id} onClick={() => props.onUnsave(s.id)}>{`quita-${s.id}`}</button>
       ))}
@@ -75,12 +82,27 @@ async function renderMapaPage() {
 }
 
 describe("Mi mapa -- signed out", () => {
-  it("shows the sign-in gate and never calls myMap()", async () => {
+  // Preview round: signed-out visitors now see the map with the famous-
+  // places preview pins behind the sign-in gate, instead of a gate card
+  // alone -- "so people know what they're in here for". myMap() is still
+  // never called (it would just return [] for a signed-out session).
+  it("shows the sign-in gate over the map with the preview pins, and never calls myMap()", async () => {
     await renderMapaPage();
 
-    expect(await screen.findByText(new RegExp(COPY.emptyMap.en, "i"))).toBeInTheDocument();
+    expect(await screen.findByText(new RegExp(COPY.signInFirst.en, "i"))).toBeInTheDocument();
     expect(myMap).not.toHaveBeenCalled();
-    expect(screen.queryByTestId("spot-map")).not.toBeInTheDocument();
+    const ids = (await screen.findByTestId("spot-map-ids")).textContent ?? "";
+    expect(ids).toContain(`${PREVIEW_SPOTS[0].id}:preview`);
+    expect(ids.split(",")).toHaveLength(PREVIEW_SPOTS.length);
+  });
+
+  // The city outline is tall and every preview pin is downtown, so a plain
+  // fit-to-city leaves them all below the fold: the map has to fit the
+  // preview pins themselves.
+  it("fits the map to the preview pins, not the whole city", async () => {
+    await renderMapaPage();
+
+    expect(await screen.findByTestId("spot-map-fit")).toHaveTextContent(JSON.stringify(previewBounds()));
   });
 });
 
@@ -98,12 +120,51 @@ describe("Mi mapa -- signed in", () => {
     expect(await screen.findByTestId("spot-map-ids")).toHaveTextContent("spot-1:mine,spot-2:been");
   });
 
-  it("shows the empty-map copy when myMap() resolves no pins", async () => {
+  it("shows the empty-map copy AND the preview pins when myMap() resolves no pins", async () => {
     myMap.mockResolvedValue([]);
 
     await renderMapaPage();
 
     expect(await screen.findByText(new RegExp(COPY.emptyMap.en, "i"))).toBeInTheDocument();
+    expect(await screen.findByText(new RegExp(COPY.previewHint.en, "i"))).toBeInTheDocument();
+    const ids = (await screen.findByTestId("spot-map-ids")).textContent ?? "";
+    expect(ids.split(",")).toHaveLength(PREVIEW_SPOTS.length);
+    expect(ids.split(",").every((entry) => entry.endsWith(":preview"))).toBe(true);
+    expect(screen.getByTestId("spot-map-fit")).toHaveTextContent(JSON.stringify(previewBounds()));
+  });
+
+  it("does not override the city fit once the account has real pins", async () => {
+    myMap.mockResolvedValue([makeMapSpot({ id: "spot-1", source: "mine" })]);
+
+    await renderMapaPage();
+
+    await screen.findByTestId("spot-map-ids");
+    expect(screen.getByTestId("spot-map-fit")).toHaveTextContent("");
+    expect(screen.getByTestId("spot-map-fit").textContent).toBe("");
+  });
+
+  it("does not show the preview pins once the account has real pins", async () => {
+    myMap.mockResolvedValue([makeMapSpot({ id: "spot-1", source: "mine" })]);
+
+    await renderMapaPage();
+
+    expect(await screen.findByTestId("spot-map-ids")).toHaveTextContent("spot-1:mine");
+    expect(screen.getByTestId("spot-map-ids")).not.toHaveTextContent("preview");
+    expect(screen.queryByText(new RegExp(COPY.previewHint.en, "i"))).not.toBeInTheDocument();
+  });
+
+  it("legend: unchecking every source still leaves the preview pins on an empty map", async () => {
+    myMap.mockResolvedValue([]);
+    const user = userEvent.setup();
+    await renderMapaPage();
+    await screen.findByTestId("spot-map-ids");
+
+    await user.click(screen.getByRole("checkbox", { name: new RegExp(COPY.mine.en, "i") }));
+    await user.click(screen.getByRole("checkbox", { name: new RegExp(COPY.been.en, "i") }));
+    await user.click(screen.getByRole("checkbox", { name: new RegExp(COPY.saved.en, "i") }));
+
+    const ids = screen.getByTestId("spot-map-ids").textContent ?? "";
+    expect(ids.split(",")).toHaveLength(PREVIEW_SPOTS.length);
   });
 
   it("legend: unchecking 'Guardao' hides saved-source pins from the map", async () => {

@@ -80,7 +80,17 @@ interface SpotMapProps {
    * `openSpotId` is set (that deep link opens its own popup instead).
    */
   fitToCity?: boolean;
+  /**
+   * Fits the view to these [[south, west], [north, east]] bounds whenever
+   * the value changes (compared by value, so an inline literal is fine),
+   * and wins over `fitToCity` when both are set on mount. Mi mapa uses it
+   * to frame the preview pins, which fit-to-city would leave off-screen.
+   */
+  fitBounds?: [[number, number], [number, number]];
 }
+
+/** Padding + zoom cap for `fitBounds`, so a tight downtown cluster doesn't land at street level. */
+const FIT_BOUNDS_OPTIONS = { padding: [32, 32] as [number, number], maxZoom: 15 };
 
 const FAB_CLASS =
   "zpots-shadow absolute right-4 top-4 z-[1000] flex min-h-10 items-center gap-2 rounded-full " +
@@ -112,7 +122,9 @@ function submitErrorMessage(error: unknown): string {
  * an unconfirmed spot you dropped yourself should still look different.
  */
 function iconForMapSpot(spot: MapSpot) {
-  if (spot.source === "mine") {
+  // Preview pins (famous-places fallback) are photo pins too -- they exist
+  // to show what a filled-in map looks like.
+  if (spot.source === "mine" || spot.source === "preview") {
     if (spot.photoUrl) return createPhotoPinIcon(spot.photoUrl, spot.status);
     return createPinIcon(spot.status);
   }
@@ -138,6 +150,7 @@ export default function SpotMap({
   onUnsave,
   sourceFilter,
   fitToCity = false,
+  fitBounds,
 }: SpotMapProps) {
   // Fail-closed default: an absent authStatus (only possible under the
   // frozen SpotMap.test.tsx, which never exercises a gated action) behaves
@@ -199,6 +212,16 @@ export default function SpotMap({
     leafletMap.fitBounds(CITY_OUTLINE_BOUNDS, { padding: [16, 16] });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leafletMap]);
+
+  // Explicit bounds (Mi mapa's preview pins): re-fits whenever the bounds
+  // *value* changes. Declared after the fit-to-city effect on purpose so
+  // that, when both apply on the same mount, this one runs last and wins.
+  const fitBoundsKey = fitBounds ? JSON.stringify(fitBounds) : null;
+  useEffect(() => {
+    if (!leafletMap || !fitBounds || openSpotId) return;
+    leafletMap.fitBounds(fitBounds, FIT_BOUNDS_OPTIONS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leafletMap, fitBoundsKey]);
 
   // Only listens once the real Leaflet Map instance is available (never
   // happens under a test double that doesn't forward `ref`) -- clicking an
@@ -380,6 +403,7 @@ export default function SpotMap({
                     {spot.confirmations} confirmation{spot.confirmations === 1 ? "" : "s"}
                   </p>
                   {spot.nickname && <p className="zpots-popup-credit">by {spot.nickname}</p>}
+                  {spot.photoCredit && <p className="zpots-popup-credit">{`Foto: ${spot.photoCredit}`}</p>}
                   {(onConfirmSpot || onReportSpot) && (
                     <div className="zpots-popup-actions">
                       {onConfirmSpot && (

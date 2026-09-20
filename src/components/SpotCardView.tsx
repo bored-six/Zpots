@@ -15,6 +15,7 @@ import SpotPhoto from "@/components/SpotPhoto";
 import type { AuthStatus } from "@/lib/auth";
 import { bilingualLabel, COPY } from "@/lib/copy";
 import { formatDistance } from "@/lib/geo";
+import { isPreviewSpot } from "@/lib/preview-spots";
 import type { Spot, SpotCard } from "@/lib/spots";
 import type { ReportReason } from "@/lib/validation";
 
@@ -73,12 +74,31 @@ export default function SpotCardView({
   const router = useRouter();
 
   const spotBase: Spot = card;
+  // A preview spot (famous-places fallback) is read-only: its author has
+  // no profile page and its id does not exist server-side, so the profile
+  // link and every RPC-backed action are left out rather than gated.
+  const isPreview = isPreviewSpot(card.id);
   // Only the English phrase is rendered here (unlike the rest of this
   // card): the Chavacano and English templates would both interpolate the
   // same formatted number, so a Bilingual-style pair would put the exact
   // same substring on the page twice.
   const distanceText =
     card.distanceM != null ? COPY.distanceAway.en.replace("{n}", formatDistance(card.distanceM)) : null;
+
+  const authorBlock = (
+    <>
+      <Avatar
+        handle={card.author.handle}
+        avatarUrl={card.author.avatarUrl}
+        displayName={card.author.displayName}
+        size={40}
+      />
+      <span className="flex flex-col leading-tight">
+        <span className="font-bold text-cream">{card.author.displayName}</span>
+        <span className="text-sm text-cream/80">{`@${card.author.handle}`}</span>
+      </span>
+    </>
+  );
 
   function handleInsetTap() {
     if (isOnMyMap) {
@@ -116,18 +136,18 @@ export default function SpotCardView({
       </div>
 
       <div className="relative mt-auto flex flex-col gap-3 p-4 text-cream">
-        <Link href={`/u/${card.author.handle}`} className="flex w-fit items-center gap-2">
-          <Avatar
-            handle={card.author.handle}
-            avatarUrl={card.author.avatarUrl}
-            displayName={card.author.displayName}
-            size={40}
-          />
-          <span className="flex flex-col leading-tight">
-            <span className="font-bold text-cream">{card.author.displayName}</span>
-            <span className="text-sm text-cream/80">{`@${card.author.handle}`}</span>
-          </span>
-        </Link>
+        {isPreview ? (
+          <div className="flex w-fit items-center gap-2">
+            {authorBlock}
+            <span className="ml-1 rounded-full border border-cream/60 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-cream">
+              <Bilingual k="preview" tone="inherit" />
+            </span>
+          </div>
+        ) : (
+          <Link href={`/u/${card.author.handle}`} className="flex w-fit items-center gap-2">
+            {authorBlock}
+          </Link>
+        )}
 
         <div>
           <h2
@@ -141,10 +161,15 @@ export default function SpotCardView({
 
         {distanceText && <p className="text-xs text-cream/80">{distanceText}</p>}
 
+        {isPreview && card.photoCredit && (
+          <p className="text-[11px] text-cream/70">{`Foto: ${card.photoCredit}`}</p>
+        )}
+
         <span className="zpots-popup-status w-fit" data-status={card.status}>
           <Bilingual k={card.status === "confirmed" ? "statusConfirmed" : "statusUnconfirmed"} tone="inherit" />
         </span>
 
+        {!isPreview && (
         <div className="flex flex-wrap items-center gap-2">
           {isSaved ? (
             <button
@@ -172,6 +197,7 @@ export default function SpotCardView({
 
           <ReportButton spotId={card.id} onReport={onReport} />
         </div>
+        )}
       </div>
 
       {showSaveGate && <SignInPrompt action="save" onDismiss={() => setShowSaveGate(false)} />}
