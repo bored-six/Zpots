@@ -85,3 +85,13 @@ Rolling log of non-obvious discoveries. Newest first. Prune entries older than 6
 - **Fit-to-city leaves downtown below the fold:** the outline is tall (6.78 to 7.48 lat) and clamps to MIN_ZOOM 12 centered mid-city. `SpotMap`'s new `fitBounds` prop (compared by value, capped at zoom 15) frames the preview cluster instead; it is declared after the fit-to-city effect so it wins on the same mount.
 - **Photos are hot-linked from Wikimedia Commons** (CC BY-SA, attribution in `photoCredit`, rendered on the card and in the popup). `SpotPhoto`'s onError placeholder covers a dead link; `next.config` needs no `remotePatterns` because the app uses plain `<img>`.
 - **Full-suite timeouts while `next dev` and the browser pane are running** (AddSpotForm, profile-page, settings-page) pass alone; the CPU contention, not the code, is the cause.
+
+## 2026-09-20 - Applying migrations to a hosted Supabase project
+
+Three real failures hitting a live project with migration 0004, worth not repeating:
+
+- **The SQL editor cannot own `storage.buckets`.** `insert into storage.buckets ...` fails with `42501: must be owner of table buckets` on current projects, even though 0001 did it successfully when this project was created. Create buckets in Dashboard > Storage and keep only `storage.objects` policies in SQL.
+- **A failed run is not necessarily rolled back.** Despite the `begin; ... commit;` wrapper, the editor had already committed the tables before the failing statement, so the re-run died on `42P07: relation "profiles" already exists`. Every migration that a human pastes must be idempotent: `if not exists`, `or replace`, `drop policy/trigger if exists`, and a `pg_constraint` guard around `add constraint`.
+- **Never `drop view` when functions return `setof` that view.** `feed_nuevo` and `feed_siguiendo` are declared `returns setof public.spot_cards`, which depends on the view's composite type, so a drop fails with `2BP01`. Use `create or replace view`, which keeps the type OID. `drop ... cascade` would have silently removed the functions. A test now asserts the file contains no `drop view`.
+- **Do not let a test regex drive SQL shape.** The `drop view` above was introduced only so an existing regex would keep matching. Change the test, not the DDL.
+- **No local Postgres here** (no docker, psql, or supabase CLI), so migrations cannot be rehearsed before the user runs them. Compensate with a statement-by-statement static audit and a commented verification query at the end of the file.
