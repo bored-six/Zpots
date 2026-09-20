@@ -35,7 +35,10 @@ function cardRow(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  // resetAllMocks (not clearAllMocks) so a mockResolvedValueOnce queued by
+  // one test can never leak into the next test's first call -- clearAllMocks
+  // wipes call history but leaves queued once-implementations in place.
+  vi.resetAllMocks();
   vi.mocked(requireUserId).mockResolvedValue("user-1");
   vi.mocked(getCurrentUser).mockResolvedValue({ id: "user-1", email: "a@b.com", nickname: "" });
 });
@@ -139,11 +142,23 @@ describe("feedNuevo", () => {
   });
 
   it("is readable while signed out", async () => {
-    vi.mocked(getCurrentUser).mockResolvedValueOnce(null);
+    // mockResolvedValue (not Once) -- a queued once-value here has nothing
+    // to do with this test's identity-independent behavior and would only
+    // risk leaking into whichever test runs next.
+    vi.mocked(getCurrentUser).mockResolvedValue(null);
     const rpcMock = vi.fn().mockResolvedValue({ data: [cardRow()], error: null });
     vi.mocked(getSupabaseClient).mockReturnValue({ rpc: rpcMock } as never);
 
     await expect(feedNuevo()).resolves.toHaveLength(1);
+  });
+
+  it("never calls getCurrentUser -- feed_nuevo is a public read with no identity scoping", async () => {
+    const rpcMock = vi.fn().mockResolvedValue({ data: [], error: null });
+    vi.mocked(getSupabaseClient).mockReturnValue({ rpc: rpcMock } as never);
+
+    await feedNuevo();
+
+    expect(getCurrentUser).not.toHaveBeenCalled();
   });
 });
 

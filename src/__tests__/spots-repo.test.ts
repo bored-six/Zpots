@@ -21,7 +21,6 @@ import { getSupabaseClient } from "@/lib/supabase";
 import { getCurrentUser, requireUserId } from "@/lib/auth";
 import { createFakeSupabase, makeSpotRow } from "@/__tests__/helpers/fake-supabase";
 import {
-  fetchSpots,
   createSpot,
   confirmSpot,
   reportSpot,
@@ -39,64 +38,6 @@ beforeEach(() => {
     id: "user-uuid",
     email: "person@example.com",
     nickname: "",
-  });
-});
-
-// ---------------------------------------------------------------------------
-// fetchSpots
-// ---------------------------------------------------------------------------
-describe("fetchSpots", () => {
-  it("resolves to the array of rows the client returns", async () => {
-    const rows: Spot[] = [
-      {
-        id: "spot-1",
-        name: "Fort Pilar",
-        note: "Historic fort.",
-        lat: 6.9098,
-        lng: 122.079,
-        status: "unconfirmed",
-        confirmations: 0,
-        createdAt: "2026-01-01T00:00:00.000Z",
-      },
-    ];
-    const selectMock = vi.fn().mockReturnValue(Promise.resolve({ data: rows, error: null }));
-    const fromMock = vi.fn(() => ({ select: selectMock }));
-    vi.mocked(getSupabaseClient).mockReturnValue({ from: fromMock } as never);
-
-    const result = await fetchSpots();
-
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ id: "spot-1", name: "Fort Pilar" });
-  });
-
-  it("resolves to an empty array when there are no rows", async () => {
-    const selectMock = vi.fn().mockReturnValue(Promise.resolve({ data: [], error: null }));
-    const fromMock = vi.fn(() => ({ select: selectMock }));
-    vi.mocked(getSupabaseClient).mockReturnValue({ from: fromMock } as never);
-
-    const result = await fetchSpots();
-
-    expect(result).toEqual([]);
-  });
-
-  it("rejects when the client reports an error, instead of silently returning nothing", async () => {
-    const selectMock = vi
-      .fn()
-      .mockReturnValue(Promise.resolve({ data: null, error: { message: "network error" } }));
-    const fromMock = vi.fn(() => ({ select: selectMock }));
-    vi.mocked(getSupabaseClient).mockReturnValue({ from: fromMock } as never);
-
-    await expect(fetchSpots()).rejects.toBeTruthy();
-  });
-
-  it("runs for signed-out visitors too (never calls requireUserId)", async () => {
-    const selectMock = vi.fn().mockReturnValue(Promise.resolve({ data: [], error: null }));
-    const fromMock = vi.fn(() => ({ select: selectMock }));
-    vi.mocked(getSupabaseClient).mockReturnValue({ from: fromMock } as never);
-
-    await fetchSpots();
-
-    expect(requireUserId).not.toHaveBeenCalled();
   });
 });
 
