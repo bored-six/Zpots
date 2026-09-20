@@ -18,6 +18,7 @@ import type { AuthStatus } from "@/lib/auth";
 import { isWithinZamboangaCity } from "@/lib/city-bounds";
 import { CITY_OUTLINE_BOUNDS } from "@/lib/city-outline";
 import { bilingualLabel } from "@/lib/copy";
+import { hasUsableMapSize } from "@/lib/leaflet-safe-view";
 import {
   DEFAULT_ZOOM,
   MAX_BOUNDS,
@@ -102,6 +103,50 @@ interface SpotMapProps {
 
 /** Padding + zoom cap for `fitBounds`, so a tight downtown cluster doesn't land at street level. */
 const FIT_BOUNDS_OPTIONS = { padding: [32, 32] as [number, number], maxZoom: 15 };
+
+/**
+ * `fitBounds`, guarded the same way `MapInsetInner`'s `FlyToCenter` guards
+ * `flyTo`: `fitBounds`'s own zoom-to-fit math (`Map#getBoundsZoom`) divides
+ * by the container's pixel size, and a 0x0 container -- possible the
+ * instant this map mounts, before layout has settled -- turns that into
+ * NaN, which Leaflet's `LatLng` constructor then throws on regardless of
+ * `animate`. If the container isn't sized yet, wait one frame (nudging
+ * Leaflet to notice its real size via `invalidateSize()`) and retry once;
+ * either way a throw is swallowed rather than crashing the page. Returns a
+ * cleanup that cancels the pending retry, if there is one.
+ */
+function safeFitBounds(
+  map: LeafletMap,
+  bounds: Parameters<LeafletMap["fitBounds"]>[0],
+  options?: Parameters<LeafletMap["fitBounds"]>[1],
+): () => void {
+  // Unlike `flyTo`, `fitBounds` has no safe animate:false-style fallback --
+  // the NaN comes from the zoom-to-fit math itself, not the animation on
+  // top of it. So a still-zero container after the retry just doesn't get
+  // fit, rather than risking the crash.
+  function fitIfUsable(): boolean {
+    if (!hasUsableMapSize(map)) return false;
+    try {
+      map.fitBounds(bounds, options);
+    } catch {
+      // A fit must never take the whole page down.
+    }
+    return true;
+  }
+
+  if (fitIfUsable()) return () => {};
+
+  let cancelled = false;
+  const frame = requestAnimationFrame(() => {
+    if (cancelled) return;
+    map.invalidateSize();
+    fitIfUsable();
+  });
+  return () => {
+    cancelled = true;
+    cancelAnimationFrame(frame);
+  };
+}
 
 const FAB_CLASS =
   "zpots-shadow absolute right-4 top-4 z-[1000] flex min-h-10 items-center gap-2 rounded-full " +
@@ -220,7 +265,7 @@ export default function SpotMap({
   // every later identity change of either.
   useEffect(() => {
     if (!leafletMap || !fitToCity || openSpotId) return;
-    leafletMap.fitBounds(CITY_OUTLINE_BOUNDS, { padding: [16, 16] });
+    return safeFitBounds(leafletMap, CITY_OUTLINE_BOUNDS, { padding: [16, 16] });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leafletMap]);
 
@@ -230,7 +275,7 @@ export default function SpotMap({
   const fitBoundsKey = fitBounds ? JSON.stringify(fitBounds) : null;
   useEffect(() => {
     if (!leafletMap || !fitBounds || openSpotId) return;
-    leafletMap.fitBounds(fitBounds, FIT_BOUNDS_OPTIONS);
+    return safeFitBounds(leafletMap, fitBounds, FIT_BOUNDS_OPTIONS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leafletMap, fitBoundsKey]);
 

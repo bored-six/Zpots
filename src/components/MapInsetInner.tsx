@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import type { Map as LeafletMap } from "leaflet";
 import { MapContainer, Marker, TileLayer, useMap } from "react-leaflet";
 
 import CityMask from "@/components/CityMask";
 import type { LatLng } from "@/lib/geo";
+import { hasUsableMapSize } from "@/lib/leaflet-safe-view";
 import { TILE_ATTRIBUTION, TILE_URL } from "@/lib/map-config";
 import { createPinIcon } from "@/lib/pin-icon";
 import type { SpotStatus } from "@/lib/spots";
@@ -41,13 +43,86 @@ function isUsableCenter(center: LatLng | undefined | null): center is LatLng {
   );
 }
 
-/** Leaflet-side controller: pans (flyTo) whenever `center` changes. */
+/**
+ * Recenters via `setView` (no animation, no division-by-pixel-size math) --
+ * the safe fallback whenever an animated `flyTo` can't be trusted, and used
+ * again once the container has a real size to make sure it's centered on
+ * whatever `center` was actually meant. Swallows a throw defensively: a pan
+ * must never take the whole page down.
+ */
+function safeSetView(map: LeafletMap, center: LatLng) {
+  try {
+    map.setView([center.lat, center.lng], map.getZoom(), { animate: false });
+  } catch {
+    // Nothing useful to do beyond not crashing.
+  }
+}
+
+/**
+ * Leaflet-side controller: pans whenever `center` changes to a different
+ * coordinate.
+ *
+ * Does *not* pan on the very first run -- `MapContainer`'s own `center`
+ * prop already positions the map at mount, so an initial pan here would
+ * just be a redundant animation. It was also, in practice, the dangerous
+ * one: `MapInset`'s `fill` variant (`app/page.tsx`'s desktop right column,
+ * `h-full w-full` inside a flex row) can still report a 0x0 container to
+ * Leaflet the moment this effect first fires, before that flex layout has
+ * resolved a real height. Leaflet's `flyTo` divides by the container's
+ * pixel size (`getSize()`) as part of its easing math; a 0x0 size turns
+ * that into NaN, which its `LatLng` constructor then throws on --
+ * "Invalid LatLng object: (NaN, NaN)" -- taking down the whole page.
+ */
 function FlyToCenter({ center }: { center: LatLng }) {
   const map = useMap();
+  const previousCenterRef = useRef<LatLng | null>(null);
+
+  // If the container is already usably sized at mount, there's nothing to
+  // fix here -- MapContainer's own `center` prop already positioned it
+  // correctly. Otherwise (the `fill` variant before its flex layout has
+  // resolved a real height), wait one frame, nudge Leaflet to recompute
+  // against whatever real size it has by then via `invalidateSize()`, and
+  // reapply the center it was mounted with -- the pixel origin Leaflet
+  // computed against the 0x0 container at mount would otherwise stay
+  // wrong even after the box gets its real height.
+  useEffect(() => {
+    if (hasUsableMapSize(map)) return;
+
+    let cancelled = false;
+    const frame = requestAnimationFrame(() => {
+      if (cancelled) return;
+      map.invalidateSize();
+      const pending = previousCenterRef.current;
+      if (pending) safeSetView(map, pending);
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
+    // Runs once per mount only -- `map` is a stable reference from
+    // react-leaflet, not something that should retrigger this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!isUsableCenter(center)) return;
-    map.flyTo([center.lat, center.lng], map.getZoom(), { duration: 0.25 });
+
+    const previous = previousCenterRef.current;
+    const isFirstRun = previous === null;
+    const isUnchanged = previous !== null && previous.lat === center.lat && previous.lng === center.lng;
+    previousCenterRef.current = center;
+
+    if (isFirstRun || isUnchanged) return;
+
+    if (hasUsableMapSize(map)) {
+      try {
+        map.flyTo([center.lat, center.lng], map.getZoom(), { duration: 0.25 });
+      } catch {
+        // A pan must never take the whole page down.
+      }
+    } else {
+      safeSetView(map, center);
+    }
     // Only the coordinates should retrigger the pan -- not a new `map`
     // reference (there isn't one) or a new function identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps

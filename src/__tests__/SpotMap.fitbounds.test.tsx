@@ -15,6 +15,11 @@ const { fakeMap } = vi.hoisted(() => ({
     off: vi.fn(),
     setMaxBounds: vi.fn(),
     fitBounds: vi.fn(),
+    // A real (non-zero) size so the zero-size guard's happy path (call
+    // fitBounds immediately, no rAF retry) is what this file exercises --
+    // the zero-size retry path has its own dedicated test file.
+    getSize: vi.fn(() => ({ x: 800, y: 600 })),
+    invalidateSize: vi.fn(),
   },
 }));
 

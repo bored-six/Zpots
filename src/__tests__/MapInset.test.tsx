@@ -1,6 +1,6 @@
 import { useEffect, useState, type ComponentType } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LatLng } from "@/lib/geo";
 
 // MapInset.tsx wraps its own inner component in `next/dynamic` (unlike
@@ -30,10 +30,18 @@ vi.mock("next/dynamic", () => ({
   },
 }));
 
-// flyTo is asserted on directly, so it has to be a spy that survives
-// vi.mock's hoisting (a plain outer `let` wouldn't be initialized yet when
-// the mock factory below runs).
-const { flyToSpy } = vi.hoisted(() => ({ flyToSpy: vi.fn() }));
+// flyTo/setView/invalidateSize are asserted on directly, so they have to be
+// spies that survive vi.mock's hoisting (a plain outer `let` wouldn't be
+// initialized yet when the mock factory below runs). `sizeRef` lets a test
+// flip what `getSize()` reports (a real size vs. the zero-size container
+// that's the whole point of this regression suite) without needing a fresh
+// mock per test.
+const { flyToSpy, setViewSpy, invalidateSizeSpy, sizeRef } = vi.hoisted(() => ({
+  flyToSpy: vi.fn(),
+  setViewSpy: vi.fn(),
+  invalidateSizeSpy: vi.fn(),
+  sizeRef: { current: { x: 800, y: 600 } },
+}));
 
 vi.mock("react-leaflet", async () => {
   const React = await import("react");
@@ -47,7 +55,10 @@ vi.mock("react-leaflet", async () => {
     ),
     useMap: () => ({
       flyTo: flyToSpy,
+      setView: setViewSpy,
+      invalidateSize: invalidateSizeSpy,
       getZoom: () => 16,
+      getSize: () => sizeRef.current,
     }),
   };
 });
@@ -58,15 +69,19 @@ vi.mock("@/components/CityMask", () => ({
 
 import MapInset from "@/components/MapInset";
 
+const CENTER_A: LatLng = { lat: 6.9042, lng: 122.0812 };
+const CENTER_B: LatLng = { lat: 6.91, lng: 122.09 };
+
+beforeEach(() => {
+  flyToSpy.mockClear();
+  setViewSpy.mockClear();
+  invalidateSizeSpy.mockClear();
+  sizeRef.current = { x: 800, y: 600 };
+});
+
 describe("MapInset", () => {
   it("renders a CityMask inside the map container", async () => {
-    render(
-      <MapInset
-        center={{ lat: 6.9042, lng: 122.0812 }}
-        status="unconfirmed"
-        onExpand={vi.fn()}
-      />,
-    );
+    render(<MapInset center={CENTER_A} status="unconfirmed" onExpand={vi.fn()} />);
 
     const mapContainer = await screen.findByTestId("map-container");
     const cityMask = await screen.findByTestId("city-mask");
@@ -74,17 +89,50 @@ describe("MapInset", () => {
     expect(mapContainer).toContainElement(cityMask);
   });
 
-  it("calls flyTo with the finite center it was given", async () => {
-    flyToSpy.mockClear();
-    render(
-      <MapInset
-        center={{ lat: 6.9042, lng: 122.0812 }}
-        status="unconfirmed"
-        onExpand={vi.fn()}
-      />,
-    );
+  // Regression coverage for "Invalid LatLng object: (NaN, NaN)" taking down
+  // the whole page: `MapContainer`'s own `center` prop already positions
+  // the map correctly on first render, so FlyToCenter must not re-pan on
+  // mount at all -- that redundant pan was also the one most likely to run
+  // before layout had settled (see the zero-size test below).
+  it("does not pan on mount when the container is already usably sized", async () => {
+    render(<MapInset center={CENTER_A} status="unconfirmed" onExpand={vi.fn()} />);
 
-    await waitFor(() => expect(flyToSpy).toHaveBeenCalledWith([6.9042, 122.0812], 16, expect.anything()));
+    await screen.findByTestId("map-container");
+    // Give any stray mount-time pan a chance to fire before asserting the
+    // negative.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(flyToSpy).not.toHaveBeenCalled();
+    expect(setViewSpy).not.toHaveBeenCalled();
+  });
+
+  it("pans exactly once, via flyTo, when the center changes and the container is usably sized", async () => {
+    const { rerender } = render(<MapInset center={CENTER_A} status="unconfirmed" onExpand={vi.fn()} />);
+    await screen.findByTestId("map-container");
+
+    rerender(<MapInset center={CENTER_B} status="unconfirmed" onExpand={vi.fn()} />);
+
+    await waitFor(() => expect(flyToSpy).toHaveBeenCalledTimes(1));
+    expect(flyToSpy).toHaveBeenCalledWith([CENTER_B.lat, CENTER_B.lng], 16, expect.anything());
+    expect(setViewSpy).not.toHaveBeenCalled();
+  });
+
+  // The exact regression this suite exists for: a zero-size container (the
+  // `fill` variant, `app/page.tsx`'s desktop right column, before its flex
+  // layout resolves a real height) must never reach `flyTo` -- its
+  // animation math divides by the container's pixel size and produces NaN,
+  // which Leaflet's `LatLng` constructor then throws on.
+  it("never calls flyTo and never throws when the container has a zero size", async () => {
+    sizeRef.current = { x: 0, y: 0 };
+    const { rerender } = render(<MapInset center={CENTER_A} status="unconfirmed" onExpand={vi.fn()} />);
+    await screen.findByTestId("map-container");
+
+    rerender(<MapInset center={CENTER_B} status="unconfirmed" onExpand={vi.fn()} />);
+
+    // Give the effect a chance to run before asserting the negative.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(flyToSpy).not.toHaveBeenCalled();
   });
 
   // Regression coverage for "Invalid LatLng object: (NaN, NaN)" (a full-page
