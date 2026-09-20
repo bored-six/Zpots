@@ -24,6 +24,17 @@ const { fakeMap, emitMapClick } = vi.hoisted(() => {
     // SpotMap now also calls this imperatively (belt-and-suspenders on top
     // of the `maxBounds` JSX prop) once the map instance is available.
     setMaxBounds: () => {},
+    // PlaceLabelsLayer (and BasemapLayer) take the live map as a plain
+    // `map` prop rather than `useMap()` -- see PlaceLabelsLayer.tsx's own
+    // comment -- so it's this forwarded-ref fake, not react-leaflet's
+    // `useMap()` mock, that needs the imperative pane/layer API a real
+    // `L.Map` provides. Same shape as SpotMap.city.test.tsx's `useMap()`
+    // stand-in.
+    getPane: () => ({ style: {} }) as unknown as HTMLElement,
+    createPane: () => ({ style: {} }) as unknown as HTMLElement,
+    addLayer: () => {},
+    removeLayer: () => {},
+    getZoom: () => 14,
   };
   const emitMapClick = (lat: number, lng: number) => {
     for (const handler of handlers["click"] ?? []) {

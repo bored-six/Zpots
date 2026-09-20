@@ -22,6 +22,17 @@ const { fakeMap, sizeRef } = vi.hoisted(() => ({
     fitBounds: vi.fn(),
     invalidateSize: vi.fn(),
     getSize: vi.fn(),
+    // PlaceLabelsLayer (and BasemapLayer) take the live map as a plain
+    // `map` prop rather than `useMap()` -- see PlaceLabelsLayer.tsx's own
+    // comment -- so it's this forwarded-ref fake, not react-leaflet's
+    // `useMap()` mock below, that needs the imperative pane/layer API a
+    // real `L.Map` provides. Same shape as SpotMap.city.test.tsx's
+    // `useMap()` stand-in.
+    getPane: vi.fn(() => ({ style: {} }) as unknown as HTMLElement),
+    createPane: vi.fn(() => ({ style: {} }) as unknown as HTMLElement),
+    addLayer: vi.fn(),
+    removeLayer: vi.fn(),
+    getZoom: vi.fn(() => 14),
   },
 }));
 
