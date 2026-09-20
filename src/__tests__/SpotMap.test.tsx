@@ -169,7 +169,13 @@ describe("SpotMap", () => {
     const popup = screen.getByTestId("popup");
     expect(within(popup).getByText(confirmedSpot.name)).toBeInTheDocument();
     expect(within(popup).getByText(confirmedSpot.note)).toBeInTheDocument();
-    expect(within(popup).getByText(/^confirmed$/i)).toBeInTheDocument();
+    // Plural, not singular: the status pill's own Bilingual(statusConfirmed)
+    // English span and ConfirmButton's settled badge both legitimately
+    // render the exact word "Confirmed" in a confirmed spot's popup (fix
+    // round 1, spec item R1) -- at least one match is what matters here,
+    // not exactly one.
+    const matches = within(popup).getAllByText(/^confirmed$/i);
+    expect(matches.length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders a note containing HTML-special characters as literal text, not injected markup", () => {

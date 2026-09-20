@@ -60,7 +60,7 @@ export default function ReportButton({ spotId, onReport }: ReportButtonProps) {
         className="inline-flex min-h-10 items-center gap-1.5 rounded border border-cardinal px-2.5 py-1.5 text-xs font-bold uppercase tracking-wide text-cardinal hover:bg-cream-deep"
       >
         <FlagIcon size={14} />
-        <Bilingual k="report" />
+        <Bilingual k="report" layout="stack" />
       </button>
     );
   }

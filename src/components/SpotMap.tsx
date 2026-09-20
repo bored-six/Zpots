@@ -12,6 +12,7 @@ import { AlertIcon } from "@/components/icons/status-icons";
 import { VintaRule } from "@/components/icons/ornaments";
 import ReportButton from "@/components/ReportButton";
 import SignInPrompt, { type GatedAction } from "@/components/SignInPrompt";
+import SpotPhoto from "@/components/SpotPhoto";
 import type { AuthStatus } from "@/lib/auth";
 import { isWithinZamboangaCity } from "@/lib/city-bounds";
 import { bilingualLabel } from "@/lib/copy";
@@ -67,17 +68,6 @@ const CARD_CLASS =
   "zpots-shadow flex max-h-full w-full max-w-sm flex-col overflow-y-auto rounded-[6px] " +
   "border border-stone bg-cream";
 const CARD_BODY_CLASS = "flex flex-col gap-4 p-5";
-
-/**
- * "Unconfirmed pin" or "Confirmed pin" -- the status pill's own label.
- * Deliberately not the bare word "Confirmed": `ConfirmButton`'s settled
- * badge (now rendered in this same popup, spec item 4) already uses that
- * exact word, and a second literal match would make it ambiguous which
- * element a plain-text query found.
- */
-function statusLabel(spot: Spot): string {
-  return spot.status === "confirmed" ? "Confirmed pin" : "Unconfirmed pin";
-}
 
 function submitErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong. Please try again.";
@@ -253,21 +243,15 @@ export default function SpotMap({
               <div className="zpots-popup">
                 <VintaRule />
                 <div className="px-4 py-3.5">
-                  {spot.photoUrl && (
-                    // next/image needs a known width/height or `fill` with a
-                    // sized parent; a Leaflet popup sizes itself around its
-                    // content, so a plain <img> is the simpler, correct fit.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={spot.photoUrl}
-                      alt={`Photo of ${spot.name}`}
-                      className="zpots-popup-photo"
-                    />
-                  )}
+                  <SpotPhoto photoUrl={spot.photoUrl} name={spot.name} />
                   <p className="zpots-popup-name">{spot.name}</p>
                   <p className="zpots-popup-note">{spot.note}</p>
                   <span className="zpots-popup-status" data-status={spot.status}>
-                    {statusLabel(spot)}
+                    {spot.status === "confirmed" ? (
+                      <Bilingual k="statusConfirmed" />
+                    ) : (
+                      <Bilingual k="statusUnconfirmed" />
+                    )}
                   </span>
                   <p className="zpots-popup-confirmations">
                     {spot.confirmations} confirmation{spot.confirmations === 1 ? "" : "s"}
@@ -305,7 +289,11 @@ export default function SpotMap({
           className={`${FAB_CLASS} ${isPlacementArmed ? FAB_ARMED_CLASS : FAB_IDLE_CLASS}`}
         >
           <AddSpotIcon />
-          {isPlacementArmed ? <Bilingual k="cancel" /> : <Bilingual k="addSpot" />}
+          {isPlacementArmed ? (
+            <Bilingual k="cancel" tone="inherit" />
+          ) : (
+            <Bilingual k="addSpot" tone="inherit" />
+          )}
         </button>
       )}
 

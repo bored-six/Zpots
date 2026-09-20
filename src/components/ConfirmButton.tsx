@@ -20,8 +20,8 @@ const BADGE_CLASS =
   "uppercase tracking-wide text-cream";
 
 const CTA_CLASS =
-  "inline-flex min-h-10 items-center gap-1.5 rounded bg-terracotta px-3 py-1.5 text-sm " +
-  "font-bold text-cream hover:bg-terracotta-deep disabled:cursor-not-allowed " +
+  "inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded bg-terracotta px-4 " +
+  "py-1.5 text-sm font-bold text-cream hover:bg-terracotta-deep disabled:cursor-not-allowed " +
   "disabled:bg-stone disabled:text-stone-deep";
 
 /**
@@ -54,7 +54,11 @@ export default function ConfirmButton({ spot, onConfirm }: ConfirmButtonProps) {
       className={CTA_CLASS}
     >
       <CheckIcon />
-      {alreadyConfirmedByMe ? "You confirmed this spot" : <Bilingual k="confirmVisit" />}
+      {alreadyConfirmedByMe ? (
+        "You confirmed this spot"
+      ) : (
+        <Bilingual k="confirmVisit" tone="inherit" layout="stack" />
+      )}
     </button>
   );
 }

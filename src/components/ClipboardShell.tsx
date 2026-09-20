@@ -4,9 +4,9 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { useAuth } from "@/components/AuthProvider";
-import Bilingual from "@/components/Bilingual";
 import { SettingsCompassIcon } from "@/components/icons/action-icons";
 import { AzulejoBand, StoneArch, VintaRule } from "@/components/icons/ornaments";
+import { COPY } from "@/lib/copy";
 
 interface ClipboardShellProps {
   children: ReactNode;
@@ -19,7 +19,7 @@ interface ClipboardShellProps {
 }
 
 const HEADER_CLASS =
-  "relative flex items-start justify-between gap-4 bg-cream-deep px-5 py-5 sm:px-9 sm:py-6";
+  "relative flex items-start justify-between gap-4 bg-cream-deep px-5 py-3 sm:px-9 sm:py-6";
 
 /**
  * Shared plaza / stone-wall chrome for both the map page and the Settings
@@ -51,19 +51,27 @@ export default function ClipboardShell({ children, fullBleed = false }: Clipboar
         <header className={HEADER_CLASS}>
           <div>
             <p
-              className="text-[28px] tracking-wide text-ink"
+              className="text-2xl tracking-wide text-ink sm:text-[28px]"
               style={{ fontFamily: "var(--font-wordmark)" }}
             >
               Zpots
             </p>
-            <p className="mt-1 text-[0.65rem] font-bold uppercase tracking-[0.2em] text-terracotta sm:text-xs">
+            <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.2em] text-terracotta sm:text-xs">
               Ciudad de Zamboanga
             </p>
             <p
               className="mt-1 text-base italic text-stone-deep sm:text-lg"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              <Bilingual k="tagline" />
+              {/* English secondary drops to its own line below `sm` -- at
+                  375px wide, keeping it inline with the Chavacano primary
+                  wrapped the tagline across 2-3 lines and blew the header
+                  past 300px tall (fix round 1, spec item B4). */}
+              <span aria-hidden="true">{COPY.tagline.cv}</span>
+              <span className="block text-[12px] text-stone-deep sm:inline sm:text-[0.7em]">
+                {" "}
+                {COPY.tagline.en}
+              </span>
             </p>
           </div>
 

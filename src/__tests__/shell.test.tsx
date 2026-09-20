@@ -6,6 +6,7 @@ vi.mock("@/components/AuthProvider", () => ({
 }));
 
 import ClipboardShell from "@/components/ClipboardShell";
+import { AzulejoBand } from "@/components/icons/ornaments";
 
 describe("ClipboardShell -- plaza / stone-wall redesign", () => {
   it("renders the Zpots wordmark", () => {
@@ -43,5 +44,23 @@ describe("ClipboardShell -- plaza / stone-wall redesign", () => {
     );
     expect(container.querySelector('[class*="binder" i]')).toBeNull();
     expect(container.querySelector('[data-testid*="binder" i]')).toBeNull();
+  });
+});
+
+describe("AzulejoBand -- tileable lattice pattern", () => {
+  it("two rendered bands have distinct pattern ids, so neither reuses the other's <defs>", () => {
+    const { container } = render(
+      <>
+        <AzulejoBand />
+        <AzulejoBand />
+      </>,
+    );
+
+    const patterns = container.querySelectorAll("pattern");
+    expect(patterns.length).toBe(2);
+    const ids = Array.from(patterns).map((p) => p.id);
+    expect(ids[0]).toBeTruthy();
+    expect(ids[1]).toBeTruthy();
+    expect(ids[0]).not.toBe(ids[1]);
   });
 });
