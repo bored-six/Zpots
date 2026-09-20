@@ -49,11 +49,6 @@ export async function feedNuevo(
   pageSize = DEFAULT_PAGE_SIZE,
   cursor?: FeedCursor,
 ): Promise<SpotCard[]> {
-  // Reads the session (never gates on it -- Nuevo is public either way) so
-  // a signed-in caller's account is already warm for whatever the deck
-  // does next with it (e.g. the save/been button state alongside this row).
-  await getCurrentUser();
-
   const client = getSupabaseClient();
   const { data, error } = await client.rpc("feed_nuevo", {
     page_size: pageSize,
