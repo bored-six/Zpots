@@ -92,6 +92,18 @@ select:focus-visible,
   box-shadow: 0 6px 18px rgb(31 24 19 / 0.22);
 }
 
+/* Vinta-stripe ring around the Hoy row avatars (social-spots.md, "Hoy row")
+   -- same four sail-stripe tokens as .vinta-rule, wrapped into a ring
+   instead of a straight divider. */
+.vinta-ring {
+  background: conic-gradient(
+    var(--color-vinta-red) 0deg 90deg,
+    var(--color-vinta-yellow) 90deg 180deg,
+    var(--color-vinta-blue) 180deg 270deg,
+    var(--color-vinta-green) 270deg 360deg
+  );
+}
+
 .leaflet-container {
   background: var(--color-cream-deep);
   font-family: var(--font-body);
