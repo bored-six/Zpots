@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Alegreya, Alegreya_Sans, Cinzel } from "next/font/google";
 
+import AppNav from "@/components/AppNav";
 import AuthProvider from "@/components/AuthProvider";
+import HandleGate from "@/components/HandleGate";
 import "leaflet/dist/leaflet.css";
 import "./globals.css";
 
@@ -44,7 +46,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${cinzel.variable} ${alegreya.variable} ${alegreyaSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-cream text-ink font-body">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <AppNav />
+          <HandleGate />
+          <main className="pb-16 lg:pb-0 lg:pl-24">{children}</main>
+        </AuthProvider>
       </body>
     </html>
   );

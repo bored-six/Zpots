@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { useAuth } from "@/components/AuthProvider";
-import { SettingsCompassIcon } from "@/components/icons/action-icons";
 import { AzulejoBand, StoneArch, VintaRule } from "@/components/icons/ornaments";
 import { COPY } from "@/lib/copy";
 
@@ -16,6 +15,12 @@ interface ClipboardShellProps {
    * with its content (the Settings page).
    */
   fullBleed?: boolean;
+  /**
+   * Hides the tagline line so the header takes as little vertical space as
+   * possible -- used by the full-viewport Spots deck, where every pixel of
+   * height is the photo card's, not the header's.
+   */
+  compact?: boolean;
 }
 
 const HEADER_CLASS =
@@ -28,7 +33,7 @@ const HEADER_CLASS =
  * header's bottom edge. Wraps its children additively -- it does not know
  * or care what they render.
  */
-export default function ClipboardShell({ children, fullBleed = false }: ClipboardShellProps) {
+export default function ClipboardShell({ children, fullBleed = false, compact = false }: ClipboardShellProps) {
   const { status } = useAuth();
 
   return (
@@ -59,39 +64,34 @@ export default function ClipboardShell({ children, fullBleed = false }: Clipboar
             <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.2em] text-terracotta sm:text-xs">
               Ciudad de Zamboanga
             </p>
-            <p
-              className="mt-1 text-base italic text-stone-deep sm:text-lg"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              {/* English secondary drops to its own line below `sm` -- at
-                  375px wide, keeping it inline with the Chavacano primary
-                  wrapped the tagline across 2-3 lines and blew the header
-                  past 300px tall (fix round 1, spec item B4). */}
-              <span aria-hidden="true">{COPY.tagline.cv}</span>
-              <span className="block text-[12px] text-stone-deep sm:inline sm:text-[0.7em]">
-                {" "}
-                {COPY.tagline.en}
-              </span>
-            </p>
+            {!compact && (
+              <p
+                className="mt-1 text-base italic text-stone-deep sm:text-lg"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {/* English secondary drops to its own line below `sm` -- at
+                    375px wide, keeping it inline with the Chavacano primary
+                    wrapped the tagline across 2-3 lines and blew the header
+                    past 300px tall (fix round 1, spec item B4). */}
+                <span aria-hidden="true">{COPY.tagline.cv}</span>
+                <span className="block text-[12px] text-stone-deep sm:inline sm:text-[0.7em]">
+                  {" "}
+                  {COPY.tagline.en}
+                </span>
+              </p>
+            )}
           </div>
 
-          <div className="mt-1 flex shrink-0 items-center gap-3">
-            {status === "signed-out" && (
+          {status === "signed-out" && (
+            <div className="mt-1 flex shrink-0 items-center gap-3">
               <Link
                 href="/login"
                 className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-ink underline underline-offset-4 hover:text-terracotta sm:text-xs"
               >
                 Sign in
               </Link>
-            )}
-            <Link
-              href="/settings"
-              aria-label="Settings"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-stone text-ink transition hover:bg-cream-deep"
-            >
-              <SettingsCompassIcon />
-            </Link>
-          </div>
+            </div>
+          )}
         </header>
 
         <StoneArch className="block w-full" height={8} />
