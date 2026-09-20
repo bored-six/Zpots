@@ -127,8 +127,17 @@ select:focus-visible,
    TileLayer (D6 in .claude/prds/pergamino-map.md); keeping the rule alive
    is what makes that degraded map still read as Zpots instead of raw OSM
    blue. Tint lives on the tile pane only -- markers and popups are drawn
-   in other Leaflet panes, so this filter leaves them crisp either way. */
-.leaflet-tile-pane {
+   in other Leaflet panes, so this filter leaves them crisp either way.
+
+   Scoped by `[data-basemap="raster"]`, an attribute BasemapLayer.tsx sets
+   on `map.getContainer()` (this rule's `.leaflet-container` ancestor) once
+   it knows which basemap actually attached. This is load-bearing, not
+   decorative: `protomaps-leaflet` subclasses `L.GridLayer`, so the vector
+   "Pergamino" ground it draws also lands in `.leaflet-tile-pane` -- an
+   unscoped rule here tints the vector palette's deliberately-chosen
+   colours too, which defeats the entire point of drawing the map
+   ourselves. Never drop the attribute selector. */
+[data-basemap="raster"] .leaflet-tile-pane {
   filter: sepia(0.55) saturate(0.55) brightness(1.06) contrast(0.9) hue-rotate(-8deg);
 }
 

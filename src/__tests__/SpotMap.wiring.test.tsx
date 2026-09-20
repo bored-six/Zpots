@@ -35,6 +35,9 @@ const { fakeMap, emitMapClick } = vi.hoisted(() => {
     addLayer: () => {},
     removeLayer: () => {},
     getZoom: () => 14,
+    // BasemapLayer marks this with data-basemap once it resolves a mode --
+    // see BasemapLayer.container-attr.test.tsx for the dedicated coverage.
+    getContainer: () => document.createElement("div"),
   };
   const emitMapClick = (lat: number, lng: number) => {
     for (const handler of handlers["click"] ?? []) {

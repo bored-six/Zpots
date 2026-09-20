@@ -41,6 +41,9 @@ const { fakeMap, emitMapClick } = vi.hoisted(() => {
     off: (event: string, handler: (e: unknown) => void) => {
       handlers[event] = (handlers[event] ?? []).filter((h) => h !== handler);
     },
+    // BasemapLayer marks this with data-basemap once it resolves a mode --
+    // see BasemapLayer.container-attr.test.tsx for the dedicated coverage.
+    getContainer: () => document.createElement("div"),
   };
   return { fakeMap, emitMapClick };
 });

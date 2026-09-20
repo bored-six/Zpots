@@ -49,6 +49,27 @@ interface BasemapLayerProps {
 type WindowWithLeaflet = Window & { L?: unknown };
 
 /**
+ * `protomaps-leaflet` subclasses `L.GridLayer`, so its vector canvas draws
+ * into the very same `.leaflet-tile-pane` the raster fallback's `TileLayer`
+ * uses -- there is no separate pane to scope CSS to by selector alone.
+ * globals.css's sepia tint exists only to make the *raster* fallback read
+ * as Zpots (D6); the vector "Pergamino" ground's colours are chosen
+ * outright and must never be filtered. Marking the map's own container
+ * (`.leaflet-container`, the ancestor of every pane) with the resolved
+ * mode lets globals.css scope `.leaflet-tile-pane`'s filter to
+ * `[data-basemap="raster"]` only.
+ */
+function markContainerBasemapMode(map: LeafletMap, mode: BasemapMode): void {
+  map.getContainer().dataset.basemap = mode;
+}
+
+/** Cleanup counterpart to markContainerBasemapMode -- unmount or a map-prop
+ * identity change must never leave a stale attribute on an old container. */
+function clearContainerBasemapMode(map: LeafletMap): void {
+  delete map.getContainer().dataset.basemap;
+}
+
+/**
  * protomaps-leaflet's Leaflet frontend reads the *global* `L` at
  * `leafletLayer()` call time (`declare const L: any` in its source). It
  * only happens to already exist because Leaflet 1.9.4 ships as a UMD
@@ -137,6 +158,7 @@ export default function BasemapLayer({ map, onModeChange }: BasemapLayerProps) {
     function fallBackToRaster() {
       if (cancelled) return;
       setMode("raster");
+      markContainerBasemapMode(currentMap, "raster");
       onModeChange?.("raster");
     }
 
@@ -175,6 +197,7 @@ export default function BasemapLayer({ map, onModeChange }: BasemapLayerProps) {
         layer.addTo(currentMap);
         attachedLayer = layer;
         setMode("pergamino");
+        markContainerBasemapMode(currentMap, "pergamino");
         onModeChange?.("pergamino");
       } catch (error) {
         // probeBasemapArchive never throws (it resolves "unavailable"
@@ -198,6 +221,7 @@ export default function BasemapLayer({ map, onModeChange }: BasemapLayerProps) {
       if (attachedLayer) {
         currentMap.removeLayer(attachedLayer);
       }
+      clearContainerBasemapMode(currentMap);
     };
     // onModeChange is a callback prop, not reactive state this effect
     // should tear down and re-run for.

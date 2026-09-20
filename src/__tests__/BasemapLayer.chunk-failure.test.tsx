@@ -41,10 +41,14 @@ import { TILE_ATTRIBUTION, TILE_URL } from "@/lib/map-config";
 
 type FakeMap = LeafletMap & { addLayer: ReturnType<typeof vi.fn>; removeLayer: ReturnType<typeof vi.fn> };
 
+/** getContainer() returns a real DOM element so BasemapLayer's data-basemap
+ * marking has something to write to -- see BasemapLayer.container-attr.test.tsx. */
 function createFakeMap(): FakeMap {
+  const container = document.createElement("div");
   return {
     addLayer: vi.fn(),
     removeLayer: vi.fn(),
+    getContainer: () => container,
   } as unknown as FakeMap;
 }
 

@@ -31,6 +31,9 @@ const { fakeMap } = vi.hoisted(() => ({
     addLayer: vi.fn(),
     removeLayer: vi.fn(),
     getZoom: vi.fn(() => 14),
+    // BasemapLayer marks this with data-basemap once it resolves a mode --
+    // see BasemapLayer.container-attr.test.tsx for the dedicated coverage.
+    getContainer: vi.fn(() => document.createElement("div")),
   },
 }));
 

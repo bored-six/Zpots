@@ -52,11 +52,15 @@ import {
 
 type FakeMap = LeafletMap & { addLayer: ReturnType<typeof vi.fn>; removeLayer: ReturnType<typeof vi.fn> };
 
-/** A hand-written fake map recording addLayer/removeLayer -- no real Leaflet map in jsdom. */
+/** A hand-written fake map recording addLayer/removeLayer -- no real Leaflet map in jsdom.
+ * getContainer() returns a real DOM element so BasemapLayer's data-basemap
+ * marking (see BasemapLayer.container-attr.test.tsx) has something to write to. */
 function createFakeMap(): FakeMap {
+  const container = document.createElement("div");
   return {
     addLayer: vi.fn(),
     removeLayer: vi.fn(),
+    getContainer: () => container,
   } as unknown as FakeMap;
 }
 
