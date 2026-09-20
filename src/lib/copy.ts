@@ -71,6 +71,11 @@ export const COPY = {
   // shown in the deck and on Mi mapa when there is nothing real yet.
   preview: { cv: "Vista previa", en: "Preview" },
   previewHint: { cv: "Lugares famoso de Zamboanga para empeza", en: "Famous Zamboanga spots to start with" },
+
+  // pergamino-map.md PRD (T1.5) -- the raster-fallback chip shown when the
+  // vector .pmtiles basemap archive can't be read (D6).
+  simpleMap: { cv: "Mapa simple", en: "Simplified map" },
+  simpleMapWhy: { cv: "No puede carga el mapa completo", en: "Couldn't load the full map" },
 } as const;
 
 export type CopyKey = keyof typeof COPY;

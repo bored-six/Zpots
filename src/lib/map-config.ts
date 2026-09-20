@@ -28,9 +28,44 @@ export const MAX_ZOOM = 18;
  */
 export const MAX_BOUNDS = ZAMBOANGA_CITY_BOUNDS_LITERAL;
 
-/** Standard OpenStreetMap tile server template. */
+/**
+ * Standard OpenStreetMap tile server template -- kept as the raster
+ * fallback's contract (Pergamino PRD D6). Used only when the `.pmtiles`
+ * basemap archive can't be read.
+ */
 export const TILE_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
-/** Required attribution for OpenStreetMap tiles -- must stay on every map view. */
+/**
+ * Required attribution for OpenStreetMap tiles -- must stay on every map
+ * view. Kept as the raster fallback's contract (Pergamino PRD D6).
+ */
 export const TILE_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+
+/**
+ * URL of the Zamboanga-only `.pmtiles` vector basemap archive (Pergamino
+ * PRD D7). Reads an env var with a local-dev default so the hosting
+ * decision (Supabase Storage vs. `public/`) is a dashboard change, not a
+ * code change. protomaps-leaflet decides a source is PMTiles by checking
+ * that the URL's *pathname* ends in ".pmtiles" -- a query string is fine,
+ * but the path itself must end that way.
+ */
+export const BASEMAP_PMTILES_URL =
+  process.env.NEXT_PUBLIC_BASEMAP_PMTILES_URL ?? "/basemap/zamboanga.pmtiles";
+
+/**
+ * Highest zoom the `.pmtiles` archive is cut to (Pergamino PRD D9).
+ * protomaps-leaflet over-zooms vector geometry past this, so MAX_ZOOM (18)
+ * keeps working and lines stay crisp instead of going blurry. If the cut
+ * archive exceeds 50MB, re-cut at --maxzoom=14 and drop this to 14 -- see
+ * the PRD's Checkpoint section.
+ */
+export const BASEMAP_MAX_DATA_ZOOM = 15;
+
+/**
+ * Attribution for the vector basemap layer -- OpenStreetMap remains the
+ * data source (link required), Protomaps built the tiling pipeline.
+ */
+export const BASEMAP_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
+  '<a href="https://protomaps.com">Protomaps</a>';
