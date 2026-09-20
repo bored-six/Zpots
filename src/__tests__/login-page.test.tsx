@@ -6,6 +6,7 @@ const replace = vi.fn();
 const useAuthMock = vi.fn();
 const signIn = vi.fn();
 const signUp = vi.fn();
+const signInWithGoogle = vi.fn();
 
 let searchParams = new URLSearchParams();
 
@@ -24,6 +25,7 @@ vi.mock("@/lib/auth", async (importOriginal) => {
     ...actual,
     signIn: (...args: unknown[]) => signIn(...args),
     signUp: (...args: unknown[]) => signUp(...args),
+    signInWithGoogle: (...args: unknown[]) => signInWithGoogle(...args),
   };
 });
 
@@ -39,6 +41,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   setSearchParams({});
   useAuthMock.mockReturnValue({ status: "signed-out", user: null, signOut: vi.fn() });
+  signInWithGoogle.mockResolvedValue(undefined);
 });
 
 async function renderLoginPage() {
@@ -252,6 +255,71 @@ describe("Login page -- sign-up", () => {
     await user.click(screen.getByRole("button", { name: /^sign in$/i }));
 
     await waitFor(() => expect(signIn).toHaveBeenCalled());
+  });
+});
+
+describe("Login page -- Google sign-in", () => {
+  it("renders a labeled Continue with Google button", async () => {
+    await renderLoginPage();
+    expect(screen.getByRole("button", { name: /continue with google/i })).toBeInTheDocument();
+  });
+
+  it("clicking it calls signInWithGoogle with the current next path", async () => {
+    setSearchParams({ next: "/settings" });
+    const user = userEvent.setup();
+    await renderLoginPage();
+
+    await user.click(screen.getByRole("button", { name: /continue with google/i }));
+
+    expect(signInWithGoogle).toHaveBeenCalledWith("/settings");
+  });
+
+  it("falls back to / for an unsafe next value, same guard as the password flow", async () => {
+    setSearchParams({ next: "https://evil.com" });
+    const user = userEvent.setup();
+    await renderLoginPage();
+
+    await user.click(screen.getByRole("button", { name: /continue with google/i }));
+
+    expect(signInWithGoogle).toHaveBeenCalledWith("/");
+  });
+
+  it("shows a loading label and disables the button while the redirect is in flight", async () => {
+    let resolveGoogle!: () => void;
+    signInWithGoogle.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveGoogle = resolve;
+      }),
+    );
+    const user = userEvent.setup();
+    await renderLoginPage();
+
+    const googleButton = screen.getByRole("button", { name: /continue with google/i });
+    await user.click(googleButton);
+
+    expect(screen.getByRole("button", { name: /redirecting/i })).toBeDisabled();
+
+    resolveGoogle();
+  });
+
+  it("shows the mapped error and re-enables the button when signInWithGoogle rejects", async () => {
+    signInWithGoogle.mockRejectedValue(codeError("provider_disabled", "Unsupported provider"));
+    const user = userEvent.setup();
+    await renderLoginPage();
+
+    await user.click(screen.getByRole("button", { name: /continue with google/i }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /continue with google/i })).not.toBeDisabled(),
+    );
+    expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
+  });
+
+  it("does not disturb the email/password form or its existing button labels", async () => {
+    await renderLoginPage();
+    expect(screen.getByRole("button", { name: /^sign in$/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^password/i)).toBeInTheDocument();
   });
 });
 

@@ -81,7 +81,7 @@ describe("getSupabaseClient", () => {
     expect(() => getSupabaseClient()).toThrow();
   });
 
-  it("creates the client with persistSession/autoRefreshToken on and detectSessionInUrl off (auth migration D1/1.3)", async () => {
+  it("creates the client with persistSession/autoRefreshToken/detectSessionInUrl on (auth migration D1/1.3, extended for Google OAuth)", async () => {
     process.env[URL_KEY] = "https://example.supabase.co";
     process.env[ANON_KEY] = "test-anon-key";
 
@@ -101,7 +101,7 @@ describe("getSupabaseClient", () => {
         auth: expect.objectContaining({
           persistSession: true,
           autoRefreshToken: true,
-          detectSessionInUrl: false,
+          detectSessionInUrl: true,
         }),
       }),
     );

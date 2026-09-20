@@ -27,13 +27,14 @@ export function getSupabaseClient(): SupabaseClient {
     auth: {
       // persistSession/autoRefreshToken: on -- the auth migration (D1) keeps
       // plain supabase-js client sessions (localStorage-backed, auto
-      // refreshed) instead of @supabase/ssr. detectSessionInUrl stays off:
-      // nothing in this pass sends the user back with tokens in the URL
-      // (email confirmation off, password reset deferred) -- flip it on
-      // when the reset-password ticket lands.
+      // refreshed) instead of @supabase/ssr. detectSessionInUrl is on so the
+      // client picks up the session GoTrue puts in the URL after the Google
+      // OAuth redirect back to the app (implicit flow, the default flowType)
+      // -- AuthProvider's getSession() on mount is what triggers this. Also
+      // what the deferred password-reset ticket needs.
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: false,
+      detectSessionInUrl: true,
     },
   });
 

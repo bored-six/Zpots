@@ -20,6 +20,7 @@ import {
   purgeLegacyLocalData,
   requireUserId,
   signIn,
+  signInWithGoogle,
   signOut,
   signUp,
   subscribeToAuth,
@@ -51,6 +52,7 @@ function makeAuthClient(overrides: Partial<Record<string, unknown>> = {}) {
     getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
     signUp: vi.fn(),
     signInWithPassword: vi.fn(),
+    signInWithOAuth: vi.fn(),
     signOut: vi.fn().mockResolvedValue({ error: null }),
     onAuthStateChange: vi.fn().mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } }),
     updateUser: vi.fn(),
@@ -256,6 +258,43 @@ describe("signIn", () => {
     vi.mocked(getSupabaseClient).mockReturnValue(client as never);
 
     await expect(signIn("a@b.com", "wrong")).rejects.toBe(authError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// signInWithGoogle
+// ---------------------------------------------------------------------------
+describe("signInWithGoogle", () => {
+  it("calls signInWithOAuth with provider google and an absolute redirectTo built from next", async () => {
+    const signInWithOAuthMock = vi.fn().mockResolvedValue({ data: { provider: "google", url: "https://accounts.google.com/o" }, error: null });
+    const client = makeAuthClient({ signInWithOAuth: signInWithOAuthMock });
+    vi.mocked(getSupabaseClient).mockReturnValue(client as never);
+
+    await signInWithGoogle("/settings");
+
+    expect(signInWithOAuthMock).toHaveBeenCalledWith({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/settings` },
+    });
+  });
+
+  it("resolves on success", async () => {
+    const client = makeAuthClient({
+      signInWithOAuth: vi.fn().mockResolvedValue({ data: { provider: "google", url: "https://accounts.google.com/o" }, error: null }),
+    });
+    vi.mocked(getSupabaseClient).mockReturnValue(client as never);
+
+    await expect(signInWithGoogle("/")).resolves.toBeUndefined();
+  });
+
+  it("rejects with the raw AuthError on failure", async () => {
+    const authError = Object.assign(new Error("Provider not enabled"), { code: "provider_disabled" });
+    const client = makeAuthClient({
+      signInWithOAuth: vi.fn().mockResolvedValue({ data: { provider: "google", url: null }, error: authError }),
+    });
+    vi.mocked(getSupabaseClient).mockReturnValue(client as never);
+
+    await expect(signInWithGoogle("/")).rejects.toBe(authError);
   });
 });
 

@@ -100,6 +100,27 @@ export async function signIn(email: string, password: string): Promise<void> {
 }
 
 /**
+ * Kicks off the Google OAuth redirect. `next` is the same-origin relative
+ * path to land back on once Supabase sends the browser back to this app
+ * (the caller is expected to have already run it through the same
+ * open-redirect guard the email/password flow uses). On success the browser
+ * navigates away to Google before this promise settles; there is no session
+ * yet to return -- detectSessionInUrl (src/lib/supabase.ts) is what picks up
+ * the session once the redirect lands back here. Rejects with the raw
+ * supabase AuthError (the page maps it via authErrorMessage), same as
+ * signIn/signUp.
+ */
+export async function signInWithGoogle(next: string): Promise<void> {
+  const client = getSupabaseClient();
+  const { error } = await client.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: `${window.location.origin}${next}` },
+  });
+
+  if (error) throw error;
+}
+
+/**
  * Always clears the local session even if the network call fails --
  * `{ scope: 'local' }` so a dead network never leaves a user stuck signed
  * in on this device (auth-migration.md section 2.6).

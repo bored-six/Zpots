@@ -5,8 +5,9 @@ import { Suspense, useEffect, useRef, useState, type FormEvent } from "react";
 
 import { useAuth } from "@/components/AuthProvider";
 import ClipboardShell from "@/components/ClipboardShell";
+import { GoogleGIcon } from "@/components/icons/brand-icons";
 import { AlertIcon } from "@/components/icons/status-icons";
-import { authErrorMessage, signIn, signUp } from "@/lib/auth";
+import { authErrorMessage, signIn, signInWithGoogle, signUp } from "@/lib/auth";
 import { validateCredentials, type CredentialsMode } from "@/lib/validation";
 
 const FIELD_LABEL_CLASS = "text-sm font-medium text-[#3a3730]";
@@ -17,6 +18,10 @@ const TEXT_INPUT_CLASS =
 const SUBMIT_BUTTON_CLASS =
   "rounded-sm bg-[var(--zpots-brass)] px-4 py-2 text-sm font-semibold text-white hover:brightness-90 " +
   "disabled:cursor-not-allowed disabled:bg-[#c9c6bd] disabled:text-[#6f6b60]";
+const GOOGLE_BUTTON_CLASS =
+  "flex w-full items-center justify-center gap-2 rounded-sm border border-[#d8d4cb] bg-white px-4 py-2 " +
+  "text-sm font-semibold text-[#1f2420] hover:border-[var(--zpots-brass)] hover:bg-[#faf8f3] " +
+  "disabled:cursor-not-allowed disabled:bg-[#f1efe9] disabled:text-[#a9a498]";
 const RATE_LIMIT_COOLDOWN_MS = 30_000;
 
 function ErrorBanner({ message }: { message: string }) {
@@ -92,6 +97,7 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [showSignInToggle, setShowSignInToggle] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
   const rateLimitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -162,8 +168,28 @@ function LoginForm() {
     }
   }
 
+  async function handleGoogleSignIn() {
+    if (isGoogleLoading) return;
+
+    setError(null);
+    setShowSignInToggle(false);
+    setIsGoogleLoading(true);
+    try {
+      // On success the browser is about to navigate to Google, so this
+      // component stays "loading" until it unmounts -- there is nothing
+      // else to update on the happy path.
+      await signInWithGoogle(next);
+    } catch (caught) {
+      if (authStatus === "signed-in") return;
+
+      setError(authErrorMessage(caught, "signin"));
+      setIsGoogleLoading(false);
+    }
+  }
+
   const isFormDisabled = authStatus === "loading" || authStatus === "signed-in" || isSubmitting;
   const isSubmitDisabled = isFormDisabled || isRateLimited;
+  const isGoogleButtonDisabled = isFormDisabled || isGoogleLoading;
 
   if (authStatus === "signed-in") {
     return (
@@ -203,7 +229,7 @@ function LoginForm() {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4">
             {error && (
               <div className="flex flex-col gap-2">
                 <ErrorBanner message={error} />
@@ -219,6 +245,23 @@ function LoginForm() {
               </div>
             )}
 
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={isGoogleButtonDisabled}
+              className={GOOGLE_BUTTON_CLASS}
+            >
+              <GoogleGIcon />
+              {isGoogleLoading ? "Redirecting…" : "Continue with Google"}
+            </button>
+
+            <div className="flex items-center gap-3" role="separator" aria-hidden="true">
+              <div className="h-px flex-1 bg-[#d8d4cb]" />
+              <span className="text-xs font-medium uppercase tracking-wide text-[#8a8579]">or</span>
+              <div className="h-px flex-1 bg-[#d8d4cb]" />
+            </div>
+
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <label htmlFor="login-email" className={FIELD_LABEL_CLASS}>
                 Email
@@ -285,7 +328,8 @@ function LoginForm() {
                     : "Sign in"}
               </button>
             </div>
-          </form>
+            </form>
+          </div>
         )}
       </div>
     </ClipboardShell>
