@@ -120,10 +120,11 @@ describe("0004_social_spots.sql", () => {
     });
   });
 
-  it("creates the avatars storage bucket, public, with an image mime allowlist", () => {
+  it("documents the avatars storage bucket pre-step, public, with an image mime allowlist", () => {
     const sql = readMigration();
-    expect(sql).toMatch(/insert into storage\.buckets/i);
-    expect(sql).toMatch(/'avatars'/);
+    expect(sql).toMatch(/dashboard > storage/i);
+    expect(sql).toMatch(/avatars/);
+    expect(sql).toMatch(/2 ?mb/i);
     expect(sql).toMatch(/image\/jpeg/);
     expect(sql).toMatch(/image\/png/);
     expect(sql).toMatch(/image\/webp/);
