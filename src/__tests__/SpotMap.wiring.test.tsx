@@ -364,3 +364,13 @@ describe("SpotMap -- auth gating", () => {
     expect(screen.queryByText(/sign in to confirm or report/i)).not.toBeInTheDocument();
   });
 });
+
+describe("SpotMap -- Chavacano copy (Ciudad Latina redesign, spec Task 4)", () => {
+  it("shows the Chavacano primary text 'Marca un lugar' (COPY.addSpot) on the idle FAB, while its accessible name stays the English 'Add a spot'", () => {
+    render(<SpotMap {...baseProps()} spots={[]} />);
+
+    expect(screen.getByText(/marca un lugar/i)).toBeInTheDocument();
+    // Regression net: the existing English-name query must still resolve the FAB.
+    expect(screen.getByRole("button", { name: /add a spot/i })).toBeInTheDocument();
+  });
+});

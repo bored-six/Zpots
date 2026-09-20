@@ -76,4 +76,13 @@ describe("ConfirmButton", () => {
     await userEvent.click(button);
     expect(onConfirm).not.toHaveBeenCalled();
   });
+
+  it("shows the Chavacano primary text 'Ya anda yo aqui' for the call-to-action state, while the accessible name stays the English 'I've been here' (Ciudad Latina redesign, spec Task 4)", () => {
+    const spot = makeSpot({ status: "unconfirmed", confirmations: 0 });
+    render(<ConfirmButton spot={spot} onConfirm={vi.fn()} />);
+
+    expect(screen.getByText(/ya anda yo aqui/i)).toBeInTheDocument();
+    // Regression net: the English name must still resolve the button.
+    expect(screen.getByRole("button", { name: /i.?ve been here/i })).toBeInTheDocument();
+  });
 });

@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 // Intentionally NOT mocked -- the whole point of this file is to exercise
-// real Leaflet bounds math, which `SpotMap.mindanao.test.tsx` and
-// `map-config.mindanao.test.ts` cannot: both mock `react-leaflet` entirely,
-// so they only ever assert that a prop *was passed*, never that Leaflet
-// actually *enforces* it. This is what caught the original bug: `maxBounds`
-// was present in the JSX, all 145 mocked-out unit tests passed, and the
-// live map still let a user pan straight into open ocean with no
-// snap-back, because nothing ever exercised Leaflet's own bounds-clamping
-// code against a real `L.Map` instance.
+// real Leaflet bounds math, which `SpotMap.city.test.tsx` and
+// `map-config.city.test.ts` cannot: both mock `react-leaflet` entirely, so
+// they only ever assert that a prop *was passed*, never that Leaflet
+// actually *enforces* it. This is what caught the original Mindanao-era
+// bug: `maxBounds` was present in the JSX, all mocked-out unit tests
+// passed, and the live map still let a user pan straight into open ocean
+// with no snap-back, because nothing ever exercised Leaflet's own
+// bounds-clamping code against a real `L.Map` instance.
 import L from "leaflet";
 
-import { DEFAULT_ZOOM, MINDANAO_BOUNDS, ZAMBOANGA_CENTER } from "@/lib/map-config";
+import { DEFAULT_ZOOM, MAX_BOUNDS, ZAMBOANGA_CENTER } from "@/lib/map-config";
 
 /**
  * jsdom has no real layout engine, so a plain `<div>` reports 0x0 for both
@@ -40,16 +40,16 @@ function createSizedMapContainer(width = 800, height = 600): HTMLDivElement {
   return container;
 }
 
-/** A point in open ocean well outside MINDANAO_BOUNDS on every side. */
+/** A point in open ocean well outside MAX_BOUNDS (Zamboanga City) on every side. */
 const FAR_OUTSIDE_LATLNG: [number, number] = [1, 100];
 
-function isInsideMindanaoBounds(lat: number, lng: number): boolean {
-  const [[south, west], [north, east]] = MINDANAO_BOUNDS;
+function isInsideCityBounds(lat: number, lng: number): boolean {
+  const [[south, west], [north, east]] = MAX_BOUNDS;
   return lat >= south && lat <= north && lng >= west && lng <= east;
 }
 
-describe("Mindanao maxBounds restriction against real Leaflet", () => {
-  it("clamps the map back inside MINDANAO_BOUNDS when setMaxBounds has been applied, even after panning far outside it", () => {
+describe("Zamboanga City maxBounds restriction against real Leaflet", () => {
+  it("clamps the map back inside MAX_BOUNDS when setMaxBounds has been applied, even after panning far outside it", () => {
     const container = createSizedMapContainer();
     const map = new L.Map(container);
     try {
@@ -57,18 +57,18 @@ describe("Mindanao maxBounds restriction against real Leaflet", () => {
 
       // Mirrors the imperative safety-net call SpotMap.tsx makes once the
       // real Leaflet Map instance is available.
-      map.setMaxBounds(MINDANAO_BOUNDS);
+      map.setMaxBounds(MAX_BOUNDS);
 
       map.panTo(FAR_OUTSIDE_LATLNG, { animate: false });
 
       const center = map.getCenter();
-      expect(isInsideMindanaoBounds(center.lat, center.lng)).toBe(true);
+      expect(isInsideCityBounds(center.lat, center.lng)).toBe(true);
 
       // getBounds() (the visible viewport) should also sit inside/along the
       // restriction, not drifted out to the open-ocean target.
       const bounds = map.getBounds();
-      expect(bounds.getSouth()).toBeGreaterThanOrEqual(MINDANAO_BOUNDS[0][0] - 1);
-      expect(bounds.getWest()).toBeGreaterThanOrEqual(MINDANAO_BOUNDS[0][1] - 1);
+      expect(bounds.getSouth()).toBeGreaterThanOrEqual(MAX_BOUNDS[0][0] - 1);
+      expect(bounds.getWest()).toBeGreaterThanOrEqual(MAX_BOUNDS[0][1] - 1);
     } finally {
       map.remove();
     }
@@ -84,7 +84,7 @@ describe("Mindanao maxBounds restriction against real Leaflet", () => {
       map.panTo(FAR_OUTSIDE_LATLNG, { animate: false });
 
       const center = map.getCenter();
-      expect(isInsideMindanaoBounds(center.lat, center.lng)).toBe(false);
+      expect(isInsideCityBounds(center.lat, center.lng)).toBe(false);
       expect(center.lat).toBeCloseTo(FAR_OUTSIDE_LATLNG[0], 0);
       expect(center.lng).toBeCloseTo(FAR_OUTSIDE_LATLNG[1], 0);
     } finally {

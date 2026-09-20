@@ -74,4 +74,12 @@ describe("ReportButton", () => {
 
     expect(onReport).toHaveBeenCalledTimes(1);
   });
+
+  it("shows the Chavacano primary text 'Reporta' on the trigger, while the accessible name stays the English 'Report' (Ciudad Latina redesign, spec Task 4)", () => {
+    render(<ReportButton spotId="spot-1" onReport={vi.fn()} />);
+
+    expect(screen.getByText(/^reporta$/i)).toBeInTheDocument();
+    // Regression net: the English name must still resolve the trigger button.
+    expect(screen.getByRole("button", { name: /report/i })).toBeInTheDocument();
+  });
 });

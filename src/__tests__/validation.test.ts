@@ -184,6 +184,31 @@ describe("validateNewSpot - lat/lng bounds", () => {
   });
 });
 
+describe("validateNewSpot - Zamboanga City restriction (redesign)", () => {
+  it("accepts coordinates inside Zamboanga City (Fort Pilar, the default validInput() location)", () => {
+    const result = validateNewSpot(validInput());
+    expect(result.valid).toBe(true);
+  });
+
+  it("rejects Manila's coordinates with the city-only error on both lat and lng, even though they pass the -90..90 / -180..180 range checks", () => {
+    const result = validateNewSpot(validInput({ lat: 14.6, lng: 120.98 }));
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.lat).toBe("Pins can only be placed inside Zamboanga City.");
+      expect(result.errors.lng).toBe("Pins can only be placed inside Zamboanga City.");
+    }
+  });
+
+  it("a lat of 200 (out of the -90..90 range) still yields the range error, not the city error", () => {
+    const result = validateNewSpot(validInput({ lat: 200 }));
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.lat).toBe("Latitude must be between -90 and 90.");
+      expect(result.errors.lat).not.toMatch(/zamboanga city/i);
+    }
+  });
+});
+
 describe("validateNewSpot - photo", () => {
   it("rejects a null photoFile (photo is required per the brief)", () => {
     const result = validateNewSpot(validInput({ photoFile: null }));

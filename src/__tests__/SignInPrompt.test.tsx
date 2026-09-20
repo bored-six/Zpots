@@ -98,4 +98,12 @@ describe("SignInPrompt", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(screen.getByRole("heading")).toHaveFocus();
   });
+
+  it("shows the Chavacano primary text 'Entra primero' (COPY.signInFirst) somewhere in the dialog, while the existing English heading query still resolves (Ciudad Latina redesign, spec Task 4)", () => {
+    render(<SignInPrompt action="add" onDismiss={vi.fn()} />);
+
+    expect(screen.getByText(/entra primero/i)).toBeInTheDocument();
+    // Regression net: the existing English-text query must still pass.
+    expect(screen.getByText(/sign in to add a spot/i)).toBeInTheDocument();
+  });
 });

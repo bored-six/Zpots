@@ -46,15 +46,13 @@ vi.mock("react-leaflet", () => {
 });
 
 import SpotMap from "@/components/SpotMap";
-import { MINDANAO_BOUNDS, MIN_ZOOM } from "@/lib/map-config";
+import { MAX_BOUNDS, MIN_ZOOM } from "@/lib/map-config";
 
-describe("SpotMap Mindanao restriction", () => {
-  it("passes MINDANAO_BOUNDS as maxBounds to MapContainer", () => {
+describe("SpotMap Zamboanga City restriction", () => {
+  it("passes MAX_BOUNDS as maxBounds to MapContainer", () => {
     render(<SpotMap spots={[]} />);
     const map = screen.getByTestId("map-container");
-    expect(JSON.parse(map.getAttribute("data-max-bounds") ?? "null")).toEqual(
-      MINDANAO_BOUNDS,
-    );
+    expect(JSON.parse(map.getAttribute("data-max-bounds") ?? "null")).toEqual(MAX_BOUNDS);
   });
 
   it("sets maxBoundsViscosity so panning bounces back at the edge instead of scrolling freely", () => {

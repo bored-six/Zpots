@@ -181,4 +181,15 @@ describe("AddSpotForm", () => {
 
     expect(onSubmit.mock.calls[0][0].nickname).toBe("Kuya Ben");
   });
+
+  it("shows the Chavacano primary text 'Marca un lugar' (COPY.addSpot) as the form's title, while the existing field/button queries still resolve (Ciudad Latina redesign, spec Task 4)", () => {
+    const { container } = render(
+      <AddSpotForm lat={LAT} lng={LNG} onSubmit={vi.fn()} onCancel={vi.fn()} />,
+    );
+
+    expect(screen.getByText(/marca un lugar/i)).toBeInTheDocument();
+    // Regression net: existing field/button lookups must still resolve.
+    expect(getNameInput()).toBeInTheDocument();
+    expect(getSubmitButton(container)).toBeInTheDocument();
+  });
 });
