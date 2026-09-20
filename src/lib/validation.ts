@@ -19,7 +19,7 @@ export const MAX_REPORT_DETAILS_LENGTH = 500;
 export const REPORT_REASONS = ["spam", "wrong_info", "closed"] as const;
 export type ReportReason = (typeof REPORT_REASONS)[number];
 
-const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // mirrors storage bucket file_size_limit
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // mirrors storage bucket file_size_limit
 const ALLOWED_PHOTO_MIME_TYPES: ReadonlySet<string> = new Set([
   "image/jpeg",
   "image/png",
@@ -85,7 +85,7 @@ export function validateNewSpot(input: NewSpotInput): NewSpotValidationResult {
   } else if (!ALLOWED_PHOTO_MIME_TYPES.has(input.photoFile.type)) {
     errors.photoFile = "Photo must be a JPEG, PNG, WEBP, or GIF image.";
   } else if (input.photoFile.size >= MAX_PHOTO_BYTES) {
-    errors.photoFile = "Photo must be under 5MB.";
+    errors.photoFile = "Photo must be under 10MB.";
   }
 
   if (Object.keys(errors).length > 0) {

@@ -124,7 +124,7 @@ describe("0004_social_spots.sql", () => {
     const sql = readMigration();
     expect(sql).toMatch(/dashboard > storage/i);
     expect(sql).toMatch(/avatars/);
-    expect(sql).toMatch(/2 ?mb/i);
+    expect(sql).toMatch(/5 ?mb/i);
     expect(sql).toMatch(/image\/jpeg/);
     expect(sql).toMatch(/image\/png/);
     expect(sql).toMatch(/image\/webp/);

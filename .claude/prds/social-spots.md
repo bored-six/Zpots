@@ -131,7 +131,7 @@ create view public.spot_cards with (security_invoker = true) as
 --   my_map()           spot_cards + source text: 'mine' | 'saved' | 'been' (mine wins, then been, then saved)
 --   handle_available(text) boolean, callable by anon
 
--- storage: bucket 'avatars' public read, 2 MiB, jpeg/png/webp;
+-- storage: bucket 'avatars' public read, 5 MB, jpeg/png/webp;
 --   insert/update/delete to authenticated where (storage.foldername(name))[1] = auth.uid()::text
 ```
 
@@ -314,3 +314,4 @@ colors, or layout. Visuals are checked in the browser by the orchestrator.
 | 2026-09-20 | Built waves 0-4 (commits 07e5eaa..dc00b27) | 867 tests, build clean, reviewer approved after one rejection |
 | 2026-09-20 | Added city-shaped mask (`CityMask`, `city-outline.ts`, `data/zamboanga-city-outline.ts`) on every map | User: map must visibly cut off at the city |
 | 2026-09-20 | Deviations accepted: deep link past page 1 falls back to top; distance line English only; Gente Siguiendo via `profilesByIds`; `uploadAvatar` + `updateAvatarUrl` split | Test contracts / scope |
+| 2026-09-20 | Photo limit 10 MB, avatar limit 5 MB (bucket limits set in the dashboard) | User request |

@@ -26,9 +26,11 @@ import {
   profilesByIds,
 } from "@/lib/profiles-repo";
 
-function makeImageFile(name = "avatar.jpg"): File {
-  return new File([new Uint8Array(512)], name, { type: "image/jpeg" });
+function makeImageFile(name = "avatar.jpg", sizeBytes = 512): File {
+  return new File([new Uint8Array(sizeBytes)], name, { type: "image/jpeg" });
 }
+
+const FIVE_MB = 5 * 1024 * 1024;
 
 function profileRow(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -242,6 +244,29 @@ describe("uploadAvatar", () => {
     const textFile = new File(["hi"], "notes.txt", { type: "text/plain" });
     await expect(uploadAvatar(textFile)).rejects.toBeTruthy();
     expect(storageFromMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a file at exactly the 5MB boundary with a '5MB' message, before calling storage", async () => {
+    const storageFromMock = vi.fn();
+    vi.mocked(getSupabaseClient).mockReturnValue({ storage: { from: storageFromMock } } as never);
+
+    const oversizedFile = makeImageFile("avatar.jpg", FIVE_MB);
+    await expect(uploadAvatar(oversizedFile)).rejects.toThrow(/5MB/);
+    expect(storageFromMock).not.toHaveBeenCalled();
+  });
+
+  it("accepts a file one byte under the 5MB boundary", async () => {
+    const uploadMock = vi.fn().mockResolvedValue({ data: { path: "user-1/abc.jpg" }, error: null });
+    const getPublicUrlMock = vi
+      .fn()
+      .mockReturnValue({ data: { publicUrl: "https://cdn.example.com/avatars/user-1/abc.jpg" } });
+    const storageFromMock = vi.fn(() => ({ upload: uploadMock, getPublicUrl: getPublicUrlMock }));
+    vi.mocked(getSupabaseClient).mockReturnValue({ storage: { from: storageFromMock } } as never);
+
+    const url = await uploadAvatar(makeImageFile("avatar.jpg", FIVE_MB - 1));
+
+    expect(storageFromMock).toHaveBeenCalledWith("avatars");
+    expect(url).toBe("https://cdn.example.com/avatars/user-1/abc.jpg");
   });
 });
 

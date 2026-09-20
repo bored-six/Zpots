@@ -12,7 +12,7 @@ import {
   type NewSpotInput,
 } from "@/lib/validation";
 
-const FIVE_MB = 5 * 1024 * 1024;
+const TEN_MB = 10 * 1024 * 1024;
 
 function makeFile({
   sizeBytes = 1024,
@@ -252,24 +252,27 @@ describe("validateNewSpot - photo", () => {
     if (!result.valid) expect(result.errors).toHaveProperty("photoFile");
   });
 
-  it("accepts an image file one byte under the 5MB boundary", () => {
+  it("accepts an image file one byte under the 10MB boundary", () => {
     const result = validateNewSpot(
-      validInput({ photoFile: makeFile({ type: "image/png", sizeBytes: FIVE_MB - 1 }) }),
+      validInput({ photoFile: makeFile({ type: "image/png", sizeBytes: TEN_MB - 1 }) }),
     );
     expect(result.valid).toBe(true);
   });
 
-  it("rejects an image file at exactly the 5MB boundary ('under 5MB' means strictly less than)", () => {
+  it("rejects an image file at exactly the 10MB boundary ('under 10MB' means strictly less than)", () => {
     const result = validateNewSpot(
-      validInput({ photoFile: makeFile({ type: "image/png", sizeBytes: FIVE_MB }) }),
+      validInput({ photoFile: makeFile({ type: "image/png", sizeBytes: TEN_MB }) }),
     );
     expect(result.valid).toBe(false);
-    if (!result.valid) expect(result.errors).toHaveProperty("photoFile");
+    if (!result.valid) {
+      expect(result.errors).toHaveProperty("photoFile");
+      expect(result.errors.photoFile).toBe("Photo must be under 10MB.");
+    }
   });
 
-  it("rejects an image file over the 5MB boundary", () => {
+  it("rejects an image file over the 10MB boundary", () => {
     const result = validateNewSpot(
-      validInput({ photoFile: makeFile({ type: "image/png", sizeBytes: FIVE_MB + 1 }) }),
+      validInput({ photoFile: makeFile({ type: "image/png", sizeBytes: TEN_MB + 1 }) }),
     );
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.errors).toHaveProperty("photoFile");

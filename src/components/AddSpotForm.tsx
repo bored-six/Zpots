@@ -161,7 +161,7 @@ export default function AddSpotForm({
             className="block w-full text-sm text-ink file:mr-3 file:rounded file:border-0 file:bg-terracotta file:px-3 file:py-2 file:text-sm file:font-bold file:text-cream hover:file:bg-terracotta-deep"
           />
         </div>
-        <p className={FIELD_HELP_CLASS}>JPEG, PNG, WEBP, or GIF, under 5MB.</p>
+        <p className={FIELD_HELP_CLASS}>JPEG, PNG, WEBP, or GIF, under 10MB.</p>
         {errors.photoFile && <ErrorText message={errors.photoFile} />}
       </div>
 

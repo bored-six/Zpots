@@ -13,8 +13,8 @@ const HANDLE_PATTERN = /^[a-z0-9_]{3,20}$/;
 /** Mirrors `profiles_display_name_len` in 0004_social_spots.sql. */
 const MAX_DISPLAY_NAME_LENGTH = 40;
 
-/** Mirrors the `avatars` bucket's 2 MiB file-size limit. */
-const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024;
+/** Mirrors the `avatars` bucket's 5 MB file-size limit. */
+const MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024;
 
 const AVATAR_MIME_EXTENSIONS: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -151,8 +151,8 @@ export async function uploadAvatar(file: File): Promise<string> {
     throw new Error(`Unsupported avatar type: ${file.type}`);
   }
 
-  if (file.size > MAX_AVATAR_SIZE_BYTES) {
-    throw new Error("Avatar must be smaller than 2 MB.");
+  if (file.size >= MAX_AVATAR_SIZE_BYTES) {
+    throw new Error("Avatar must be under 5MB.");
   }
 
   const userId = await requireUserId();

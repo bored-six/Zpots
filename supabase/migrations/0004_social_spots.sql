@@ -455,7 +455,7 @@ grant execute on function public.handle_available(text)
 --
 --    Before running this file:
 --    1. Dashboard > Storage > New bucket: name `avatars`, Public bucket ON,
---       file size limit 2 MB, allowed MIME types image/jpeg, image/png,
+--       file size limit 5 MB, allowed MIME types image/jpeg, image/png,
 --       image/webp. Newer Supabase projects don't grant the SQL editor's
 --       role ownership of storage.buckets, so this migration can't create
 --       or update the bucket itself -- do it by hand, once, first.
