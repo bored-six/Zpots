@@ -6,21 +6,39 @@ Crowdsourced map of local spots in Zamboanga City — street food, hangouts, hid
 
 > Note: the `CLAUDE.md` in the parent `Documents/` folder is a Salesforce orchestrator config and does NOT apply to this project. This file plus `.claude/steering/` govern Zpots.
 
-## MVP scope — build these 5 things, nothing else
+## Product scope — v2 "Paseo" (social spot sharing)
 
-1. Map of Zamboanga City — pan and zoom
-2. Add a pin — photo + short note + spot name; requires a signed-in account; optional cosmetic nickname
-3. New pins appear immediately, marked **Unconfirmed**
-4. **"Confirm — I've been here"** — 2 distinct confirmations flips it to **Confirmed**
-5. **Report** button on each pin (spam / wrong info / closed)
+Zpots is a social app for sharing spots, closer to Instagram or Snapchat than to Google Maps.
+The map is a feature inside the app, not the home screen. The v1 five-item map MVP is
+superseded by this list (decided 2026-09-20, see `.claude/prds/paseo-social.md`).
 
-Browsing the map needs no account — only adding, confirming, or reporting a spot requires signing in (email + password via Supabase Auth; see `.claude/prds/auth-migration.md`).
+Build these, nothing else:
 
-## Explicitly out of scope for v1
+1. **Paseo (home)** — full-screen vertical swipe deck of spot cards: photo, spotter avatar and
+   @handle, spot name, barangay, distance from you. Lanes: **Cerca** (near me), **Nuevo**
+   (newest), **Siguiendo** (people I follow).
+2. **Map inset and Mapa tab** — a small live map on each card pans as you swipe; tap to expand
+   to the full map. On the full map every pin is the spot's photo inside the compass-rose frame,
+   clusters stack. Map stays clamped to Zamboanga City.
+3. **Hoy row** — avatars of followed people who dropped a spot today, vinta-stripe ring, tap
+   jumps the walk to their spot.
+4. **Post** — camera-first: photo, then name and one-line note, location from GPS with a map
+   nudge. Requires a signed-in account. Zamboanga City only (client + DB constraint).
+5. **Confirm and Report** — unchanged rules: "Ya anda yo aqui" from 2 distinct people flips
+   Unconfirmed to Confirmed; Report offers spam / wrong info / closed.
+6. **Profiles and follows** — @handle, avatar, "Mi paseo" route map of dropped + confirmed spots,
+   photo grid, follower and following counts. Follow is "Camina con".
+7. **Bottom nav** Paseo · Mapa · camera · Gente · Yo. Phone (375px) and desktop are both
+   first-class; desktop uses a two-column layout with the map beside the walk.
 
-- "Ask for help nearby" live-location notes
+Browsing the Paseo and the map needs no account. Posting, confirming, reporting, and following
+require signing in (email + password or Google via Supabase Auth).
+
+## Explicitly out of scope for v2
+
+- Comments, DMs, expiring stories, push notifications
 - Categories, search, filters
-- Anything not in the 5 items above
+- Anything not in the 7 items above
 
 ## Stack
 
