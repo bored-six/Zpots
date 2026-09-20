@@ -4,6 +4,8 @@
  * supabase/migrations/0001_init.sql -- keep both in sync (spec section 5.7).
  */
 
+import { isWithinZamboangaCity } from "@/lib/city-bounds";
+
 /** Mirrors `spots_name_len` in 0001_init.sql. */
 export const MAX_NAME_LENGTH = 80;
 /** Mirrors `spots_note_len` in 0001_init.sql. */
@@ -61,6 +63,17 @@ export function validateNewSpot(input: NewSpotInput): NewSpotValidationResult {
 
   if (!Number.isFinite(input.lng) || input.lng < -180 || input.lng > 180) {
     errors.lng = "Longitude must be between -180 and 180.";
+  }
+
+  if (
+    !errors.lat &&
+    !errors.lng &&
+    Number.isFinite(input.lat) &&
+    Number.isFinite(input.lng) &&
+    !isWithinZamboangaCity(input.lat, input.lng)
+  ) {
+    errors.lat = "Pins can only be placed inside Zamboanga City.";
+    errors.lng = "Pins can only be placed inside Zamboanga City.";
   }
 
   if (input.nickname !== undefined && input.nickname.length > MAX_NICKNAME_LENGTH) {

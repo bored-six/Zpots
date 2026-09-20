@@ -11,11 +11,12 @@ import { AlertIcon } from "@/components/icons/status-icons";
 import ReportButton from "@/components/ReportButton";
 import SignInPrompt, { type GatedAction } from "@/components/SignInPrompt";
 import type { AuthStatus } from "@/lib/auth";
+import { isWithinZamboangaCity } from "@/lib/city-bounds";
 import {
   DEFAULT_ZOOM,
+  MAX_BOUNDS,
   MAX_ZOOM,
   MIN_ZOOM,
-  MINDANAO_BOUNDS,
   TILE_ATTRIBUTION,
   TILE_URL,
   ZAMBOANGA_CENTER,
@@ -104,6 +105,7 @@ export default function SpotMap({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [reportedSpotIds, setReportedSpotIds] = useState<ReadonlySet<string>>(new Set());
   const [gatedAction, setGatedAction] = useState<GatedAction | null>(null);
+  const [showOutsideCityBanner, setShowOutsideCityBanner] = useState(false);
 
   function isGateOpen(): boolean {
     return effectiveAuthStatus === "signed-in";
@@ -122,7 +124,7 @@ export default function SpotMap({
   }, [effectiveAuthStatus]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Belt-and-suspenders enforcement of the Mindanao restriction: the
+  // Belt-and-suspenders enforcement of the Zamboanga City restriction: the
   // `maxBounds`/`maxBoundsViscosity` props below get applied by react-leaflet
   // as one-shot Leaflet Map *constructor* options, at the moment the
   // underlying DOM node is first attached -- before layout has necessarily
@@ -134,7 +136,7 @@ export default function SpotMap({
   // ended up outside bounds by the time this runs.
   useEffect(() => {
     if (!leafletMap) return;
-    leafletMap.setMaxBounds(MINDANAO_BOUNDS);
+    leafletMap.setMaxBounds(MAX_BOUNDS);
   }, [leafletMap]);
 
   // Only listens once the real Leaflet Map instance is available (never
@@ -146,7 +148,17 @@ export default function SpotMap({
 
     function handleMapClick(event: LeafletMouseEvent) {
       if (!isPlacementArmed) return;
-      setTappedLocation({ lat: event.latlng.lat, lng: event.latlng.lng });
+      const { lat, lng } = event.latlng;
+      // Defensive tap guard: don't open the add-pin modal for a tap outside
+      // Zamboanga City -- MAX_BOUNDS should already keep the viewport from
+      // getting there, but this is the belt-and-suspenders check at the
+      // point of the tap itself.
+      if (!isWithinZamboangaCity(lat, lng)) {
+        setShowOutsideCityBanner(true);
+        setTimeout(() => setShowOutsideCityBanner(false), 3000);
+        return;
+      }
+      setTappedLocation({ lat, lng });
     }
 
     leafletMap.on("click", handleMapClick);
@@ -225,7 +237,7 @@ export default function SpotMap({
         zoom={DEFAULT_ZOOM}
         minZoom={MIN_ZOOM}
         maxZoom={MAX_ZOOM}
-        maxBounds={MINDANAO_BOUNDS}
+        maxBounds={MAX_BOUNDS}
         maxBoundsViscosity={1.0}
         scrollWheelZoom
         className="h-full w-full"
@@ -277,7 +289,12 @@ export default function SpotMap({
         </button>
       )}
 
-      {isPlacementArmed && !tappedLocation && (
+      {showOutsideCityBanner && (
+        // TODO(Task 4): COPY.outsideCity -- src/lib/copy.ts doesn't exist yet.
+        <div className={BANNER_CLASS}>Pins can only be placed inside Zamboanga City</div>
+      )}
+
+      {!showOutsideCityBanner && isPlacementArmed && !tappedLocation && (
         <div className={BANNER_CLASS}>Tap the map to place your pin.</div>
       )}
 
