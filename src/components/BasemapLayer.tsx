@@ -176,10 +176,17 @@ export default function BasemapLayer({ map, onModeChange }: BasemapLayerProps) {
         attachedLayer = layer;
         setMode("pergamino");
         onModeChange?.("pergamino");
-      } catch {
+      } catch (error) {
         // probeBasemapArchive never throws (it resolves "unavailable"
         // instead), so a rejection here can only be the dynamic import --
-        // or, defensively, anything else unexpected during attach.
+        // or, defensively, anything else unexpected during attach. Logged
+        // only while still mounted (same guard fallBackToRaster already
+        // applies) so a genuine implementation bug stays discoverable
+        // without spamming the console for a rejection that arrives after
+        // teardown.
+        if (!cancelled) {
+          console.error("BasemapLayer: falling back to raster basemap", error);
+        }
         fallBackToRaster();
       }
     }

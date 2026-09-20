@@ -76,6 +76,22 @@ describe("BasemapLayer -- rejected protomaps-leaflet import()", () => {
     expect(map.addLayer).not.toHaveBeenCalled();
   });
 
+  it("logs the caught error via console.error while still mounted", async () => {
+    probeMock.mockResolvedValue("ok");
+    const map = createFakeMap();
+    const onModeChange = vi.fn();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    render(<BasemapLayer map={map} onModeChange={onModeChange} />);
+
+    await screen.findByTestId("tile-layer");
+
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    const loggedError = consoleError.mock.calls[0]?.find((arg) => arg instanceof Error);
+    expect(loggedError).toBeInstanceOf(Error);
+    consoleError.mockRestore();
+  });
+
   it("a rejection arriving after unmount sets no state (respects the cancelled guard)", async () => {
     probeMock.mockResolvedValue("ok");
     const map = createFakeMap();
