@@ -177,6 +177,30 @@ export async function uploadAvatar(file: File): Promise<string> {
   return publicUrl;
 }
 
+/**
+ * Persists an already-uploaded avatar URL (from `uploadAvatar`) onto the
+ * caller's own row. Same `.update().eq().select().single()` shape as
+ * `updateDisplayName` -- kept as its own function since the two are
+ * independent edits (a profile page might update one without the other).
+ */
+export async function updateAvatarUrl(url: string): Promise<Profile> {
+  const userId = await requireUserId();
+  const client = getSupabaseClient();
+
+  const { data, error } = await client
+    .from(PROFILES_TABLE)
+    .update({ avatar_url: url })
+    .eq("id", userId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error("Failed to update avatar.", { cause: error });
+  }
+
+  return toProfile(data as ProfileRow);
+}
+
 /** Follow is idempotent: a duplicate (23505) is swallowed, not an error. */
 export async function follow(followeeId: string): Promise<void> {
   const followerId = await requireUserId();

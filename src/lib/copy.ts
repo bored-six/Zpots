@@ -55,6 +55,10 @@ export const COPY = {
   distanceAway: { cv: "{n} de aqui", en: "{n} away" },
   droppedBy: { cv: "De", en: "By" },
   spotIsUp: { cv: "Ya sale tu spot", en: "Your spot is up" },
+
+  // Profile page ("Not found" state) -- added while implementing
+  // src/app/u/[handle]/page.tsx, not in the PRD's own Copy table.
+  profileNotFound: { cv: "Nuay ese perfil", en: "Profile not found" },
 } as const;
 
 export type CopyKey = keyof typeof COPY;
