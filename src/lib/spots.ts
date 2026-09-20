@@ -27,6 +27,35 @@ export function isConfirmed(spot: Spot): boolean {
   return spot.confirmations >= CONFIRMATION_THRESHOLD;
 }
 
+/**
+ * The account that dropped a spot, as embedded on `spot_cards` rows
+ * (social-spots.md "Types"). `avatarUrl` is `null` until the account
+ * uploads one -- `Avatar` renders initials in that case.
+ */
+export interface SpotAuthor {
+  id: string;
+  handle: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+/**
+ * A `Spot` plus its author and, when the source query provides one (e.g.
+ * `feedCerca`), the caller's distance to it in meters.
+ */
+export interface SpotCard extends Spot {
+  author: SpotAuthor;
+  distanceM?: number;
+}
+
+/** Why a spot appears on the caller's personal map (`my_map()`). */
+export type MapSource = "mine" | "saved" | "been";
+
+/** A `SpotCard` tagged with why it's on the caller's personal map. */
+export interface MapSpot extends SpotCard {
+  source: MapSource;
+}
+
 /** One real, recognizable seed spot for this milestone: Fort Pilar. */
 export const SEED_SPOTS: readonly Spot[] = [
   {

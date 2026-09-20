@@ -4,6 +4,7 @@ import { generateUuid } from "@/lib/uuid";
 import {
   isConfirmed,
   type Spot,
+  type SpotCard,
   type SpotStatus,
 } from "@/lib/spots";
 import {
@@ -30,6 +31,21 @@ type SpotRow = {
   status: SpotStatus;
   confirmations: number;
   created_at?: string;
+  created_by?: string;
+};
+
+/**
+ * Raw row shape for `public.spot_cards` (social-spots.md) -- a `SpotRow`
+ * joined to its author's `profiles` columns. `created_by` is the author's
+ * id; `handle`/`display_name`/`avatar_url` come from `profiles`.
+ * `distance_m` is present only on rows from `feed_cerca`.
+ */
+export type SpotCardRow = SpotRow & {
+  created_by: string;
+  handle: string;
+  display_name: string;
+  avatar_url: string | null;
+  distance_m?: number;
 };
 
 /** Maps a `SpotRow` (or a test double sharing the same field names) to `Spot`. */
@@ -49,6 +65,28 @@ function toSpot(row: SpotRow): Spot {
   if (row.photo_url != null) spot.photoUrl = row.photo_url;
 
   return spot;
+}
+
+/**
+ * Maps a `spot_cards` row (or a `feed_*`/`my_map()` row, which share the
+ * same shape plus an optional `distance_m`) to a `SpotCard`. `distanceM` is
+ * only set when the row carries `distance_m` (feedCerca) -- feedNuevo and
+ * feedSiguiendo rows never attach one.
+ */
+export function toSpotCard(row: SpotCardRow): SpotCard {
+  const card: SpotCard = {
+    ...toSpot(row),
+    author: {
+      id: row.created_by,
+      handle: row.handle,
+      displayName: row.display_name,
+      avatarUrl: row.avatar_url,
+    },
+  };
+
+  if (row.distance_m != null) card.distanceM = row.distance_m;
+
+  return card;
 }
 
 const MIME_EXTENSIONS: Record<string, string> = {
@@ -79,21 +117,6 @@ function isSessionExpiredError(error: unknown): boolean {
   const code = (error as { code?: unknown }).code;
   const status = (error as { status?: unknown }).status;
   return code === "42501" || status === 401;
-}
-
-/**
- * Fetches every spot. No `.order()` / `.limit()` / `.range()` is chained
- * after `select('*')` (spec F6) -- sort client-side if the UI needs one.
- */
-export async function fetchSpots(): Promise<Spot[]> {
-  const client = getSupabaseClient();
-  const { data, error } = await client.from(SPOTS_TABLE).select("*");
-
-  if (error) {
-    throw new Error("Failed to fetch spots.", { cause: error });
-  }
-
-  return ((data as SpotRow[] | null) ?? []).map(toSpot);
 }
 
 /**
