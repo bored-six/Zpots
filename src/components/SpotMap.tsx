@@ -2,15 +2,17 @@
 
 import type { LeafletMouseEvent, Map as LeafletMap } from "leaflet";
 import { useEffect, useState } from "react";
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import { MapContainer, Marker, Popup } from "react-leaflet";
 
 import AddSpotForm from "@/components/AddSpotForm";
+import BasemapLayer, { type BasemapMode } from "@/components/BasemapLayer";
 import Bilingual from "@/components/Bilingual";
 import CityMask from "@/components/CityMask";
 import ConfirmButton from "@/components/ConfirmButton";
 import { AddSpotIcon } from "@/components/icons/action-icons";
 import { AlertIcon } from "@/components/icons/status-icons";
 import { VintaRule } from "@/components/icons/ornaments";
+import PlaceLabelsLayer from "@/components/PlaceLabelsLayer";
 import ReportButton from "@/components/ReportButton";
 import SignInPrompt, { type GatedAction } from "@/components/SignInPrompt";
 import SpotPhoto from "@/components/SpotPhoto";
@@ -24,8 +26,6 @@ import {
   MAX_BOUNDS,
   MAX_ZOOM,
   MIN_ZOOM,
-  TILE_ATTRIBUTION,
-  TILE_URL,
   ZAMBOANGA_CENTER,
 } from "@/lib/map-config";
 import { createPhotoPinIcon, createPinIcon } from "@/lib/pin-icon";
@@ -159,6 +159,16 @@ const BANNER_CLASS =
   "overflow-hidden rounded-[6px] border border-stone bg-cream-deep text-sm font-medium text-ink";
 const BANNER_TEXT_CLASS = "px-4 py-2";
 
+/**
+ * The raster-fallback notice (Pergamino PRD D6): a small chip, not a banner
+ * -- it must never fight the outside-city / tap-to-place banners for the
+ * same top-of-map space, and at 112px the deck inset doesn't show it at all
+ * (PlaceLabelsLayer and this chip are both SpotMap-only, per D3/T3.2).
+ */
+const RASTER_CHIP_CLASS =
+  "zpots-shadow absolute bottom-4 left-4 z-[1000] w-fit rounded-full border border-stone " +
+  "bg-cream px-3 py-1 text-xs font-medium text-ink";
+
 const OVERLAY_CLASS =
   "absolute inset-0 z-[1100] flex items-center justify-center bg-tinta/55 p-4";
 const CARD_CLASS =
@@ -218,6 +228,7 @@ export default function SpotMap({
   ).filter(hasFiniteCoords);
 
   const [leafletMap, setLeafletMap] = useState<LeafletMap | null>(null);
+  const [basemapMode, setBasemapMode] = useState<BasemapMode | null>(null);
   const [isPlacementArmed, setIsPlacementArmed] = useState(false);
   const [tappedLocation, setTappedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -387,8 +398,9 @@ export default function SpotMap({
         scrollWheelZoom
         className="h-full w-full"
       >
-        <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+        <BasemapLayer map={leafletMap} onModeChange={setBasemapMode} />
         <CityMask />
+        <PlaceLabelsLayer map={leafletMap} />
         {effectiveSpots.map((spot) => (
           <Marker key={spot.id} position={[spot.lat, spot.lng]} icon={createPinIcon(spot.status)}>
             <Popup>
@@ -498,6 +510,12 @@ export default function SpotMap({
           </Marker>
         ))}
       </MapContainer>
+
+      {basemapMode === "raster" && (
+        <div className={RASTER_CHIP_CLASS}>
+          <Bilingual k="simpleMap" />
+        </div>
+      )}
 
       {!tappedLocation && onCreateSpot && (
         <button

@@ -73,11 +73,38 @@ vi.mock("react-leaflet", () => {
   };
 });
 
+// SpotMap now renders the vector "Pergamino" basemap via BasemapLayer
+// instead of a raw react-leaflet TileLayer (Pergamino PRD T3.1) -- stand in
+// for it the same way the rest of this file stands in for react-leaflet
+// itself, serialising the props it receives as data-* attributes.
+vi.mock("@/components/BasemapLayer", () => {
+  return {
+    default: ({
+      map,
+      onModeChange,
+    }: {
+      map: unknown;
+      onModeChange?: (mode: string) => void;
+    }) => (
+      <div
+        data-testid="basemap"
+        data-has-map={String(map !== null && map !== undefined)}
+        data-has-on-mode-change={String(typeof onModeChange === "function")}
+      />
+    ),
+  };
+});
+
 // Import after the mock is declared (vi.mock is hoisted by vitest, but we
 // keep the import below it for readability). This import will fail until
 // src/components/SpotMap.tsx exists -- that is expected right now.
 import SpotMap from "@/components/SpotMap";
-import { ZAMBOANGA_CENTER, DEFAULT_ZOOM, TILE_URL, TILE_ATTRIBUTION } from "@/lib/map-config";
+import {
+  ZAMBOANGA_CENTER,
+  DEFAULT_ZOOM,
+  BASEMAP_PMTILES_URL,
+  BASEMAP_ATTRIBUTION,
+} from "@/lib/map-config";
 
 function extractLatLng(position: unknown): { lat: number; lng: number } {
   if (Array.isArray(position)) {
@@ -122,12 +149,26 @@ describe("SpotMap", () => {
     expect(map.getAttribute("data-zoom")).toBe(String(DEFAULT_ZOOM));
   });
 
-  it("renders exactly one TileLayer using TILE_URL and TILE_ATTRIBUTION", () => {
+  it("renders exactly one BasemapLayer and no raster tile layer", () => {
     render(<SpotMap spots={[]} />);
-    const tiles = screen.getAllByTestId("tile-layer");
-    expect(tiles).toHaveLength(1);
-    expect(tiles[0].getAttribute("data-url")).toBe(TILE_URL);
-    expect(tiles[0].getAttribute("data-attribution")).toBe(TILE_ATTRIBUTION);
+
+    // The vector "Pergamino" basemap (BasemapLayer) replaces the raw
+    // TileLayer SpotMap used to render directly -- SpotMap's own tree must
+    // never contain a raster tile layer in the normal (non-fallback) path;
+    // BasemapLayer owns that fallback internally now (Pergamino PRD D6).
+    const basemaps = screen.getAllByTestId("basemap");
+    expect(basemaps).toHaveLength(1);
+    expect(screen.queryAllByTestId("tile-layer")).toHaveLength(0);
+
+    // BasemapLayer is wired to a live map and a way to report which mode it
+    // lands in, so the raster-fallback chip (T3.1) has something to key off.
+    expect(basemaps[0].getAttribute("data-has-on-mode-change")).toBe("true");
+
+    // The basemap's own contract (Pergamino PRD D7/D6): a real .pmtiles
+    // archive URL, and OpenStreetMap attribution still reaching the user
+    // regardless of which mode it lands in.
+    expect(BASEMAP_PMTILES_URL.length).toBeGreaterThan(0);
+    expect(BASEMAP_ATTRIBUTION).toContain("OpenStreetMap");
   });
 
   it("renders zero markers for an empty spots array without crashing", () => {
