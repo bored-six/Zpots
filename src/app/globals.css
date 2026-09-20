@@ -25,6 +25,18 @@
   --color-vinta-yellow: #e8b63a;
   --color-vinta-blue: #2c62a8;
   --color-vinta-green: #2e8b57;
+
+  /* "Pergamino" -- the ground of the map Zpots draws itself (see
+     .claude/prds/pergamino-map.md). Ground colours only; map lettering
+     reuses --color-ink / --color-stone-deep / --color-teal-deep above. */
+  --color-pergamino-land: #e9debf;
+  --color-pergamino-sea: #d6be92;
+  --color-pergamino-coast: #8a7048;
+  --color-pergamino-major: #9d7b46;
+  --color-pergamino-arterial: #b5945f;
+  --color-pergamino-street: #c5a87d;
+  --color-pergamino-minor: #d5c09a;
+  --color-pergamino-river: #a9b79e;
 }
 
 /* `inline` because these point at the CSS variables next/font injects on
@@ -109,10 +121,69 @@ select:focus-visible,
   font-family: var(--font-body);
 }
 
-/* Tint lives on the tile pane only -- markers and popups are drawn in
-   other Leaflet panes, so this filter leaves them crisp. */
+/* Fallback only: the normal map path draws vector ground (Pergamino --
+   see pergamino-palette.ts / pergamino-style.ts) with no raster tiles to
+   tint. This filter only fires when BasemapLayer falls back to the raster
+   TileLayer (D6 in .claude/prds/pergamino-map.md); keeping the rule alive
+   is what makes that degraded map still read as Zpots instead of raw OSM
+   blue. Tint lives on the tile pane only -- markers and popups are drawn
+   in other Leaflet panes, so this filter leaves them crisp either way. */
 .leaflet-tile-pane {
   filter: sepia(0.55) saturate(0.55) brightness(1.06) contrast(0.9) hue-rotate(-8deg);
+}
+
+/* Place labels ("Pergamino" lettering) -- Leaflet divIcon markers created
+   by createPlaceLabelIcon (src/lib/place-label-icon.ts), rendered on the
+   dedicated "placeLabels" pane (PlaceLabelsLayer.tsx, z-index 450: above
+   the city mask, below spot pins). iconSize is [0, 0] so the marker box
+   contributes no chrome of its own -- the inner span is the whole label
+   and centers itself on the anchor point via translateX(-50%). */
+.zpots-place-label {
+  background: none;
+  border: 0;
+}
+
+.zpots-place-label span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  pointer-events: none;
+  /* Cream halo on all four sides so the label stays legible over roads
+     and water alike, without a solid background box. */
+  text-shadow:
+    0 1px 2px var(--color-cream),
+    0 -1px 2px var(--color-cream),
+    1px 0 2px var(--color-cream),
+    -1px 0 2px var(--color-cream);
+}
+
+.zpots-place-label--landmark span {
+  font-family: var(--font-wordmark);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-ink);
+}
+
+.zpots-place-label--barangay span {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 9.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-stone-deep);
+}
+
+.zpots-place-label--water span {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 0.34em;
+  color: color-mix(in srgb, var(--color-teal-deep) 78%, transparent);
 }
 
 /* CityMask's mask Polygon (world ring, city outline as its hole) -- creams
