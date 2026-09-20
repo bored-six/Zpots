@@ -22,6 +22,39 @@ export const COPY = {
   tagline: { cv: "Ciudad Latina de Asia", en: "Asia's Latin City, one spot at a time" },
   cancel: { cv: "Cancela", en: "Cancel" },
   save: { cv: "Guarda", en: "Save" },
+
+  // social-spots.md PRD ("Copy" section) -- feed/save/follow/profile/post
+  // copy for the social redesign. "spots" is a deliberate exception: the
+  // brand word is the same word in both languages (see copy.adversarial
+  // .test.ts allowlist), everything else below is translated per usual.
+  spots: { cv: "Spots", en: "Spots" },
+  cerca: { cv: "Cerca", en: "Near me" },
+  nuevo: { cv: "Nuevo", en: "New" },
+  siguiendo: { cv: "Siguiendo", en: "Following" },
+  hoy: { cv: "Hoy", en: "Today" },
+  miMapa: { cv: "Mi mapa", en: "My map" },
+  gente: { cv: "Gente", en: "People" },
+  yo: { cv: "Yo", en: "Me" },
+  saved: { cv: "Guardao", en: "Saved" },
+  unsave: { cv: "Quita", en: "Remove" },
+  follow: { cv: "Camina con", en: "Follow" },
+  unfollow: { cv: "Deja de camina", en: "Unfollow" },
+  followingState: { cv: "Ta camina", en: "Following" },
+  followers: { cv: "Seguidores", en: "Followers" },
+  followingCount: { cv: "Siguiendo", en: "Following" },
+  pickHandle: { cv: "Escoge tu handle", en: "Pick your handle" },
+  handleTaken: { cv: "Ya tiene ese handle", en: "That handle is taken" },
+  takePhoto: { cv: "Saca foto", en: "Take a photo" },
+  choosePhoto: { cv: "Escoge foto", en: "Choose a photo" },
+  whereIsIt: { cv: "Donde este?", en: "Where is it?" },
+  usingCenter: { cv: "Ta usa el centro del ciudad", en: "Using the city center" },
+  noSpotsYet: { cv: "Nuay pa spots", en: "No spots yet" },
+  emptyMap: { cv: "Guarda un spot para mira aqui", en: "Save a spot to see it here" },
+  findPeople: { cv: "Busca gente", en: "Find people" },
+  nobodyToday: { cv: "Nuay pa quien ya sale hoy", en: "Nobody has gone out today" },
+  distanceAway: { cv: "{n} de aqui", en: "{n} away" },
+  droppedBy: { cv: "De", en: "By" },
+  spotIsUp: { cv: "Ya sale tu spot", en: "Your spot is up" },
 } as const;
 
 export type CopyKey = keyof typeof COPY;
