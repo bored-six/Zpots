@@ -1,7 +1,7 @@
 import type { SVGProps } from "react";
 
 export interface PinIconProps extends SVGProps<SVGSVGElement> {
-  /** Rendered width and height in pixels. Defaults to 32. */
+  /** Rendered width and height in pixels. Defaults to 22. */
   size?: number;
 }
 
@@ -34,7 +34,7 @@ const VIEW_BOX = "0 0 32 32";
  * with a fixed-color halo stroke (not currentColor) so the silhouette
  * separates from busy map tiles regardless of pin state or terrain color.
  */
-export function UnconfirmedPin({ size = 32, className, ...props }: PinIconProps) {
+export function UnconfirmedPin({ size = 22, className, ...props }: PinIconProps) {
   return (
     <svg
       viewBox={VIEW_BOX}
@@ -48,20 +48,28 @@ export function UnconfirmedPin({ size = 32, className, ...props }: PinIconProps)
       <path
         d={`${COMPASS_POINTS} ${PIN_TAIL}`}
         fill="none"
-        stroke="white"
+        stroke="#f6eedc"
         strokeOpacity={0.95}
-        strokeWidth={4}
+        strokeWidth={3.2}
         strokeLinejoin="round"
       />
       <path
         d={COMPASS_POINTS}
-        fill="none"
+        fill="#f6eedc"
+        fillOpacity={0.85}
         stroke="currentColor"
-        strokeWidth={1.75}
+        strokeWidth={2.0}
         strokeLinejoin="round"
       />
-      <path d={PIN_TAIL} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinejoin="round" />
-      <circle cx={16} cy={16} r={1.6} fill="none" stroke="currentColor" strokeWidth={1.25} />
+      <path
+        d={PIN_TAIL}
+        fill="#f6eedc"
+        fillOpacity={0.85}
+        stroke="currentColor"
+        strokeWidth={2.0}
+        strokeLinejoin="round"
+      />
+      <circle cx={16} cy={16} r={1.6} fill="none" stroke="currentColor" strokeWidth={1.4} />
     </svg>
   );
 }
@@ -72,7 +80,7 @@ export function UnconfirmedPin({ size = 32, className, ...props }: PinIconProps)
  * approved mockup) -- distinguishable from the unconfirmed outline by fill
  * state alone, same silhouette either way.
  */
-export function ConfirmedPin({ size = 32, className, ...props }: PinIconProps) {
+export function ConfirmedPin({ size = 22, className, ...props }: PinIconProps) {
   return (
     <svg
       viewBox={VIEW_BOX}
@@ -86,9 +94,9 @@ export function ConfirmedPin({ size = 32, className, ...props }: PinIconProps) {
       <path
         d={`${COMPASS_POINTS} ${PIN_TAIL}`}
         fill="none"
-        stroke="white"
+        stroke="#f6eedc"
         strokeOpacity={0.95}
-        strokeWidth={4}
+        strokeWidth={3.2}
         strokeLinejoin="round"
       />
       <path
@@ -99,7 +107,7 @@ export function ConfirmedPin({ size = 32, className, ...props }: PinIconProps) {
         strokeLinejoin="round"
       />
       <path d={PIN_TAIL} fill="currentColor" stroke="currentColor" strokeWidth={1} strokeLinejoin="round" />
-      <circle cx={16} cy={16} r={1.8} fill="#8a2a1e" stroke="none" />
+      <circle cx={16} cy={16} r={2} fill="#f6eedc" stroke="none" />
     </svg>
   );
 }
