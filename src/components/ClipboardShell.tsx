@@ -46,7 +46,7 @@ export default function ClipboardShell({ children, fullBleed = false }: Clipboar
             : "zpots-shadow relative mx-auto flex w-full max-w-3xl flex-col overflow-hidden rounded-[6px] border border-stone"
         }
       >
-        <AzulejoBand className="block w-full" height={6} />
+        <AzulejoBand className="block w-full" height={12} />
 
         <header className={HEADER_CLASS}>
           <div>

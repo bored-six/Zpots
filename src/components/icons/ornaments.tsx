@@ -20,6 +20,19 @@ export interface OrnamentProps extends Omit<SVGProps<SVGSVGElement>, "width" | "
  * stays crisp and continuous at any width (header, card divider, settings
  * page) instead of stretching or clipping mid-tile.
  *
+ * Deliberately no `viewBox`/`preserveAspectRatio`: with those set (as an
+ * earlier version of this component had), the browser scales the whole
+ * 24x12 coordinate system to fit the rendered box -- on a 766px-wide
+ * header that stretches the single pattern tile across the entire band
+ * instead of repeating it, so only two dots ever showed. Without a
+ * `viewBox`, the SVG's user-unit coordinate system equals real CSS pixels
+ * at whatever size it's actually rendered, so `patternUnits="userSpaceOnUse"`
+ * tiles the pattern in genuine 24x12px squares that repeat across the
+ * covering `<rect width="100%" height="100%">`. Callers must give this a
+ * `height` of at least 12 for the diamond to render uncropped -- anything
+ * shorter clips it, which is why a true 1px hairline divider should be a
+ * plain `border-t` instead of this component.
+ *
  * The pattern id is generated per-instance with `useId()` -- several bands
  * render on the same page at once (the settings page alone renders five),
  * and a shared literal id would mean every band after the first silently
@@ -32,8 +45,6 @@ export function AzulejoBand({ width = "100%", height = 18, className, ...props }
     <svg
       width={width}
       height={height}
-      viewBox="0 0 24 12"
-      preserveAspectRatio="none"
       {...props}
       className={className}
       role="presentation"
@@ -59,7 +70,7 @@ export function AzulejoBand({ width = "100%", height = 18, className, ...props }
           <rect x={17} y={5} width={2} height={2} fill="var(--color-terracotta)" />
         </pattern>
       </defs>
-      <rect width={24} height={12} fill={`url(#${patternId})`} />
+      <rect width="100%" height="100%" fill={`url(#${patternId})`} />
     </svg>
   );
 }

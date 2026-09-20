@@ -63,4 +63,23 @@ describe("AzulejoBand -- tileable lattice pattern", () => {
     expect(ids[1]).toBeTruthy();
     expect(ids[0]).not.toBe(ids[1]);
   });
+
+  it("has no viewBox on the outer svg, so the pattern tiles in real pixels instead of being stretched to fit", () => {
+    const { container } = render(<AzulejoBand />);
+
+    const svg = container.querySelector("svg");
+    expect(svg).not.toBeNull();
+    expect(svg).not.toHaveAttribute("viewBox");
+    expect(svg).not.toHaveAttribute("preserveAspectRatio");
+  });
+
+  it("the <pattern> tiles in real pixels: patternUnits='userSpaceOnUse' with a 24x12 tile", () => {
+    const { container } = render(<AzulejoBand />);
+
+    const pattern = container.querySelector("pattern");
+    expect(pattern).not.toBeNull();
+    expect(pattern).toHaveAttribute("patternUnits", "userSpaceOnUse");
+    expect(pattern).toHaveAttribute("width", "24");
+    expect(pattern).toHaveAttribute("height", "12");
+  });
 });

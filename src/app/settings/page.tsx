@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/AuthProvider";
 import ClipboardShell from "@/components/ClipboardShell";
-import { AzulejoBand } from "@/components/icons/ornaments";
 import { updateNickname, type AuthUser } from "@/lib/auth";
 import { fetchMyConfirmedSpotIds } from "@/lib/spots-repo";
 import { MAX_NICKNAME_LENGTH } from "@/lib/validation";
@@ -21,10 +20,12 @@ const SECTION_HEADING_CLASS =
 const SIGN_OUT_BUTTON_CLASS =
   "inline-flex min-h-10 items-center gap-2 rounded border border-cardinal px-4 py-2 text-sm " +
   "font-bold text-cardinal transition hover:bg-cardinal hover:text-cream";
-// A 1px AzulejoBand at 40% opacity stands in for the plain hairline
-// dividers between settings sections (spec Task 4, "Settings page").
+// A plain 1px stone hairline divides settings sections (spec Task 4,
+// "Settings page"). AzulejoBand can't do this: its tile pattern needs at
+// least 12px of height to show a full diamond, so a 1px band just clips
+// it down to an unrecognizable sliver (see ornaments.tsx AzulejoBand doc).
 function SectionDivider() {
-  return <AzulejoBand height={1} className="block w-full opacity-40" />;
+  return <div className="w-full border-t border-stone" />;
 }
 
 function Attribution() {
