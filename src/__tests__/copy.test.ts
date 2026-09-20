@@ -29,6 +29,51 @@ describe("COPY", () => {
     }
   });
 
+  // social-spots.md PRD ("Copy" section) -- feed/save/follow/profile/post copy
+  // added for the social redesign. "save" already existed from the original
+  // spec (Guarda / Save) and is asserted above; "been" reuses the existing
+  // confirmVisit key rather than being a new entry.
+  it("has at least the entries named in the social-spots PRD", () => {
+    const expectedSocialKeys: CopyKey[] = [
+      "spots",
+      "cerca",
+      "nuevo",
+      "siguiendo",
+      "hoy",
+      "miMapa",
+      "gente",
+      "yo",
+      "saved",
+      "unsave",
+      "follow",
+      "unfollow",
+      "followingState",
+      "followers",
+      "followingCount",
+      "pickHandle",
+      "handleTaken",
+      "takePhoto",
+      "choosePhoto",
+      "whereIsIt",
+      "usingCenter",
+      "noSpotsYet",
+      "emptyMap",
+      "findPeople",
+      "nobodyToday",
+      "distanceAway",
+      "droppedBy",
+      "spotIsUp",
+    ];
+    for (const key of expectedSocialKeys) {
+      expect(keys).toContain(key);
+    }
+  });
+
+  it("spots is Spots/Spots -- a deliberate brand-word exception (see copy.adversarial.test.ts allowlist)", () => {
+    expect(COPY.spots.cv).toBe("Spots");
+    expect(COPY.spots.en).toBe("Spots");
+  });
+
   it.each(keys)("entry '%s' has a non-empty cv and en string", (key) => {
     const entry = COPY[key];
     expect(typeof entry.cv).toBe("string");
