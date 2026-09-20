@@ -99,9 +99,19 @@ describe("0004_social_spots.sql", () => {
 
   it("creates the spot_cards security-invoker view joining spots and profiles", () => {
     const sql = readMigration();
-    expect(sql).toMatch(/create view\s+public\.spot_cards/i);
+    expect(sql).toMatch(/create\s+(or\s+replace\s+)?view\s+public\.spot_cards/i);
     expect(sql).toMatch(/security_invoker\s*=\s*true/i);
     expect(sql).toMatch(/join\s+public\.profiles/i);
+  });
+
+  it("never DROPs spot_cards or uses a cascading DROP -- feed_nuevo/feed_siguiendo depend on its type, so a DROP VIEW is refused (2BP01) once they exist, and DROP ... CASCADE would silently take them down; CREATE OR REPLACE VIEW is the only safe way to redefine it on re-run", () => {
+    const sql = readMigration();
+    expect(sql).not.toMatch(/drop view/i);
+    // Scoped to an actual "drop ... cascade" statement, not the legitimate
+    // "references ... on delete cascade" foreign-key clauses elsewhere in
+    // this file (profiles.id, follows.follower_id/followee_id, saves.user_id/
+    // spot_id all cascade-delete on their parent row, which is unrelated).
+    expect(sql).not.toMatch(/drop\s+\w+[^;]*cascade/i);
   });
 
   describe("functions", () => {

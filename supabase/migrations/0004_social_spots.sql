@@ -254,10 +254,17 @@ create index if not exists spots_created_by_created_at_idx on public.spots(creat
 
 -- ----------------------------------------------------------------------------
 -- 6. spot_cards -- the read shape every feed/profile query selects from.
+--    Redefined with CREATE OR REPLACE only -- never dropped and recreated.
+--    feed_nuevo/feed_siguiendo below are declared "returns setof
+--    public.spot_cards", which makes them depend on this view's composite
+--    row type. Dropping the view first (IF EXISTS or not) is refused with
+--    2BP01 on any database where those functions already exist; forcing it
+--    with a dependency-following drop would silently take the feed
+--    functions down too. CREATE OR REPLACE keeps the same type OID, so
+--    dependents are untouched, as long as the column list/order never
+--    changes -- which it hasn't across this file's history.
 -- ----------------------------------------------------------------------------
-drop view if exists public.spot_cards;
-
-create view public.spot_cards
+create or replace view public.spot_cards
 with (security_invoker = true) as
 select
   s.id, s.name, s.note, s.lat, s.lng, s.status, s.confirmations, s.created_at, s.photo_url,
@@ -279,6 +286,16 @@ grant select on public.spot_cards to anon, authenticated;
 
 -- Cerca: every spot, ordered by distance from (lat, lng). Public -- no
 -- auth.uid() involved, so it works identically signed in or signed out.
+-- DROP FUNCTION IF EXISTS guards below (feed_cerca through handle_available):
+-- unlike the trigger functions above (fixed "returns trigger", never at
+-- risk), these six return data shapes that have changed across this file's
+-- drafts. CREATE OR REPLACE FUNCTION errors with 42P13 if a same-signature,
+-- different-return-type version is already installed from an earlier
+-- partial apply; DROP FUNCTION IF EXISTS with the exact current argument
+-- types clears that (or no-ops if nothing matches) before the CREATE OR
+-- REPLACE below. Safe: nothing else in this schema depends on these
+-- functions' types the way feed_nuevo/feed_siguiendo depend on spot_cards.
+drop function if exists public.feed_cerca(double precision, double precision, integer, integer);
 create or replace function public.feed_cerca(
   lat double precision,
   lng double precision,
@@ -309,6 +326,7 @@ as $$
 $$;
 
 -- Nuevo: newest first, keyset-paginated on (created_at, id). Public.
+drop function if exists public.feed_nuevo(integer, timestamptz, uuid);
 create or replace function public.feed_nuevo(
   page_size integer default 10,
   before_created_at timestamptz default null,
@@ -331,6 +349,7 @@ $$;
 -- Siguiendo: same paging as Nuevo, scoped to accounts I follow. Empty
 -- follows (or auth.uid() null when signed out) yields an empty "in ()" set,
 -- so this returns zero rows rather than erroring.
+drop function if exists public.feed_siguiendo(integer, timestamptz, uuid);
 create or replace function public.feed_siguiendo(
   page_size integer default 10,
   before_created_at timestamptz default null,
@@ -358,6 +377,7 @@ $$;
 -- Hoy: followees with a spot in the last 24h, one row per person (their
 -- latest), newest first, max 20. auth.uid() null -> zero followees -> zero
 -- rows.
+drop function if exists public.hoy_row();
 create or replace function public.hoy_row()
 returns table (
   spot_id uuid, id uuid, handle citext, display_name text, avatar_url text
@@ -386,6 +406,7 @@ $$;
 -- spot, tagged with a single source (mine wins over been, been wins over
 -- saved). auth.uid() null -> every branch's equality against auth.uid()
 -- fails -> zero rows.
+drop function if exists public.my_map();
 create or replace function public.my_map()
 returns table (
   id uuid, name text, note text, lat double precision, lng double precision, status text,
@@ -425,6 +446,7 @@ $$;
 -- Handle availability check, for the live indicator in the handle-pick modal.
 -- Callable by anon: the handle gate can run before a user has finished
 -- signing in, and it only ever reads the already-public handle column.
+drop function if exists public.handle_available(text);
 create or replace function public.handle_available(handle text)
 returns boolean
 language sql
@@ -512,3 +534,33 @@ create policy avatars_delete_own_folder on storage.objects
 notify pgrst, 'reload schema';
 
 commit;
+
+-- ============================================================================
+-- Verification (commented out -- paste and run separately after this
+-- migration, never as part of it). Expected result: 3 tables (profiles,
+-- follows, saves), 1 view (spot_cards), 6 functions (feed_cerca, feed_nuevo,
+-- feed_siguiendo, hoy_row, my_map, handle_available), and RLS policies on
+-- profiles/follows/saves (3 + 3 + 3) plus storage.objects (3 avatars_* rows).
+-- ============================================================================
+-- select table_name, table_type
+-- from information_schema.tables
+-- where table_schema = 'public'
+--   and table_name in ('profiles', 'follows', 'saves', 'spot_cards')
+-- order by table_name;
+--
+-- select p.proname as function_name, pg_get_function_identity_arguments(p.oid) as args,
+--        pg_get_function_result(p.oid) as returns
+-- from pg_proc p
+-- join pg_namespace n on n.oid = p.pronamespace
+-- where n.nspname = 'public'
+--   and p.proname in (
+--     'feed_cerca', 'feed_nuevo', 'feed_siguiendo',
+--     'hoy_row', 'my_map', 'handle_available'
+--   )
+-- order by p.proname;
+--
+-- select schemaname, tablename, policyname, cmd
+-- from pg_policies
+-- where (schemaname = 'public' and tablename in ('profiles', 'follows', 'saves'))
+--    or (schemaname = 'storage' and tablename = 'objects' and policyname like 'avatars_%')
+-- order by schemaname, tablename, policyname;
