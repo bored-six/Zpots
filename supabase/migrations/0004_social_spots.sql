@@ -32,7 +32,7 @@ create extension if not exists citext;
 -- ----------------------------------------------------------------------------
 -- 2. profiles
 -- ----------------------------------------------------------------------------
-create table public.profiles (
+create table if not exists public.profiles (
   id               uuid primary key references auth.users(id) on delete cascade,
   handle           citext not null unique,
   display_name     text not null default '',
@@ -128,7 +128,7 @@ grant update (handle, display_name, avatar_url, needs_handle)
 -- ----------------------------------------------------------------------------
 -- 3. follows ("Camina con")
 -- ----------------------------------------------------------------------------
-create table public.follows (
+create table if not exists public.follows (
   follower_id uuid not null references public.profiles(id) on delete cascade,
   followee_id uuid not null references public.profiles(id) on delete cascade,
   created_at  timestamptz not null default now(),
@@ -139,7 +139,7 @@ create table public.follows (
 comment on table public.follows is
   'follower_id follows followee_id. profiles.follower_count/following_count are trigger-maintained from this table -- never write them directly.';
 
-create index follows_followee_idx on public.follows(followee_id, follower_id);
+create index if not exists follows_followee_idx on public.follows(followee_id, follower_id);
 
 create or replace function public.follows_adjust_counts()
 returns trigger
@@ -197,7 +197,7 @@ grant delete on table public.follows to authenticated;
 -- ----------------------------------------------------------------------------
 -- 4. saves ("Guarda") -- private bookmarks onto Mi mapa.
 -- ----------------------------------------------------------------------------
-create table public.saves (
+create table if not exists public.saves (
   user_id    uuid not null references public.profiles(id) on delete cascade,
   spot_id    uuid not null references public.spots(id) on delete cascade,
   created_at timestamptz not null default now(),
@@ -207,7 +207,7 @@ create table public.saves (
 comment on table public.saves is
   'Private bookmarks. Never public -- select is scoped to the caller''s own rows, unlike confirmations ("been"), which counts toward the public Confirmed threshold.';
 
-create index saves_spot_idx on public.saves(spot_id);
+create index if not exists saves_spot_idx on public.saves(spot_id);
 
 alter table public.saves enable row level security;
 
@@ -239,15 +239,24 @@ grant delete on table public.saves to authenticated;
 -- 5. spots.created_by -> profiles, for PostgREST/view embedding.
 --    (The existing 0002 FK to auth.users(id) is untouched; this is additive.)
 -- ----------------------------------------------------------------------------
-alter table public.spots
-  add constraint spots_created_by_profile_fkey
-  foreign key (created_by) references public.profiles(id);
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'spots_created_by_profile_fkey'
+  ) then
+    alter table public.spots
+      add constraint spots_created_by_profile_fkey
+      foreign key (created_by) references public.profiles(id);
+  end if;
+end $$;
 
-create index spots_created_by_created_at_idx on public.spots(created_by, created_at desc);
+create index if not exists spots_created_by_created_at_idx on public.spots(created_by, created_at desc);
 
 -- ----------------------------------------------------------------------------
 -- 6. spot_cards -- the read shape every feed/profile query selects from.
 -- ----------------------------------------------------------------------------
+drop view if exists public.spot_cards;
+
 create view public.spot_cards
 with (security_invoker = true) as
 select
@@ -270,7 +279,7 @@ grant select on public.spot_cards to anon, authenticated;
 
 -- Cerca: every spot, ordered by distance from (lat, lng). Public -- no
 -- auth.uid() involved, so it works identically signed in or signed out.
-create function public.feed_cerca(
+create or replace function public.feed_cerca(
   lat double precision,
   lng double precision,
   page_size integer default 10,
@@ -300,7 +309,7 @@ as $$
 $$;
 
 -- Nuevo: newest first, keyset-paginated on (created_at, id). Public.
-create function public.feed_nuevo(
+create or replace function public.feed_nuevo(
   page_size integer default 10,
   before_created_at timestamptz default null,
   before_id uuid default null
@@ -322,7 +331,7 @@ $$;
 -- Siguiendo: same paging as Nuevo, scoped to accounts I follow. Empty
 -- follows (or auth.uid() null when signed out) yields an empty "in ()" set,
 -- so this returns zero rows rather than erroring.
-create function public.feed_siguiendo(
+create or replace function public.feed_siguiendo(
   page_size integer default 10,
   before_created_at timestamptz default null,
   before_id uuid default null
@@ -349,7 +358,7 @@ $$;
 -- Hoy: followees with a spot in the last 24h, one row per person (their
 -- latest), newest first, max 20. auth.uid() null -> zero followees -> zero
 -- rows.
-create function public.hoy_row()
+create or replace function public.hoy_row()
 returns table (
   spot_id uuid, id uuid, handle citext, display_name text, avatar_url text
 )
@@ -377,7 +386,7 @@ $$;
 -- spot, tagged with a single source (mine wins over been, been wins over
 -- saved). auth.uid() null -> every branch's equality against auth.uid()
 -- fails -> zero rows.
-create function public.my_map()
+create or replace function public.my_map()
 returns table (
   id uuid, name text, note text, lat double precision, lng double precision, status text,
   confirmations integer, created_at timestamptz, photo_url text, created_by uuid,
@@ -416,7 +425,7 @@ $$;
 -- Handle availability check, for the live indicator in the handle-pick modal.
 -- Callable by anon: the handle gate can run before a user has finished
 -- signing in, and it only ever reads the already-public handle column.
-create function public.handle_available(handle text)
+create or replace function public.handle_available(handle text)
 returns boolean
 language sql
 stable
