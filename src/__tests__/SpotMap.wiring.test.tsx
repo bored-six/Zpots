@@ -61,6 +61,10 @@ vi.mock("react-leaflet", async () => {
   };
 });
 
+vi.mock("@/components/CityMask", () => ({
+  default: () => <div data-testid="city-mask" />,
+}));
+
 import SpotMap from "@/components/SpotMap";
 
 function makeImageFile(name = "photo.jpg"): File {
@@ -362,6 +366,17 @@ describe("SpotMap -- auth gating", () => {
     render(<SpotMap {...props} authStatus="signed-in" spots={[unconfirmedSpot]} />);
 
     expect(screen.queryByText(/sign in to confirm or report/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("SpotMap -- city outline mask", () => {
+  it("renders CityMask inside the map container", () => {
+    render(<SpotMap {...baseProps()} spots={[]} />);
+
+    const mapContainer = screen.getByTestId("map-container");
+    const cityMask = screen.getByTestId("city-mask");
+
+    expect(mapContainer).toContainElement(cityMask);
   });
 });
 
