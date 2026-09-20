@@ -19,6 +19,7 @@ vi.mock("@/lib/auth", () => ({
 
 import { getSupabaseClient } from "@/lib/supabase";
 import { getCurrentUser, requireUserId } from "@/lib/auth";
+import { createFakeSupabase, makeSpotRow } from "@/__tests__/helpers/fake-supabase";
 import {
   fetchSpots,
   createSpot,
@@ -245,124 +246,6 @@ describe("createSpot", () => {
 // catch the unique violation" identity check without hardcoding which one
 // the implementation picks).
 // ---------------------------------------------------------------------------
-function createFakeSupabase(seedRows: Record<string, Record<string, unknown>[]>) {
-  const db: Record<string, Record<string, unknown>[]> = {};
-  for (const [table, rows] of Object.entries(seedRows)) {
-    db[table] = rows.map((r) => ({ ...r }));
-  }
-  const calls: { table: string; method: string; args: unknown[] }[] = [];
-
-  function ensureTable(table: string) {
-    if (!db[table]) db[table] = [];
-    return db[table];
-  }
-
-  function makeBuilder(table: string) {
-    const filters: [string, unknown][] = [];
-    let pendingUpdate: Record<string, unknown> | null = null;
-    let pendingInsert: Record<string, unknown> | null = null;
-
-    function matches(row: Record<string, unknown>) {
-      return filters.every(([col, val]) => row[col] === val);
-    }
-
-    function currentRows() {
-      const rows = ensureTable(table);
-      return filters.length ? rows.filter(matches) : rows;
-    }
-
-    function resolveNow(): { data: unknown; error: { code?: string; message: string } | null } {
-      if (pendingInsert !== null) {
-        const rows = ensureTable(table);
-        const newValues = Object.values(pendingInsert);
-        const isDuplicate = rows.some((existing) => {
-          const sharedCount = Object.values(existing).filter((v) => newValues.includes(v)).length;
-          return sharedCount >= 2;
-        });
-        calls.push({ table, method: "insert", args: [pendingInsert] });
-        if (isDuplicate) {
-          return {
-            data: null,
-            error: { code: "23505", message: "duplicate key value violates unique constraint" },
-          };
-        }
-        const row = { ...pendingInsert };
-        rows.push(row);
-        return { data: row, error: null };
-      }
-      if (pendingUpdate !== null) {
-        calls.push({ table, method: "update", args: [pendingUpdate, filters] });
-        const rows = currentRows();
-        for (const row of rows) Object.assign(row, pendingUpdate);
-        return { data: rows, error: null };
-      }
-      calls.push({ table, method: "select", args: [filters] });
-      return { data: currentRows(), error: null };
-    }
-
-    const builder: {
-      select: () => typeof builder;
-      eq: (col: string, val: unknown) => typeof builder;
-      insert: (row: Record<string, unknown>) => typeof builder;
-      update: (patch: Record<string, unknown>) => typeof builder;
-      single: () => Promise<{ data: unknown; error: unknown }>;
-      then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) => unknown;
-    } = {
-      select: () => builder,
-      eq: (col, val) => {
-        filters.push([col, val]);
-        return builder;
-      },
-      insert: (row) => {
-        pendingInsert = row;
-        return builder;
-      },
-      update: (patch) => {
-        pendingUpdate = patch;
-        return builder;
-      },
-      single: async () => {
-        const result = resolveNow();
-        if (Array.isArray(result.data)) {
-          const first = result.data[0];
-          return first
-            ? { data: first, error: null }
-            : { data: null, error: { message: "not found" } };
-        }
-        return result;
-      },
-      then: (resolve, reject) => Promise.resolve(resolveNow()).then(resolve, reject),
-    };
-    return builder;
-  }
-
-  const client = {
-    from: (table: string) => makeBuilder(table),
-    storage: {
-      from: () => ({
-        upload: async () => ({ data: { path: "fake/path.jpg" }, error: null }),
-        getPublicUrl: () => ({ data: { publicUrl: "https://cdn.example.com/fake.jpg" } }),
-      }),
-    },
-  };
-
-  return { client, db, calls };
-}
-
-function makeSpotRow(overrides: Partial<Spot> = {}): Spot {
-  return {
-    id: "spot-1",
-    name: "Fort Pilar",
-    note: "Historic fort.",
-    lat: 6.9098,
-    lng: 122.079,
-    status: "unconfirmed",
-    confirmations: 0,
-    createdAt: "2026-01-01T00:00:00.000Z",
-    ...overrides,
-  };
-}
-
 /** Queues requireUserId() to resolve each id in order, one per call. */
 function queueConfirmerIds(ids: string[]) {
   for (const id of ids) {
