@@ -1,7 +1,7 @@
 # PRD: Pergamino — a map Zpots draws itself
 
 **Ticket:** None (ad-hoc request, 2026-09-20)
-**Status:** Planning
+**Status:** In Progress (waves 1-3 complete and reviewed; blocked on the archive checkpoints)
 **Created:** 2026-09-20
 **Last Updated:** 2026-09-20
 **Supersedes (partially):** the raster-tile + CSS-tint decision in `.claude/prds/ciudad-latina-redesign.md`
@@ -827,3 +827,25 @@ coder agents in the same working tree.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-09-20 | PRD created | User approved the "Pergamino" drawn-map direction against a published design preview |
+
+
+## Change Log
+
+| Date | Change | Reason |
+|------|--------|--------|
+| 2026-09-20 | T3.3 added, not in the original plan: four fake Leaflet maps extended with `getPane`/`createPane`/`addLayer`/`removeLayer`/`getZoom`. | D4's claim that no existing react-leaflet mock needed changing was wrong for the suites that forward a live fake map through `ref`. 35 tests failed until the doubles were made faithful. |
+| 2026-09-20 | T3.4 added after review rejected the change: `attach()` wrapped in try/catch with a shared raster fallback. | The archive probe never throws, but the awaited dynamic `import()` does. An unhandled rejection left the ground permanently blank, violating D6's own "never a blank rectangle" guarantee. |
+| 2026-09-20 | T3.4 also wired `COPY.simpleMapWhy` into the fallback chip as its title and accessible description. | It was defined and asserted to exist but never rendered, i.e. a copy entry existing only to satisfy a test. |
+| 2026-09-20 | T3.5 added: the catch logs the caught error, gated on still being mounted. | Review noted the catch would otherwise turn a genuine defect, such as a TypeError while building paint rules, into a silent downgrade discoverable only by eye. |
+| 2026-09-20 | Deferred Wave 1 test 4 (token membership) backfilled into `pergamino-style.test.ts`. | T1.1 could not import a parallel task's not-yet-written module; the natural dependency direction is style importing the palette's token names. |
+
+## Outcome so far
+
+Waves 1 to 3 are implemented, reviewed and committed across twelve commits. Gates: 82 test files,
+1070 tests passing, types clean, build clean, one pre-existing lint warning unrelated to this work.
+
+The map is wired end to end but **nobody has seen the drawn version in the real app yet**, because
+the `.pmtiles` archive is not hosted. Until it is, every map mount probes the configured URL, gets
+a 404, and falls back to the tinted raster with the "Mapa simple" chip. That is the designed
+degraded state and it is verified working in the live dev app, with our own Cinzel lettering
+already drawing over the raster ground.
