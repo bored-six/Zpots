@@ -25,6 +25,8 @@ import {
   confirmSpot,
   reportSpot,
   fetchMyConfirmedSpotIds,
+  toSpotCard,
+  type SpotCardRow,
 } from "@/lib/spots-repo";
 
 function makeImageFile(name = "photo.jpg"): File {
@@ -395,5 +397,68 @@ describe("fetchMyConfirmedSpotIds", () => {
     vi.mocked(getSupabaseClient).mockReturnValue({ from: fromMock } as never);
 
     await expect(fetchMyConfirmedSpotIds()).rejects.toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// toSpotCard -- the exact column list `public.spot_cards` (and every
+// function that returns its row shape: feed_cerca/feed_nuevo/feed_siguiendo/
+// my_map, all declared in supabase/migrations/0004_social_spots.sql) sends
+// back over PostgREST. A renamed/dropped `lat`/`lng` column here is exactly
+// the failure mode that hands Leaflet an undefined coordinate and crashes
+// the page with "Invalid LatLng object: (NaN, NaN)" (MapInsetInner.tsx) --
+// this test pins the mapping so that regression can't happen silently.
+// ---------------------------------------------------------------------------
+describe("toSpotCard", () => {
+  function spotCardRow(overrides: Partial<SpotCardRow> = {}): SpotCardRow {
+    return {
+      id: "spot-1",
+      name: "Fort Pilar",
+      note: "Historic fort.",
+      lat: 6.9098,
+      lng: 122.079,
+      status: "unconfirmed",
+      confirmations: 0,
+      created_at: "2026-01-01T00:00:00.000Z",
+      photo_url: "https://cdn.example.com/fort.jpg",
+      created_by: "user-2",
+      handle: "kuya_ben",
+      display_name: "Kuya Ben",
+      avatar_url: null,
+      ...overrides,
+    };
+  }
+
+  it("maps the row's real lat/lng columns to SpotCard.lat/lng as finite numbers", () => {
+    const card = toSpotCard(spotCardRow({ lat: 6.9098, lng: 122.079 }));
+
+    expect(card.lat).toBe(6.9098);
+    expect(card.lng).toBe(122.079);
+    expect(Number.isFinite(card.lat)).toBe(true);
+    expect(Number.isFinite(card.lng)).toBe(true);
+  });
+
+  it("maps every column public.spot_cards actually returns (migration 0004), not a renamed guess", () => {
+    const row = spotCardRow({ distance_m: 842.5 });
+    const card = toSpotCard(row);
+
+    expect(card).toMatchObject({
+      id: row.id,
+      name: row.name,
+      note: row.note,
+      lat: row.lat,
+      lng: row.lng,
+      status: row.status,
+      confirmations: row.confirmations,
+      createdAt: row.created_at,
+      photoUrl: row.photo_url,
+      distanceM: row.distance_m,
+      author: {
+        id: row.created_by,
+        handle: row.handle,
+        displayName: row.display_name,
+        avatarUrl: row.avatar_url,
+      },
+    });
   });
 });

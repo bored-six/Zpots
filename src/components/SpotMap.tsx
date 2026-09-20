@@ -31,6 +31,17 @@ import { createPhotoPinIcon, createPinIcon } from "@/lib/pin-icon";
 import type { MapSource, MapSpot, Spot } from "@/lib/spots";
 import type { NewSpotInput, ReportReason } from "@/lib/validation";
 
+/**
+ * True only for a spot Leaflet can actually plot. A row with a missing or
+ * non-finite `lat`/`lng` (bad upstream data, a partial/legacy row) must
+ * never reach a `Marker` -- Leaflet's LatLng constructor throws "Invalid
+ * LatLng object: (NaN, NaN)", which would take down the whole map instead
+ * of just skipping the one bad pin.
+ */
+function hasFiniteCoords(spot: { lat: number; lng: number }): boolean {
+  return Number.isFinite(spot.lat) && Number.isFinite(spot.lng);
+}
+
 interface SpotMapProps {
   /**
    * Write-mode spots (tap-to-place, confirm, report). Omitted entirely by
@@ -156,10 +167,10 @@ export default function SpotMap({
   // frozen SpotMap.test.tsx, which never exercises a gated action) behaves
   // exactly like 'signed-out'. Never default to 'signed-in'.
   const effectiveAuthStatus: AuthStatus = authStatus ?? "signed-out";
-  const effectiveSpots = spots ?? [];
-  const visibleMapSpots = sourceFilter
-    ? (mapSpots ?? []).filter((spot) => sourceFilter.has(spot.source))
-    : (mapSpots ?? []);
+  const effectiveSpots = (spots ?? []).filter(hasFiniteCoords);
+  const visibleMapSpots = (
+    sourceFilter ? (mapSpots ?? []).filter((spot) => sourceFilter.has(spot.source)) : (mapSpots ?? [])
+  ).filter(hasFiniteCoords);
 
   const [leafletMap, setLeafletMap] = useState<LeafletMap | null>(null);
   const [isPlacementArmed, setIsPlacementArmed] = useState(false);

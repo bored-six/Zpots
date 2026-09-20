@@ -34,11 +34,19 @@ export interface MapInsetProps {
   fill?: boolean;
 }
 
+/** True only for a `LatLng` Leaflet can actually plot -- both coordinates present and finite. */
+function isUsableCenter(center: LatLng | undefined | null): center is LatLng {
+  return (
+    center != null && Number.isFinite(center.lat) && Number.isFinite(center.lng)
+  );
+}
+
 /** Leaflet-side controller: pans (flyTo) whenever `center` changes. */
 function FlyToCenter({ center }: { center: LatLng }) {
   const map = useMap();
 
   useEffect(() => {
+    if (!isUsableCenter(center)) return;
     map.flyTo([center.lat, center.lng], map.getZoom(), { duration: 0.25 });
     // Only the coordinates should retrigger the pan -- not a new `map`
     // reference (there isn't one) or a new function identity.
@@ -55,6 +63,14 @@ export default function MapInsetInner({
   size = DEFAULT_SIZE,
   fill = false,
 }: MapInsetProps) {
+  // A missing/non-finite coordinate must never crash the page -- Leaflet's
+  // LatLng constructor throws "Invalid LatLng object: (NaN, NaN)" on
+  // anything else. A caller can hand this a center before any real spot is
+  // active (page.tsx's right-column map before the first card loads) or a
+  // row whose coordinates didn't survive the trip from the database; either
+  // way, render nothing rather than a broken MapContainer.
+  if (!isUsableCenter(center)) return null;
+
   const dimensionStyle = fill ? undefined : { width: size, height: size };
   const dimensionClass = fill ? "h-full w-full" : "";
 

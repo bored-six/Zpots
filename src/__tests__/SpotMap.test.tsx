@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { Spot } from "@/lib/spots";
+import type { MapSpot, Spot } from "@/lib/spots";
 
 // We deliberately avoid rendering real Leaflet in jsdom (it needs real layout
 // measurement and is flaky in a headless DOM). Instead we replace
@@ -169,6 +169,33 @@ describe("SpotMap", () => {
         Math.abs(p.lat - swapped.lat) < 1e-9 && Math.abs(p.lng - swapped.lng) < 1e-9,
     );
     expect(accidentallyMatchesSwapped).toBe(false);
+  });
+
+  // Regression coverage for "Invalid LatLng object: (NaN, NaN)" (a full-page
+  // runtime crash): one spot with a missing/non-finite coordinate -- a bad
+  // upstream row, not something the UI should ever be able to produce on its
+  // own -- must not take down every other pin on the map. It's skipped
+  // instead.
+  it("skips a spots[] row with a non-finite coordinate instead of crashing, and still renders the rest", () => {
+    const badSpot: Spot = { ...unconfirmedSpot, id: "spot-bad", lat: NaN, lng: 122.05 };
+
+    expect(() => render(<SpotMap spots={[badSpot, confirmedSpot]} />)).not.toThrow();
+    expect(screen.getAllByTestId("marker")).toHaveLength(1);
+  });
+
+  it("skips a mapSpots row with an undefined coordinate instead of crashing, and still renders the rest", () => {
+    const goodMapSpot: MapSpot = { ...unconfirmedSpot, source: "mine" };
+    const badMapSpot: MapSpot = {
+      ...confirmedSpot,
+      id: "spot-bad-2",
+      source: "saved",
+      lat: undefined as unknown as number,
+    };
+
+    expect(() =>
+      render(<SpotMap authStatus="signed-in" mapSpots={[badMapSpot, goodMapSpot]} />),
+    ).not.toThrow();
+    expect(screen.getAllByTestId("marker")).toHaveLength(1);
   });
 
   it("shows name, note, and 'Unconfirmed' label in the popup for an unconfirmed spot", () => {
