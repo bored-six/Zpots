@@ -23,6 +23,10 @@ import {
   isFollowing,
   isHandleAvailable,
   searchProfiles,
+  // Not implemented yet (fix round) -- gente-page.md's "Siguiendo" rewrite
+  // needs a bulk-by-id profile lookup distinct from `getProfileByHandle`.
+  // @ts-expect-error -- profilesByIds doesn't exist on profiles-repo yet.
+  profilesByIds,
 } from "@/lib/profiles-repo";
 
 function makeImageFile(name = "avatar.jpg"): File {
@@ -383,3 +387,43 @@ describe("searchProfiles", () => {
     expect(limitMock).toHaveBeenCalledWith(20);
   });
 });
+
+// ---------------------------------------------------------------------------
+// profilesByIds -- fix round: gente-page's "Siguiendo" section needs to
+// resolve full profiles for a set of ids (from followingIds()) instead of
+// deriving them from feedNuevo's authors. Not implemented yet -- expected
+// to fail red until profiles-repo.ts exports it.
+// ---------------------------------------------------------------------------
+describe("profilesByIds (fix round -- expected red)", () => {
+  it("resolves an empty array without touching the client for an empty id list", async () => {
+    const fromMock = vi.fn();
+    vi.mocked(getSupabaseClient).mockReturnValue({ from: fromMock } as never);
+
+    const result = await profilesByIds([]);
+
+    expect(result).toEqual([]);
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it("returns profiles for the given ids via an .in() query", async () => {
+    const { client } = createFakeSupabaseForProfilesByIds([
+      profileRow({ id: "user-2", handle: "ben" }),
+      profileRow({ id: "user-3", handle: "cara" }),
+    ]);
+    vi.mocked(getSupabaseClient).mockReturnValue(client as never);
+
+    const result = await profilesByIds(["user-2", "user-3"]);
+
+    expect(result.map((p: { id: string }) => p.id).sort()).toEqual(["user-2", "user-3"]);
+  });
+});
+
+// Minimal local query-builder stand-in (mirrors the shape searchProfiles's
+// own tests above build by hand) -- kept local to this describe block since
+// it's the only place in this file that needs a plain `.select().in()` chain.
+function createFakeSupabaseForProfilesByIds(rows: Record<string, unknown>[]) {
+  const inMock = vi.fn().mockResolvedValue({ data: rows, error: null });
+  const selectMock = vi.fn(() => ({ in: inMock }));
+  const fromMock = vi.fn(() => ({ select: selectMock }));
+  return { client: { from: fromMock } };
+}

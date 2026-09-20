@@ -106,4 +106,23 @@ describe("SignInPrompt", () => {
     // Regression net: the existing English-text query must still pass.
     expect(screen.getByText(/sign in to add a spot/i)).toBeInTheDocument();
   });
+
+  // social-spots.md: the save/follow flows on the Spots deck, Gente page,
+  // and profile page all gate through this same shared prompt (mirrors the
+  // existing "add"/"confirm"/"report" actions) -- these two actions don't
+  // exist on GatedAction yet, so both cases below are expected to fail red
+  // until the fix round adds them.
+  it("shows the 'follow' copy -- heading 'Sign in to follow'", () => {
+    // @ts-expect-error -- "follow" isn't a member of GatedAction yet (fix round).
+    render(<SignInPrompt action="follow" onDismiss={vi.fn()} />);
+
+    expect(screen.getByRole("heading", { name: /sign in to follow/i })).toBeInTheDocument();
+  });
+
+  it("shows the 'save' copy -- heading 'Sign in to save'", () => {
+    // @ts-expect-error -- "save" isn't a member of GatedAction yet (fix round).
+    render(<SignInPrompt action="save" onDismiss={vi.fn()} />);
+
+    expect(screen.getByRole("heading", { name: /sign in to save/i })).toBeInTheDocument();
+  });
 });

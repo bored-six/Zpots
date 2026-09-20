@@ -287,6 +287,83 @@ describe("SpotsDeck -- save toggle (optimistic + rollback)", () => {
   });
 });
 
+// Live-browser-check regression net: a useEffect dependency array that
+// changes length between renders (e.g. one that conditionally includes the
+// deep-link callback) makes React log "The final argument passed to
+// useEffect changed size between renders." This asserts the deck's own
+// effects never trigger that warning, deep-linked or not.
+describe("SpotsDeck -- effect dependency-array stability (regression net)", () => {
+  it("never logs a 'changed size between renders' warning when rendered with a ?spot= deep link", async () => {
+    searchParams = new URLSearchParams({ spot: "spot-2" });
+    feedCerca.mockResolvedValue(makeCards(5));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    render(<SpotsDeck />);
+    await waitFor(() =>
+      expect(screen.getByTestId("spots-deck").getAttribute("data-active-id")).toBe("spot-2"),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const offendingCall = errorSpy.mock.calls.find((call) =>
+      String(call[0]).includes("changed size between renders"),
+    );
+    expect(offendingCall).toBeUndefined();
+    errorSpy.mockRestore();
+  });
+
+  it("never logs a 'changed size between renders' warning when rendered without a deep link", async () => {
+    feedCerca.mockResolvedValue(makeCards(5));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    render(<SpotsDeck />);
+    await screen.findAllByTestId("spot-card");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const offendingCall = errorSpy.mock.calls.find((call) =>
+      String(call[0]).includes("changed size between renders"),
+    );
+    expect(offendingCall).toBeUndefined();
+    errorSpy.mockRestore();
+  });
+});
+
+// Fix round (expected red): a failed feed load currently falls through to
+// the same empty-lane ("No spots yet") UI as a lane that's genuinely empty,
+// with no indication anything went wrong and no way to retry. COPY.couldNotLoad
+// doesn't exist yet either (see copy.test.ts), so this fails for two related
+// reasons: the missing copy key and the missing error/retry UI.
+describe("SpotsDeck -- feed repo failure (fix round)", () => {
+  it("shows COPY.couldNotLoad and a retry control when the feed rejects, not the empty-lane state", async () => {
+    feedCerca.mockRejectedValue(new Error("network down"));
+    render(<SpotsDeck />);
+
+    expect(await screen.findByText(new RegExp(COPY.couldNotLoad.en, "i"))).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(COPY.noSpotsYet.en, "i"))).not.toBeInTheDocument();
+  });
+
+  // Complements the case above: today `loadFirstPage`'s try/finally has no
+  // catch, so a rejected feed call escapes as an unhandled promise
+  // rejection (visible in this suite's own run as a "Vitest caught 1
+  // unhandled error" warning) on top of showing the wrong UI. The deck must
+  // catch its own fetch failures.
+  it("never produces an unhandled promise rejection when the feed rejects", async () => {
+    feedCerca.mockRejectedValue(new Error("network down"));
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+
+    try {
+      render(<SpotsDeck />);
+      await waitFor(() => expect(feedCerca).toHaveBeenCalled());
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off("unhandledRejection", unhandled);
+    }
+  });
+});
+
 describe("SpotsDeck -- bulk (windowing)", () => {
   it("renders at most 5 spot-card DOM nodes even with 200 cards loaded", async () => {
     feedCerca.mockResolvedValue(makeCards(200));

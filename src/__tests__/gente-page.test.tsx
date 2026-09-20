@@ -17,6 +17,9 @@ const searchProfiles = vi.fn();
 const follow = vi.fn();
 const unfollow = vi.fn();
 const isFollowing = vi.fn();
+const followingIds = vi.fn();
+const profilesByIds = vi.fn();
+const feedNuevo = vi.fn();
 const useAuthMock = vi.fn();
 
 vi.mock("@/components/AuthProvider", () => ({
@@ -28,6 +31,13 @@ vi.mock("@/lib/profiles-repo", () => ({
   follow: (...args: unknown[]) => follow(...args),
   unfollow: (...args: unknown[]) => unfollow(...args),
   isFollowing: (...args: unknown[]) => isFollowing(...args),
+  followingIds: (...args: unknown[]) => followingIds(...args),
+  // Not implemented yet (fix round) -- see the "Siguiendo" describe block below.
+  profilesByIds: (...args: unknown[]) => profilesByIds(...args),
+}));
+
+vi.mock("@/lib/feed-repo", () => ({
+  feedNuevo: (...args: unknown[]) => feedNuevo(...args),
 }));
 
 function authValue(status: AuthStatus, user: AuthUser | null = null) {
@@ -53,6 +63,9 @@ beforeEach(() => {
   useAuthMock.mockReturnValue(authValue("signed-in", { id: "user-1", email: "a@b.com", nickname: "" }));
   searchProfiles.mockResolvedValue([]);
   isFollowing.mockResolvedValue(false);
+  followingIds.mockResolvedValue(new Set<string>());
+  profilesByIds.mockResolvedValue([]);
+  feedNuevo.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -136,5 +149,67 @@ describe("Gente page -- follow state on results", () => {
     await screen.findByText(/@me/i);
 
     expect(screen.queryByRole("button", { name: new RegExp(COPY.follow.en, "i") })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Fix round (expected red): the notes.md-documented limitation -- "Siguiendo
+ * only surfaces followed accounts with a recent spot" -- is being fixed by
+ * building the section from `followingIds()` + `profilesByIds()` directly,
+ * not by filtering `feedNuevo()`'s authors. These two cases fail against the
+ * current implementation, which never calls `profilesByIds` at all.
+ */
+describe("Gente page -- Siguiendo built from followingIds + profilesByIds (fix round)", () => {
+  it("renders every followed account from followingIds()/profilesByIds(), even one with no recent spot", async () => {
+    followingIds.mockResolvedValue(new Set(["user-5"]));
+    profilesByIds.mockResolvedValue([
+      makeProfile({ id: "user-5", handle: "no_recent_spots" }),
+    ]);
+    // Deliberately empty -- proves the section isn't sourced from the feed.
+    feedNuevo.mockResolvedValue([]);
+
+    await renderGentePage();
+
+    expect(await screen.findByText(/@no_recent_spots/i)).toBeInTheDocument();
+  });
+
+  it("calls profilesByIds with exactly the ids followingIds() resolves", async () => {
+    followingIds.mockResolvedValue(new Set(["user-5", "user-6"]));
+    profilesByIds.mockResolvedValue([]);
+
+    await renderGentePage();
+
+    await waitFor(() => expect(profilesByIds).toHaveBeenCalled());
+    const calledWith = profilesByIds.mock.calls[0][0] as string[];
+    expect(new Set(calledWith)).toEqual(new Set(["user-5", "user-6"]));
+  });
+});
+
+/**
+ * Fix round (expected red): COPY.noPeopleYet doesn't exist yet, and the
+ * empty Siguiendo/Gente nueva sections currently reuse `nobodyToday`
+ * ("Nobody has gone out today") -- copy that belongs to the Hoy row, not a
+ * plain "there's no one here" list state.
+ */
+describe("Gente page -- empty-section copy (fix round)", () => {
+  it("shows COPY.noPeopleYet, not 'Nobody has gone out today', when Siguiendo is empty", async () => {
+    followingIds.mockResolvedValue(new Set<string>());
+    feedNuevo.mockResolvedValue([]);
+
+    await renderGentePage();
+
+    expect(await screen.findByText(new RegExp(COPY.noPeopleYet.en, "i"))).toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(COPY.nobodyToday.en, "i"))).not.toBeInTheDocument();
+  });
+
+  it("shows COPY.noPeopleYet, not 'Nobody has gone out today', when Gente nueva is empty", async () => {
+    followingIds.mockResolvedValue(new Set<string>());
+    feedNuevo.mockResolvedValue([]);
+
+    await renderGentePage();
+
+    const noPeopleYetMatches = await screen.findAllByText(new RegExp(COPY.noPeopleYet.en, "i"));
+    // Both empty sections (Siguiendo and Gente nueva) should use this copy.
+    expect(noPeopleYetMatches.length).toBeGreaterThanOrEqual(2);
   });
 });

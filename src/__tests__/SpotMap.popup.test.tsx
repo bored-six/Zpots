@@ -23,6 +23,21 @@ vi.mock("react-leaflet", async () => {
     Popup: ({ children }: { children?: React.ReactNode }) => (
       <div data-testid="popup">{children}</div>
     ),
+    // CityMask (rendered inside SpotMap) imports these directly -- see the
+    // matching note in SpotMap.test.tsx's mock.
+    Polygon: (props: Record<string, unknown>) => (
+      <div data-testid="polygon" data-props={JSON.stringify(props)} />
+    ),
+    Polyline: (props: Record<string, unknown>) => (
+      <div data-testid="polyline" data-props={JSON.stringify(props)} />
+    ),
+    useMap: () => ({
+      createPane: vi.fn(() => ({ style: {} }) as unknown as HTMLElement),
+      getPane: vi.fn(() => ({ style: {} }) as unknown as HTMLElement),
+      fitBounds: vi.fn(),
+      flyTo: vi.fn(),
+      setView: vi.fn(),
+    }),
   };
 });
 

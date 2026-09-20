@@ -93,6 +93,30 @@ describe("COPY", () => {
   });
 });
 
+// Fix round (expected red): Mi mapa's legend and the deck's "feed failed"
+// state need three copy entries that don't exist yet.
+describe("COPY -- fix round additions", () => {
+  it("has 'mine' (Mios / Mine)", () => {
+    expect(COPY.mine.cv).toBe("Mios");
+    expect(COPY.mine.en).toBe("Mine");
+  });
+
+  it("has 'been' (Ya anda / Been)", () => {
+    expect(COPY.been.cv).toBe("Ya anda");
+    expect(COPY.been.en).toBe("Been");
+  });
+
+  it("has 'couldNotLoad' (No puede carga / Could not load)", () => {
+    expect(COPY.couldNotLoad.cv).toBe("No puede carga");
+    expect(COPY.couldNotLoad.en).toBe("Could not load");
+  });
+
+  it("has 'noPeopleYet' (Nuay pa gente / No people yet) -- distinct from Hoy's 'nobodyToday'", () => {
+    expect(COPY.noPeopleYet.cv).toBe("Nuay pa gente");
+    expect(COPY.noPeopleYet.en).toBe("No people yet");
+  });
+});
+
 describe("bilingualLabel", () => {
   it("returns the English string for a given key, for use as an aria-label", () => {
     expect(bilingualLabel("confirmVisit")).toBe("I've been here");

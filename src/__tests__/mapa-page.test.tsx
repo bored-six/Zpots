@@ -135,6 +135,22 @@ describe("Mi mapa -- signed in", () => {
     await waitFor(() => expect(screen.getByTestId("spot-map-ids")).not.toHaveTextContent("spot-2"));
   });
 
+  // Fix round (expected red): the legend's "Mine"/"Been" labels are
+  // currently hardcoded literals in app/mapa/page.tsx, not sourced from
+  // COPY (which doesn't have `mine`/`been` entries yet either -- see
+  // copy.test.ts). Deriving the expected names from COPY itself (rather
+  // than hardcoding "Mine"/"Been" again here) means this only turns green
+  // once the legend is actually wired to the copy contract.
+  it("legend checkbox accessible names come from COPY.mine/COPY.been/COPY.saved, not local literals", async () => {
+    myMap.mockResolvedValue([makeMapSpot({ id: "spot-1", source: "mine" })]);
+    await renderMapaPage();
+    await screen.findByTestId("spot-map-ids");
+
+    expect(screen.getByRole("checkbox", { name: new RegExp(COPY.mine.en, "i") })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: new RegExp(COPY.been.en, "i") })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: new RegExp(COPY.saved.en, "i") })).toBeInTheDocument();
+  });
+
   it("passes ?spot=<id> through as the pin to open", async () => {
     searchParams = new URLSearchParams({ spot: "spot-2" });
     myMap.mockResolvedValue([makeMapSpot({ id: "spot-2", source: "been" })]);

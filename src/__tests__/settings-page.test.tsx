@@ -2,12 +2,19 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthStatus, AuthUser } from "@/lib/auth";
+import type { Profile } from "@/lib/profiles";
 
 const replace = vi.fn();
 const useAuthMock = vi.fn();
 const updateNickname = vi.fn();
 const fetchMyConfirmedSpotIds = vi.fn();
 const signOutMock = vi.fn();
+const getMyProfile = vi.fn();
+const isHandleAvailable = vi.fn();
+const updateHandle = vi.fn();
+const updateDisplayName = vi.fn();
+const updateAvatarUrl = vi.fn();
+const uploadAvatar = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
@@ -25,14 +32,42 @@ vi.mock("@/lib/spots-repo", () => ({
   fetchMyConfirmedSpotIds: (...args: unknown[]) => fetchMyConfirmedSpotIds(...args),
 }));
 
+// social-spots.md ("Settings" UI spec): handle edit + avatar upload are new
+// here -- mocked the same way spots-repo/auth are above so the handle/
+// display-name/avatar tests below don't hit the real Supabase client.
+vi.mock("@/lib/profiles-repo", () => ({
+  getMyProfile: (...args: unknown[]) => getMyProfile(...args),
+  isHandleAvailable: (...args: unknown[]) => isHandleAvailable(...args),
+  updateHandle: (...args: unknown[]) => updateHandle(...args),
+  updateDisplayName: (...args: unknown[]) => updateDisplayName(...args),
+  updateAvatarUrl: (...args: unknown[]) => updateAvatarUrl(...args),
+  uploadAvatar: (...args: unknown[]) => uploadAvatar(...args),
+}));
+
 function authValue(status: AuthStatus, user: AuthUser | null = null) {
   return { status, user, signOut: signOutMock };
+}
+
+function makeProfile(overrides: Partial<Profile> = {}): Profile {
+  return {
+    id: "u1",
+    handle: "kuya_ben",
+    displayName: "Kuya Ben",
+    avatarUrl: null,
+    needsHandle: false,
+    followerCount: 0,
+    followingCount: 0,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   fetchMyConfirmedSpotIds.mockResolvedValue(new Set<string>());
   signOutMock.mockResolvedValue(undefined);
+  getMyProfile.mockResolvedValue(makeProfile());
+  isHandleAvailable.mockResolvedValue(true);
 });
 
 afterEach(() => {
@@ -100,33 +135,36 @@ describe("Settings page -- signed in", () => {
     expect(screen.getByText("person@example.com")).toBeInTheDocument();
   });
 
-  it("renders a nickname text input pre-filled from user.nickname", async () => {
+  // social-spots.md ("Settings" UI spec): "Adds handle edit and avatar
+  // upload; nickname field removed." The nickname field (and updateNickname)
+  // is gone from the signed-in settings view -- superseded by the handle
+  // (`updateHandle`) and display name (`updateDisplayName`) fields below.
+  // These three cases replace the pre-social-spots nickname-input tests
+  // that used to live here.
+  it("does not render a nickname textbox", async () => {
     await renderSettingsPage();
-    const input = screen.getByRole("textbox", { name: /nickname/i });
+    expect(screen.queryByRole("textbox", { name: /nickname/i })).not.toBeInTheDocument();
+  });
+
+  it("renders a handle textbox pre-filled from the profile", async () => {
+    getMyProfile.mockResolvedValue(makeProfile({ handle: "kuya_ben" }));
+    await renderSettingsPage();
+
+    const input = await screen.findByRole("textbox", { name: /handle/i });
+    expect(input).toHaveValue("kuya_ben");
+  });
+
+  it("renders a display name textbox pre-filled from the profile", async () => {
+    getMyProfile.mockResolvedValue(makeProfile({ displayName: "Kuya Ben" }));
+    await renderSettingsPage();
+
+    const input = await screen.findByRole("textbox", { name: /display name/i });
     expect(input).toHaveValue("Kuya Ben");
   });
 
-  it("calls updateNickname with the trimmed value when the nickname field loses focus after being edited", async () => {
-    const userEv = userEvent.setup();
+  it("renders an avatar upload control", async () => {
     await renderSettingsPage();
-
-    const input = screen.getByRole("textbox", { name: /nickname/i });
-    await userEv.clear(input);
-    await userEv.type(input, "  Ate Joy  ");
-    await userEv.tab();
-
-    await waitFor(() => expect(updateNickname).toHaveBeenCalledWith("Ate Joy"));
-  });
-
-  it("does not call updateNickname when the value on blur is unchanged", async () => {
-    const userEv = userEvent.setup();
-    await renderSettingsPage();
-
-    const input = screen.getByRole("textbox", { name: /nickname/i });
-    await userEv.click(input);
-    await userEv.tab();
-
-    expect(updateNickname).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/change avatar/i)).toBeInTheDocument();
   });
 
   it("renders the count of confirmed spots from fetchMyConfirmedSpotIds", async () => {

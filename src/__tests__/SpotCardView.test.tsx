@@ -7,6 +7,16 @@ import { formatDistance } from "@/lib/geo";
 import { COPY } from "@/lib/copy";
 import type { SpotCard } from "@/lib/spots";
 
+// Fix round (expected red): the map inset tap for a spot already on my map
+// currently does `window.location.assign(...)` (a full page navigation)
+// instead of the Next router. Mocking next/navigation here so the redirect
+// describe block below can assert on `push` -- this mock is inert for every
+// other test in this file (none of them render the map-inset-tap path).
+const push = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push }),
+}));
+
 /**
  * SpotCardView (social-spots.md UI spec, "Card:") -- one card in the Spots
  * deck. Per the user's rule, this only checks behavior/text/accessible
@@ -146,5 +156,16 @@ describe("SpotCardView -- report action", () => {
     await user.click(screen.getByRole("button", { name: /submit report/i }));
 
     expect(props.onReport).toHaveBeenCalled();
+  });
+});
+
+describe("SpotCardView -- map inset navigation (fix round)", () => {
+  it("tapping the inset for a spot already on my map uses the Next router, not a full page navigation", async () => {
+    const user = userEvent.setup();
+    render(<SpotCardView {...baseProps({ isOnMyMap: true })} />);
+
+    await user.click(screen.getByRole("button", { name: /open on the map/i }));
+
+    expect(push).toHaveBeenCalledWith("/mapa?spot=spot-1");
   });
 });
