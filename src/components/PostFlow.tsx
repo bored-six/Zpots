@@ -3,23 +3,18 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { LeafletMouseEvent, Map as LeafletMap } from "leaflet";
-import { MapContainer, Marker, TileLayer } from "react-leaflet";
+import { MapContainer, Marker } from "react-leaflet";
 import Link from "next/link";
 
 import { useAuth } from "@/components/AuthProvider";
+import BasemapLayer from "@/components/BasemapLayer";
 import Bilingual from "@/components/Bilingual";
 import CityMask from "@/components/CityMask";
 import { AlertIcon } from "@/components/icons/status-icons";
 import { CameraIcon } from "@/components/icons/nav-icons";
 import { bilingualLabel } from "@/lib/copy";
 import { isWithinZamboangaCity } from "@/lib/city-bounds";
-import {
-  MAX_BOUNDS,
-  MAX_ZOOM,
-  MIN_ZOOM,
-  TILE_ATTRIBUTION,
-  TILE_URL,
-} from "@/lib/map-config";
+import { MAX_BOUNDS, MAX_ZOOM, MIN_ZOOM } from "@/lib/map-config";
 import { createPinIcon } from "@/lib/pin-icon";
 import { createSpot } from "@/lib/spots-repo";
 import { useLocation } from "@/lib/use-location";
@@ -304,7 +299,9 @@ export default function PostFlow() {
               scrollWheelZoom={false}
               className="h-full w-full grayscale"
             >
-              <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+              {/* No PlaceLabelsLayer and no raster-fallback chip here (D6/E17):
+                  this tap map's job is picking a coordinate, not being pretty. */}
+              <BasemapLayer map={leafletMap} />
               <CityMask />
               {tappedLocation && (
                 <Marker

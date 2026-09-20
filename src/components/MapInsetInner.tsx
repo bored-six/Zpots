@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap } from "leaflet";
-import { MapContainer, Marker, TileLayer, useMap } from "react-leaflet";
+import { MapContainer, Marker, useMap } from "react-leaflet";
 
+import BasemapLayer from "@/components/BasemapLayer";
 import CityMask from "@/components/CityMask";
 import type { LatLng } from "@/lib/geo";
 import { hasUsableMapSize } from "@/lib/leaflet-safe-view";
-import { TILE_ATTRIBUTION, TILE_URL } from "@/lib/map-config";
 import { createPinIcon } from "@/lib/pin-icon";
 import type { SpotStatus } from "@/lib/spots";
 
@@ -138,6 +138,12 @@ export default function MapInsetInner({
   size = DEFAULT_SIZE,
   fill = false,
 }: MapInsetProps) {
+  // Declared before the `isUsableCenter` early return below so hook order
+  // never varies across renders (PostFlow.tsx's own early returns follow
+  // the same shape). Feeds the live Leaflet instance to `BasemapLayer` as
+  // an explicit prop -- D4: never `useMap()`.
+  const [map, setMap] = useState<LeafletMap | null>(null);
+
   // A missing/non-finite coordinate must never crash the page -- Leaflet's
   // LatLng constructor throws "Invalid LatLng object: (NaN, NaN)" on
   // anything else. A caller can hand this a center before any real spot is
@@ -158,6 +164,7 @@ export default function MapInsetInner({
     >
       <span className="sr-only">Open on the map</span>
       <MapContainer
+        ref={setMap}
         center={[center.lat, center.lng]}
         zoom={INSET_ZOOM}
         zoomControl={false}
@@ -170,7 +177,9 @@ export default function MapInsetInner({
         keyboard={false}
         className="h-full w-full"
       >
-        <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+        {/* No PlaceLabelsLayer and no raster-fallback chip here (D3/D6/E17):
+            112px is too small for either -- ground + pin only. */}
+        <BasemapLayer map={map} />
         <CityMask />
         <Marker position={[center.lat, center.lng]} icon={createPinIcon(status)} />
         <FlyToCenter center={center} />
