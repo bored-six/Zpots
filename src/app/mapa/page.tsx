@@ -58,26 +58,19 @@ function LoadingView() {
 }
 
 function SignedOutView() {
-  // Same flex-column + `min-h-0 flex-1` skeleton as SignedInView: the map
-  // needs a definite height at mount, or `fitToCity` fits the outline into
-  // a zero-size container and lands at max zoom with every pin off-screen.
+  // "Al tocar" (spec fix): browsing the map needs no account (CLAUDE.md),
+  // so there is no standing gate here -- just the map, fully pan/zoom/
+  // open-a-popup browsable, seeded with the famous-places preview pins.
+  // The sign-in prompt only shows up at the moment of an actual gated
+  // action (Save/confirm/report/follow/post), none of which this read-only
+  // preview view renders any control for. Same flex-column + `min-h-0
+  // flex-1` skeleton as SignedInView: the map needs a definite height at
+  // mount, or `fitToCity`/`fitBounds` fits into a zero-size container and
+  // lands at max zoom with every pin off-screen.
   return (
     <main className="relative flex h-full w-full flex-col">
       <div className="relative min-h-0 flex-1">
         <SpotMap authStatus="signed-out" mapSpots={PREVIEW_MAP_SPOTS} fitBounds={PREVIEW_BOUNDS} />
-        <div className={OVERLAY_CLASS}>
-          <div className={`${GATE_CARD_CLASS} pointer-events-auto`}>
-            <p className="font-bold uppercase tracking-[0.12em] text-stone-deep">
-              <Bilingual k="signInFirst" />
-            </p>
-            <p className="mt-2">
-              <Bilingual k="emptyMap" />
-            </p>
-            <p className="mt-2 text-xs">
-              <Bilingual k="previewHint" />
-            </p>
-          </div>
-        </div>
       </div>
     </main>
   );
@@ -183,7 +176,7 @@ function MapaPageContent() {
   const { status } = useAuth();
 
   return (
-    <ClipboardShell fullBleed>
+    <ClipboardShell fullBleed hideHeader>
       {status === "loading" && <LoadingView />}
       {status === "signed-out" && <SignedOutView />}
       {status === "signed-in" && <SignedInView />}
@@ -196,7 +189,7 @@ function MapaPageContent() {
 // as login/page.tsx's identical wrapper.
 export default function MapaPage() {
   return (
-    <Suspense fallback={<ClipboardShell fullBleed>{null}</ClipboardShell>}>
+    <Suspense fallback={<ClipboardShell fullBleed hideHeader>{null}</ClipboardShell>}>
       <MapaPageContent />
     </Suspense>
   );

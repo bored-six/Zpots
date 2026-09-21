@@ -47,6 +47,47 @@ describe("ClipboardShell -- plaza / stone-wall redesign", () => {
   });
 });
 
+describe("ClipboardShell -- hideHeader ('Nada': no header on map screens)", () => {
+  it("omits the wordmark, the 'Ciudad de Zamboanga' label, and the <header> element when hideHeader is set", () => {
+    const { container } = render(
+      <ClipboardShell hideHeader>
+        <p>content</p>
+      </ClipboardShell>,
+    );
+    expect(screen.queryByText("Zpots")).not.toBeInTheDocument();
+    expect(screen.queryByText(/ciudad de zamboanga/i)).not.toBeInTheDocument();
+    expect(container.querySelector("header")).toBeNull();
+  });
+
+  it("still renders exactly one thin .vinta-rule band at the top when hideHeader is set", () => {
+    const { container } = render(
+      <ClipboardShell hideHeader>
+        <p>content</p>
+      </ClipboardShell>,
+    );
+    expect(container.querySelectorAll(".vinta-rule").length).toBe(1);
+  });
+
+  it("still renders its children when hideHeader is set", () => {
+    render(
+      <ClipboardShell hideHeader>
+        <p>map goes here</p>
+      </ClipboardShell>,
+    );
+    expect(screen.getByText("map goes here")).toBeInTheDocument();
+  });
+
+  it("keeps the full header (wordmark, tagline, header element) when hideHeader is omitted, e.g. Settings", () => {
+    const { container } = render(
+      <ClipboardShell>
+        <p>content</p>
+      </ClipboardShell>,
+    );
+    expect(screen.getByText("Zpots")).toBeInTheDocument();
+    expect(container.querySelector("header")).not.toBeNull();
+  });
+});
+
 describe("AzulejoBand -- tileable lattice pattern", () => {
   it("two rendered bands have distinct pattern ids, so neither reuses the other's <defs>", () => {
     const { container } = render(

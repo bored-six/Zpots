@@ -82,18 +82,21 @@ async function renderMapaPage() {
 }
 
 describe("Mi mapa -- signed out", () => {
-  // Preview round: signed-out visitors now see the map with the famous-
-  // places preview pins behind the sign-in gate, instead of a gate card
-  // alone -- "so people know what they're in here for". myMap() is still
-  // never called (it would just return [] for a signed-out session).
-  it("shows the sign-in gate over the map with the preview pins, and never calls myMap()", async () => {
+  // "Al tocar" (spec fix): the map is fully browsable signed-out -- no
+  // standing "Entra primero" card sits over it, since browsing was never
+  // meant to be gated (CLAUDE.md). The famous-places preview pins still
+  // show so people know what they're in here for; myMap() is still never
+  // called (it would just return [] for a signed-out session). Contract
+  // change from the old "gate card over the map" assertion this replaces:
+  // the standing gate is gone, not merely relabeled.
+  it("shows the map with the preview pins and no standing sign-in gate, and never calls myMap()", async () => {
     await renderMapaPage();
 
-    expect(await screen.findByText(new RegExp(COPY.signInFirst.en, "i"))).toBeInTheDocument();
-    expect(myMap).not.toHaveBeenCalled();
     const ids = (await screen.findByTestId("spot-map-ids")).textContent ?? "";
     expect(ids).toContain(`${PREVIEW_SPOTS[0].id}:preview`);
     expect(ids.split(",")).toHaveLength(PREVIEW_SPOTS.length);
+    expect(myMap).not.toHaveBeenCalled();
+    expect(screen.queryByText(new RegExp(COPY.signInFirst.en, "i"))).not.toBeInTheDocument();
   });
 
   // The city outline is tall and every preview pin is downtown, so a plain

@@ -21,6 +21,15 @@ interface ClipboardShellProps {
    * height is the photo card's, not the header's.
    */
   compact?: boolean;
+  /**
+   * "Nada" (design preview): drops the wordmark/tagline/sign-in header
+   * entirely, along with the AzulejoBand and StoneArch either side of it --
+   * only a thin VintaRule remains at the very top, the last trace of
+   * identity. Used by the map screen, whose whole job is the map itself
+   * (the wordmark already lives in the desktop nav); Settings keeps its
+   * full header by simply not passing this prop.
+   */
+  hideHeader?: boolean;
 }
 
 const HEADER_CLASS =
@@ -33,7 +42,12 @@ const HEADER_CLASS =
  * header's bottom edge. Wraps its children additively -- it does not know
  * or care what they render.
  */
-export default function ClipboardShell({ children, fullBleed = false, compact = false }: ClipboardShellProps) {
+export default function ClipboardShell({
+  children,
+  fullBleed = false,
+  compact = false,
+  hideHeader = false,
+}: ClipboardShellProps) {
   const { status } = useAuth();
 
   return (
@@ -51,51 +65,57 @@ export default function ClipboardShell({ children, fullBleed = false, compact = 
             : "zpots-shadow relative mx-auto flex w-full max-w-3xl flex-col overflow-hidden rounded-[6px] border border-stone"
         }
       >
-        <AzulejoBand className="block w-full" height={12} />
+        {hideHeader ? (
+          <VintaRule />
+        ) : (
+          <>
+            <AzulejoBand className="block w-full" height={12} />
 
-        <header className={HEADER_CLASS}>
-          <div>
-            <p
-              className="text-2xl tracking-wide text-ink sm:text-[28px]"
-              style={{ fontFamily: "var(--font-wordmark)" }}
-            >
-              Zpots
-            </p>
-            <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.2em] text-terracotta sm:text-xs">
-              Ciudad de Zamboanga
-            </p>
-            {!compact && (
-              <p
-                className="mt-1 text-base italic text-stone-deep sm:text-lg"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                {/* English secondary drops to its own line below `sm` -- at
-                    375px wide, keeping it inline with the Chavacano primary
-                    wrapped the tagline across 2-3 lines and blew the header
-                    past 300px tall (fix round 1, spec item B4). */}
-                <span aria-hidden="true">{COPY.tagline.cv}</span>
-                <span className="block text-[12px] text-stone-deep sm:inline sm:text-[0.7em]">
-                  {" "}
-                  {COPY.tagline.en}
-                </span>
-              </p>
-            )}
-          </div>
+            <header className={HEADER_CLASS}>
+              <div>
+                <p
+                  className="text-2xl tracking-wide text-ink sm:text-[28px]"
+                  style={{ fontFamily: "var(--font-wordmark)" }}
+                >
+                  Zpots
+                </p>
+                <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.2em] text-terracotta sm:text-xs">
+                  Ciudad de Zamboanga
+                </p>
+                {!compact && (
+                  <p
+                    className="mt-1 text-base italic text-stone-deep sm:text-lg"
+                    style={{ fontFamily: "var(--font-display)" }}
+                  >
+                    {/* English secondary drops to its own line below `sm` -- at
+                        375px wide, keeping it inline with the Chavacano primary
+                        wrapped the tagline across 2-3 lines and blew the header
+                        past 300px tall (fix round 1, spec item B4). */}
+                    <span aria-hidden="true">{COPY.tagline.cv}</span>
+                    <span className="block text-[12px] text-stone-deep sm:inline sm:text-[0.7em]">
+                      {" "}
+                      {COPY.tagline.en}
+                    </span>
+                  </p>
+                )}
+              </div>
 
-          {status === "signed-out" && (
-            <div className="mt-1 flex shrink-0 items-center gap-3">
-              <Link
-                href="/login"
-                className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-ink underline underline-offset-4 hover:text-terracotta sm:text-xs"
-              >
-                Sign in
-              </Link>
-            </div>
-          )}
-        </header>
+              {status === "signed-out" && (
+                <div className="mt-1 flex shrink-0 items-center gap-3">
+                  <Link
+                    href="/login"
+                    className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-ink underline underline-offset-4 hover:text-terracotta sm:text-xs"
+                  >
+                    Sign in
+                  </Link>
+                </div>
+              )}
+            </header>
 
-        <StoneArch className="block w-full" height={8} />
-        <VintaRule />
+            <StoneArch className="block w-full" height={8} />
+            <VintaRule />
+          </>
+        )}
 
         {fullBleed ? (
           <div className="relative min-h-0 flex-1">{children}</div>
