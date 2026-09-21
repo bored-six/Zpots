@@ -2,7 +2,7 @@
 
 **Feature:** Pergamino drawn map
 **PRD:** `.claude/prds/pergamino-map.md`
-**Phase:** complete and running; one polish item open
+**Phase:** complete and running
 **Last updated:** 2026-09-20
 
 ## Decisions made
@@ -63,12 +63,16 @@ and already renders our own Cinzel lettering over it.
 
 None. The drawn map is live in the running app.
 
-## Open polish item
+## Closed since
 
-- At 375px, four landmark labels around the waterfront (Plaza Pershing, Puerto, Paseo del Mar,
-  Fort Pilar) overlap each other and the pins. The zoom bounds in `zamboanga-places.ts` were
-  tuned for a wider view. Needs either collision avoidance in `PlaceLabelsLayer` or tighter
-  per-place `minZoom` values.
+- The waterfront label pile-up is gone: labels now come from the tile label engine, which
+  carries one collision index, so overlap is handled for us rather than by hand-tuned zooms.
+- The map is no longer nameless. It was passing no label rules at all, discarding every name
+  the archive carries.
+- Map screens have no header, and the standing sign-in card is gone; the prompt fires on the
+  action instead. Both were chosen by the user from a published preview.
+- The map element now forms its own stacking context, so the bottom navigation is not painted
+  over by Leaflet's panes.
 
 ## Hosting deviation from the T1.6 decision
 

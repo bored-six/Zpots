@@ -1,9 +1,11 @@
 # PRD: Pergamino — a map Zpots draws itself
 
 **Ticket:** None (ad-hoc request, 2026-09-20)
-**Status:** Complete (live in the app; one label-collision polish item open)
+**Status:** Complete (live in the app)
 **Created:** 2026-09-20
-**Last Updated:** 2026-09-21 (blob bug fix + depth: buildings/landuse/boundaries -- see Change Log)
+**Last Updated:** 2026-09-21 (labels reversal: tile-driven lettering replaces the curated-only
+approach -- see "Labels reversal" Change Log entry at the end of this file. D2 below is
+superseded; read it as history, not as the current design.)
 **Supersedes (partially):** the raster-tile + CSS-tint decision in `.claude/prds/ciudad-latina-redesign.md`
 
 ---
@@ -15,9 +17,18 @@ Zpots renders itself from vector tiles: our road weights, our colours, our lette
 stays. Every existing map component (`SpotMap`, `MapInsetInner`, `PostFlow`, `CityMask`) stays.
 The raster layer survives only as a degraded fallback when the vector archive cannot be read.
 
-Ground (land, sea, coastline, roads, rivers) is drawn by **protomaps-leaflet 5.1.0** from a
-Zamboanga-only **`.pmtiles`** archive. **All lettering is ours** — a curated list of ~20 places
-in the repo, rendered as Leaflet `divIcon` markers styled with real CSS, not canvas text.
+Ground (land, sea, coastline, roads, rivers, landuse, buildings, boundaries, named POIs) is
+drawn by **protomaps-leaflet 5.1.0** from a Zamboanga-only **`.pmtiles`** archive.
+
+**Lettering superseded (see "Labels reversal" in the Change Log):** this PRD originally shipped
+with `labelRules: []` and a curated list of ~20 places as the map's *only* naming system (D2).
+That discarded every name the archive actually carries — street names, real barangay names,
+water names, POI names — and shipped a map that read as empty at most zooms. Naming now comes
+primarily from the archive itself, via `buildLabelRules` (`BasemapLayer.tsx`) using
+protomaps-leaflet's own label symbolizers and built-in collision handling, rendered in the same
+three typefaces (Cinzel, Alegreya Sans, Alegreya italic) as canvas text. The curated list
+(`src/data/zamboanga-places.ts`) survives only for two Spanish/Chavacano water names the archive
+has no in-view equivalent for.
 
 ---
 
@@ -98,9 +109,13 @@ MapLibre GL JS with a hand-written style JSON reading the same `.pmtiles` via
 `pmtiles.Protocol`. That costs ~200 kB gzipped, a second rendering engine alongside Leaflet, and
 a rewrite of every map component and mock — which is exactly what this route avoids.
 
-### D2 — Place names come from a **curated list in the repo**, not from the tiles.
+### D2 — SUPERSEDED 2026-09-21, see "Labels reversal" in the Change Log. Place names come from a **curated list in the repo**, not from the tiles.
 
-Reasons, in order of weight:
+Kept verbatim below as a record of the original reasoning and why each point turned out wrong or
+incomplete in practice — not as the current design. `buildLabelRules` (`BasemapLayer.tsx`) is now
+the primary naming system; `ZAMBOANGA_PLACES` is now a two-entry exception list.
+
+Reasons, in order of weight (original, 2026-09-20):
 
 1. **The label count requirement is a design requirement, not a rendering one.** "Eight downtown,
    not sixty" is guaranteed by construction if we ship exactly the twenty names we want, staged
@@ -117,8 +132,23 @@ Reasons, in order of weight:
    loading when a canvas tile paints silently renders in the fallback family, forever, until
    that tile is invalidated).
 
-Consequence: `labelRules: []` is passed to protomaps-leaflet, so the tiles contribute **zero**
-lettering. The vector archive draws ground only.
+Consequence (original, now reversed): `labelRules: []` is passed to protomaps-leaflet, so the
+tiles contribute **zero** lettering. The vector archive draws ground only.
+
+**Why this turned out wrong** (see "Labels reversal" Change Log entry for the full record):
+point 1 assumed a curated list was the only way to guarantee density, but it guarantees the
+*opposite* at every zoom the curated data doesn't happen to cover — "roughly eight downtown at
+z14" said nothing about z11 or z12, which were often bare. Point 2's "coverage is not
+guaranteed" was checked against assumption, not the actual archive: queried directly (pmtiles CLI
++ `@mapbox/vector-tile`), `pois` carries "Fort Pilar", "Paseo del Mar", "Zamboanga City Hall" and
+360+ other named features in a single close tile, and `places` carries real barangay-equivalent
+names (`kind: "macrohood"`, e.g. "Baliwasan", "Canelar", "Zone I") at `min_zoom: 11`. Point 3
+(testability) is real but incomplete — `buildLabelRules` is tested the same way `buildPaintRules`
+already was (a pure function against a fake protomaps module), canvas text doesn't have to be
+literally rendered in jsdom to test the *rules* that produce it. Point 4 (webfont race) undersold
+protomaps-leaflet's own answer to the exact problem it named: the `tasks: Promise[]` option
+(documented in this PRD's own D1 table, row 3, written before D2 existed) is awaited before every
+tile's label layout, not just the first — see `pergamino-fonts.ts`.
 
 ### D3 — Ground is canvas, lettering is DOM. Two layers, one map.
 
@@ -488,35 +518,97 @@ export function visiblePlaceLabels(
 ): PlaceLabel[];
 ```
 
-Seed contents — **[ASSUMPTION]** coordinates below are best-known values and must be checked
-against the published preview and OSM during T1.3; a test enforces that every one of them falls
-inside `ZAMBOANGA_CITY_OUTLINE`, which catches gross errors but not a 200 m slip.
+**Seed contents — SUPERSEDED 2026-09-21, see "Labels reversal" in the Change Log.** The 20-row
+table below is kept as a historical record of D2's original scope. The live
+`src/data/zamboanga-places.ts` now holds exactly the last two rows (`mar-de-basilan`,
+`bahia-zamboanga`) — every `landmark` and `barangay` row duplicated a real name confirmed present
+in the tile archive's own `places`/`pois` layers and was retired in favour of `buildLabelRules`
+(below).
 
-| id | name | kind | lat, lng | minZoom | maxZoom |
+| id | name | kind | lat, lng | minZoom | maxZoom | Retired to |
+|---|---|---|---|---|---|---|
+| `fort-pilar` | Fort Pilar | landmark | 6.9028, 122.0817 | 13 | — | `pois` (`kind: "yes"`, `min_zoom: 15`) |
+| `paseo-del-mar` | Paseo del Mar | landmark | 6.9040, 122.0780 | 14 | — | `pois` (`kind: "park"`, `min_zoom: 15`) |
+| `plaza-pershing` | Plaza Pershing | landmark | 6.9114, 122.0763 | 14 | — | `pois`, close zoom |
+| `city-hall` | City Hall | landmark | 6.9110, 122.0755 | 15 | — | `pois` ("Zamboanga City Hall", `kind: "townhall"`) |
+| `pasonanca` | Pasonanca | landmark | 6.9440, 122.0660 | 12 | — | `pois`, close zoom |
+| `rio-hondo` | Rio Hondo | landmark | 6.9010, 122.0900 | 14 | — | `pois` ("Rio Hondo Naval Station" etc.) |
+| `isla-santa-cruz` | Isla Santa Cruz | landmark | 6.8830, 122.0620 | 12 | — | `pois` ("Santa Cruz Island Ferry Terminal") |
+| `aeropuerto` | Aeropuerto | landmark | 6.9224, 122.0596 | 13 | — | `pois` ("Zamboanga International Airport") |
+| `puerto` | Puerto | landmark | 6.9070, 122.0790 | 14 | — | `pois` ("Port of Zamboanga", `min_zoom: 13`) |
+| `canelar` | Canelar | landmark | 6.9090, 122.0700 | 15 | — | `places` (`kind: "macrohood"`, `min_zoom: 11`) |
+| `ateneo` | Ateneo | landmark | 6.9130, 122.0710 | 15 | — | `pois`, close zoom |
+| `la-vieja-zamboanga` | Zamboanga | landmark | 6.9120, 122.0790 | 12 | 13 | `places` (`kind: "locality"`, "Zamboanga City", `min_zoom: 6` — already covers this zoom range) |
+| `tetuan` | Tetuan | barangay | 6.9210, 122.0850 | 15 | — | `places` (`kind: "macrohood"`/`"neighbourhood"`) |
+| `santa-maria` | Santa María | barangay | 6.9280, 122.0700 | 15 | — | `places` |
+| `baliwasan` | Baliwasan | barangay | 6.9080, 122.0630 | 15 | — | `places` (`kind: "macrohood"`, confirmed present) |
+| `guiwan` | Guiwan | barangay | 6.9330, 122.0900 | 15 | — | `places` |
+| `putik` | Putik | barangay | 6.9390, 122.0840 | 15 | — | `places` |
+| `tugbungan` | Tugbungan | barangay | 6.9350, 122.0590 | 15 | — | `places` |
+| `mar-de-basilan` | Mar de Basilán | water | 6.8600, 122.0500 | 12 | 14 | **Kept.** No tile equivalent — `water` only carries ocean-scale names ("Sulu Sea") outside the city view. |
+| `bahia-zamboanga` | Bahía de Zamboanga | water | 6.8930, 122.0700 | 13 | 15 | **Kept.** Same reason. |
+
+"Confirmed present" above means queried directly against `public/basemap/zamboanga.pmtiles` with
+the `pmtiles` CLI and `@mapbox/vector-tile` (not assumed from the schema alone) — see "Labels
+reversal" in the Change Log for the method and the fuller set of names found this way.
+
+### Tile-driven labels — `buildLabelRules` (`src/components/BasemapLayer.tsx`)
+
+The primary naming system since the labels reversal. A pure function, tested the same way
+`buildPaintRules` already is (`BasemapLayer.label-rules.test.ts`): given the lazily-imported
+protomaps-leaflet module, a resolved font stack, and resolved label colours, it returns
+protomaps-leaflet `LabelRule[]`.
+
+| Tier | `dataLayer` | Filter | `minzoom` | Font | Fill |
 |---|---|---|---|---|---|
-| `fort-pilar` | Fort Pilar | landmark | 6.9028, 122.0817 | 13 | — |
-| `paseo-del-mar` | Paseo del Mar | landmark | 6.9040, 122.0780 | 14 | — |
-| `plaza-pershing` | Plaza Pershing | landmark | 6.9114, 122.0763 | 14 | — |
-| `city-hall` | City Hall | landmark | 6.9110, 122.0755 | 15 | — |
-| `pasonanca` | Pasonanca | landmark | 6.9440, 122.0660 | 12 | — |
-| `rio-hondo` | Rio Hondo | landmark | 6.9010, 122.0900 | 14 | — |
-| `isla-santa-cruz` | Isla Santa Cruz | landmark | 6.8830, 122.0620 | 12 | — |
-| `aeropuerto` | Aeropuerto | landmark | 6.9224, 122.0596 | 13 | — |
-| `puerto` | Puerto | landmark | 6.9070, 122.0790 | 14 | — |
-| `canelar` | Canelar | landmark | 6.9090, 122.0700 | 15 | — |
-| `ateneo` | Ateneo | landmark | 6.9130, 122.0710 | 15 | — |
-| `la-vieja-zamboanga` | Zamboanga | landmark | 6.9120, 122.0790 | 12 | 13 |
-| `tetuan` | Tetuan | barangay | 6.9210, 122.0850 | 15 | — |
-| `santa-maria` | Santa María | barangay | 6.9280, 122.0700 | 15 | — |
-| `baliwasan` | Baliwasan | barangay | 6.9080, 122.0630 | 15 | — |
-| `guiwan` | Guiwan | barangay | 6.9330, 122.0900 | 15 | — |
-| `putik` | Putik | barangay | 6.9390, 122.0840 | 15 | — |
-| `tugbungan` | Tugbungan | barangay | 6.9350, 122.0590 | 15 | — |
-| `mar-de-basilan` | Mar de Basilán | water | 6.8600, 122.0500 | 12 | 14 |
-| `bahia-zamboanga` | Bahía de Zamboanga | water | 6.8930, 122.0700 | 13 | 15 |
+| Settlement | `places` | `kind === "locality"` | — | Cinzel 600, uppercase | ink |
+| District (macrohood) | `places` | `kind === "macrohood"` | 11 | Alegreya Sans 500, uppercase | stone-deep |
+| District (neighbourhood) | `places` | `kind === "neighbourhood"` | 13 | Alegreya Sans 500, uppercase | stone-deep |
+| Street (major/arterial) | `roads` | `roadClass(props)` is major/arterial | 12 | Alegreya Sans 500 | stone-deep |
+| Street (minor) | `roads` | `roadClass(props)` is street/minor | 14 | Alegreya Sans 400 | stone-deep |
+| Water (line) | `water` | `isWaterLine(props)`, Line geometry | 13 | Alegreya italic 500 | teal-deep |
+| Water (point) | `water` | `kind` in ocean/bay/strait/fjord/sea/lake, Point geometry | — | Alegreya italic 500 | teal-deep |
+| POI | `pois` | `poiHasName(props)`, Point geometry | 15 | Cinzel 600, uppercase | ink |
 
-Staged so a downtown view at z14 shows roughly eight names, and barangays only appear at z15 —
-the requirement, enforced by a test rather than by eyeballing.
+`roadClass`, `isWaterLine`, and `poiHasName` are the exact same functions `pergamino-style.ts`
+already uses to *paint* the ground — a road/river/POI is labelled under the same classification
+it was drawn under, not a second, independently-drifting one. `poiHasName` also gates the new
+`pois` ground-dot paint layer (Step 3, see the Blob bug/depth Change Log entries above for the
+pattern this follows).
+
+Every symbolizer carries a cream halo (`stroke`/`width`) and uses protomaps-leaflet's built-in
+text symbolizers (`CenteredTextSymbolizer`, `LineLabelSymbolizer`, `OffsetTextSymbolizer`), which
+share one collision index (`labeler.ts`'s `Index`) — two labels from different tiers never
+draw on top of each other, which the old DOM-only curated system had no mechanism for.
+
+### The webfont race — `src/lib/pergamino-fonts.ts`
+
+Canvas text does not wait for a webfont; `document.fonts.load(spec)` returns a promise that
+resolves once the matching `@font-face` is actually loaded. `readPergaminoFontStack` resolves
+`--font-wordmark`/`--font-display`/`--font-body` (globals.css's nested `@theme inline` vars) to
+literal font-family stacks via a probe element + `getComputedStyle` (the same pattern
+`readPergaminoPalette` uses for colour tokens, extended because these three are themselves
+`var(...)`-nested and only a real `font-family` computed value — not a raw custom-property read —
+resolves the chain). `buildFontLoadTasks` turns those into `document.fonts.load(...)` promises,
+passed to protomaps-leaflet as its `tasks` option.
+
+This isn't cosmetic: `frontends/leaflet.ts`'s `renderTile` does
+`await Promise.all(this.tasks.map(reflect))` **before** `this.labelers.add(...)` (the layout
+pass that measures text) — and it does this on *every* tile render, not just the first. A tile
+painted before Cinzel/Alegreya finished loading therefore waits for `tasks` to resolve rather than
+locking in a fallback face forever, which is the exact failure mode D1's own research (table row
+3) flagged and D2 (superseded) underestimated.
+
+Verification: jsdom does not implement the CSS Font Loading API at all (`document.fonts` is
+`undefined`) and does not resolve `var(...)` in computed styles either — both confirmed directly
+(`node -e` against a bare `jsdom` instance) before writing `pergamino-fonts.test.ts`, not assumed.
+So the test suite exercises the fallback path (generic `serif`/`sans-serif`, matching `@theme
+inline`'s own terminal fallback) and the `tasks`-construction contract (`document.fonts.load`
+called once per font face `buildLabelRules` actually draws with, guarded to return `[]` rather
+than throw when the API is missing). The race-avoidance *mechanism* itself — the library awaiting
+`tasks` ahead of every tile's layout — is verified by reading `frontends/leaflet.ts` directly, not
+by a browser test; no browser-automation tool was available in this session, same limitation
+noted in the "Blob bug and depth fix" Change Log entry above.
 
 ### Label CSS (in `globals.css`)
 
@@ -736,6 +828,53 @@ jsdom, so `BasemapLayer` renders nothing and `PlaceLabelsLayer` does nothing.
 67. `npm run build` succeeds and every static route still prerenders — the real regression guard
     for "window is not defined", which is the failure mode this stack has hit twice.
 
+### Test plan addendum — Labels reversal (post-launch)
+
+New:
+- `src/__tests__/pergamino-fonts.test.ts` (jsdom) — `readPergaminoFontStack` falls back correctly
+  (jsdom never resolves `var(...)`, confirmed directly), leaves no stray DOM node,
+  `pergaminoFontLoadSpecs` produces the three face descriptors, `buildFontLoadTasks` calls
+  `document.fonts.load` once per spec and degrades to `[]` when the API is missing.
+- `src/__tests__/BasemapLayer.label-rules.test.ts` (node env) — `buildLabelRules` against a fake
+  protomaps module: one rule per tier, unique ids, "never bare between z11 and z15" (some rule's
+  `minzoom` is at or below every zoom in that range), each tier's `filter` matches/rejects the
+  right `kind`/`geomType`/`roadClass`/`poiHasName` combination, and every symbolizer's `font`
+  contains the right resolved face and carries a cream halo (`stroke`/`width`).
+- New cases in `src/__tests__/BasemapLayer.geometry-filter.test.tsx` — the `pois` paint rule
+  rejects a Polygon feature, accepts a named Point feature, rejects an unnamed Point feature.
+- New cases in `src/__tests__/pergamino-style.test.ts` — `poiHasName`'s never-throws/never-empty
+  contract, the `pois` PERGAMINO_LAYERS entry (point geometry, `minZoom: 15`, sits after every
+  road layer).
+- New assertions in `src/__tests__/pergamino-tokens.test.ts` — `--color-pergamino-poi` declared
+  and anti-drift-locked; `PERGAMINO_LABEL_FALLBACK_HEX`'s four values (`--color-ink`,
+  `--color-stone-deep`, `--color-teal-deep`, `--color-cream`) anti-drift-locked against the
+  existing "Ciudad Latina" theme block (not new tokens — the map's lettering reuses these).
+
+Changed:
+- `src/__tests__/BasemapLayer.test.tsx` — `options.labelRules` no longer asserted `toEqual([])`;
+  now asserted as an array whose length matches `buildLabelRules`'s own output, plus a new
+  assertion that `options.tasks` is present (`[]` in jsdom, per the font-race fallback above). The
+  `vi.mock("protomaps-leaflet", ...)` factory gained `CircleSymbolizer`, `CenteredTextSymbolizer`,
+  `LineLabelSymbolizer`, `OffsetTextSymbolizer`, `TextPlacements` — an unfaithful mock without
+  them throws "is not a constructor" the moment `buildPaintRules`/`buildLabelRules` run, landing
+  every "probe ok" test in the raster-fallback branch instead of failing loudly (this is exactly
+  what happened before the mock was extended — five tests failed with the fallback silently
+  swallowing the real error, not a clean assertion failure).
+- `src/__tests__/BasemapLayer.container-attr.test.tsx` — same mock extension, no assertion
+  changes (this file only checks the `data-basemap` attribute, not `labelRules`/`tasks`).
+- `src/__tests__/places.test.ts` — the "roughly eight labels downtown" headline contract and the
+  "no barangay below z15"/`la-vieja-zamboanga` tests are removed (they asserted on curated data
+  that no longer exists); a new test locks `ZAMBOANGA_PLACES` to exactly the two water entries.
+  Density/de-cluttering are now `buildLabelRules`' job, covered structurally by
+  `BasemapLayer.label-rules.test.ts` since canvas text isn't jsdom-measurable — same limitation
+  the original D2 point 3 named, now landing on the tile system instead of the curated one.
+- `src/data/zamboanga-places.ts`, `src/lib/places.ts`, `src/components/PlaceLabelsLayer.tsx`,
+  `globals.css` — doc comments only, explaining the reduced scope; no behavioural change to
+  `visiblePlaceLabels`, `createPlaceLabelIcon`, or `PlaceLabelsLayer` itself.
+  `place-label-icon.test.ts` and `PlaceLabelsLayer.test.tsx` needed no changes — both are generic
+  over `kind`/derive expectations from the live `ZAMBOANGA_PLACES` array rather than hardcoding
+  its former contents.
+
 ---
 
 ## Edge cases and failure modes
@@ -755,8 +894,8 @@ jsdom, so `BasemapLayer` renders nothing and `PlaceLabelsLayer` does nothing.
 | E11 | Retina / `devicePixelRatio` 3 | Handled by the library (`tileSize = 256 * dpr`). Do not override `devicePixelRatio`. |
 | E12 | A road arrives with an unrecognised `kind_detail` | Falls to the middle weight and is still drawn. A road never vanishes because of an unknown tag. |
 | E13 | A label name contains `&`, `<` or a quote | Escaped in the divIcon HTML (test 37). |
-| E14 | Two labels overlap at some zoom | Accepted. With ~20 curated names staged by zoom this is tuned by hand, not by a collision engine. If it bites, adjust `minZoom` in the data — do **not** add a labeller. |
-| E15 | A label sits over a spot pin | Cannot hide it: labels are pane 450, pins are 600, and landmark labels sit 15 px below their point (D3). |
+| E14 | Two labels overlap at some zoom | **Superseded by the labels reversal.** Tile-driven labels (`buildLabelRules`) use protomaps-leaflet's own collision index (`labeler.ts`'s `Index`), which drops the losing label automatically -- this also fixed the waterfront pileup the curated DOM system couldn't (four landmark labels used to cluster there; all four were retired, see "Labels reversal"). The two remaining curated water labels don't share that index with the canvas labels (D3 unchanged), but at two entries, both positioned over open water away from the POI-dense downtown core, the practical collision risk is low; if it bites, adjust `minZoom`/coordinates in `zamboanga-places.ts`. |
+| E15 | A label sits over a spot pin | Cannot hide it: labels are pane 450 (curated) or the tile canvas pane 200 (tile-driven), pins are 600, and landmark-family labels sit below/beside their point, never centred under a pin. |
 | E16 | Labels in the accessible tree / tab order | `aria-hidden="true"` and `interactive: false, keyboard: false`. Map furniture is not content. |
 | E17 | 112 px deck inset would be unreadable with labels | `PlaceLabelsLayer` is mounted by `SpotMap` only. Inset and `PostFlow` get ground + pin only. |
 | E18 | Attribution hidden on the inset (`attributionControl={false}`, `MapInsetInner.tsx:164`) | Unchanged and acceptable: the full map at `/mapa` and the desktop column carry the control, and the inset's tap opens the full map. |
@@ -770,8 +909,10 @@ jsdom, so `BasemapLayer` renders nothing and `PlaceLabelsLayer` does nothing.
 
 - The floating bottom navigation ("Isla") and folding the Mi mapa legend into a chip — a separate
   decision the user has not made. **Do not touch `AppNav.tsx` or `app/mapa/page.tsx`'s legend.**
-- Label collision avoidance, any use of protomaps-leaflet's `labelRules`, or labels derived from
-  tile data.
+- ~~Label collision avoidance, any use of protomaps-leaflet's `labelRules`, or labels derived
+  from tile data.~~ **Now in scope** (see the "Labels reversal" Change Log entry) — this line
+  described D2, which is superseded. `buildLabelRules` (`BasemapLayer.tsx`) is the primary naming
+  system; it uses protomaps-leaflet's `labelRules` and its built-in label collision handling.
 - Changing `MIN_ZOOM`, `MAX_ZOOM`, `DEFAULT_ZOOM`, `MAX_BOUNDS`, `ZAMBOANGA_CENTER`, the city
   outline, `CityMask`, pin icons, or popup markup.
 - Any automated pipeline to refresh the `.pmtiles` archive on a schedule. It is cut by hand; note
@@ -893,3 +1034,17 @@ already drawing over the raster ground.
 | 2026-09-21 | `PergaminoLayer.geometry` made load-bearing: `buildPaintRules` now emits a real `filter` per rule, combining a geometry-type guard (against `protomaps.GeomType`, handed in via the same lazily-imported module) with the existing `layer.match(props)`. | `geometry` was documentation-only — it picked a symbolizer class and nothing else. protomaps-leaflet's painter has no geometry dispatch of its own: it hands every feature in a data layer to the symbolizer's `draw()`, and `PolygonSymbolizer.draw` always does `beginPath()` -> `fill()`, which canvas implicitly closes. Every LineString in the `water` layer (rivers, streams, straits, canals — measured at 60 per z13 tile in the real archive) was therefore being closed into a shape and filled as sea: the "blob" the user reported. The official Protomaps style guards `water`/`earth` with `["==", "$type", "Polygon"]`; this is that guard, restored. `layer.match` (pergamino-style.ts) only ever sees a feature's `props`, never its geometry, so this couldn't be expressed there — `pergamino-style.ts` stays free of any Leaflet/protomaps-leaflet import (test 13), and the fix lives in `BasemapLayer.tsx`, where the real `GeomType` enum is available. `PergaminoLayer` gained an optional `dashPx?: readonly number[]` field for `boundaries`' dashed stroke. Two existing faithful `vi.mock("protomaps-leaflet", ...)` doubles (`BasemapLayer.test.tsx`, `BasemapLayer.container-attr.test.tsx`) were extended with `GeomType: { Point: 1, Line: 2, Polygon: 3 }` to stay faithful, same pattern as the T3.3 mock-extension entry above. |
 | 2026-09-21 | Nine layers now drawn instead of three: five `landuse-*` layers (grouped by `landuseGroup(kind)` into green/civic/works/cemetery/aeroway — an unrecognised `kind` matches none of the five and is not painted, never a catch-all), `buildings` (fill + hairline stroke, minZoom 14) and `boundaries` (thin dashed stroke), inserted into `PERGAMINO_LAYERS` below the roads and above earth/water, in that order (landuse -> buildings -> boundaries). Eight new `--color-pergamino-*` tokens added to `globals.css`, mirrored in `pergamino-palette.ts`'s `PERGAMINO_TOKEN_NAMES`/`PERGAMINO_FALLBACK_HEX`, and pinned by `pergamino-tokens.test.ts`. | The map only painted ground (earth/water/roads) and read as flat next to a real map — a single z15 tile over Zamboanga carries 382 buildings and 42 landuse polygons the map was simply not drawing. This also retires the "Out of scope" line that excluded buildings/landuse/boundaries; it is now wrong and has been struck through in that section, with a pointer back to this entry. |
 | 2026-09-21 | Colour-distinction note, not a defect: `--color-pergamino-civic` (`#e2d3c4`) and `--color-pergamino-aeroway` (`#e4d9c0`) are close enough in the parchment family that they may be hard to tell apart at a glance on a small phone screen; both are deliberately warm/pale since hospitals, schools and airfields are all "institutional" ground in this style. Not retuned without a stated design reason, per the "Original requirements" rule at the top of this PRD — flagged for a human look at T5.1-style verification rather than silently adjusted. | Caught while choosing the eight new hex values; recorded so nobody re-derives the same close call. |
+
+## Labels reversal (post-launch)
+
+**D2 is superseded by this entry.** The user reported the drawn map was "nearly nameless" and
+asked for everything to be traced, not a curated subset — `labelRules: []` (D2's whole
+consequence) threw away every street name, barangay name, water name, and POI name the vector
+tiles carry, leaving at most one or two curated names visible at most zooms over a city full of
+named streets.
+
+| 2026-09-21 | `buildLabelRules` (`src/components/BasemapLayer.tsx`) is now the map's primary naming system: eight `LabelRule` tiers reading `places`/`roads`/`water`/`pois` directly from the archive, using protomaps-leaflet's own `CenteredTextSymbolizer`/`LineLabelSymbolizer`/`OffsetTextSymbolizer` and its built-in label collision index, rendered in the same three typefaces (Cinzel/Alegreya Sans/Alegreya italic) the curated system used. `labelRules: []` is gone from `BasemapLayer.tsx`'s `leafletLayer({...})` call. `src/lib/pergamino-fonts.ts` is new: `readPergaminoFontStack` resolves the three `--font-*` custom properties to literal family stacks canvas can use (a probe-element + `getComputedStyle` read, extending `readPergaminoPalette`'s pattern because these three are themselves `var(...)`-nested, unlike the flat-hex ground tokens); `buildFontLoadTasks` turns those into `document.fonts.load(...)` promises passed to protomaps-leaflet's own `tasks` option — awaited before every tile's label layout (`frontends/leaflet.ts`'s `renderTile`, not just the first paint), which is the library's documented answer (D1's own table, written before D2 existed) to the exact webfont race D2 point 4 raised and then underused. | The tiles were never missing names — a 361-feature `pois` tile and real `places` barangay/quarter names (`kind: "macrohood"`/`"neighbourhood"`) were confirmed present by querying `public/basemap/zamboanga.pmtiles` directly with the `pmtiles` CLI and `@mapbox/vector-tile` before writing any code, not assumed from the schema. D2's "coverage is not guaranteed" turned out to be true of the curated list's own hand-picked ~20 names at any zoom they didn't happen to cover, and false of the archive, which had been unread. |
+| 2026-09-21 | The `pois` ground layer (Step 3): `PergaminoLayer.geometry` gained a `"point"` variant (`protomaps.CircleSymbolizer`, `protomaps.GeomType.Point`) alongside the existing polygon/line handling from the blob-bug fix above — same geometry-guard mechanism, extended, not a parallel one. A small filled dot (`radiusPx: 1.4`, `minZoom: 15`) for every *named* POI (`poiHasName`, shared with the label rule for the same layer), drawn last in `PERGAMINO_LAYERS` so it always sits on top of the street it's next to. One new token, `--color-pergamino-poi` (`#6b4a2c`). | "Add the pois layer to the drawn ground if it earns its place at close zoom" — it does: 361 features in a single close tile is exactly the texture the Step 2 depth pass (buildings/landuse) was already adding for, and the label alone floating with no anchor point read as disconnected from the ground. |
+| 2026-09-21 | `ZAMBOANGA_PLACES` (`src/data/zamboanga-places.ts`) cut from ~20 curated entries to exactly 2: `mar-de-basilan` and `bahia-zamboanga`. Every `landmark` entry (Fort Pilar, Paseo del Mar, City Hall, Pasonanca, Rio Hondo, Isla Santa Cruz, Aeropuerto, Puerto, Canelar, Ateneo, `la-vieja-zamboanga`) and every `barangay` entry (Tetuan, Santa María, Baliwasan, Guiwan, Putik, Tugbungan) duplicated a real name confirmed present in the archive's `places`/`pois` layers and is now drawn by `buildLabelRules` instead. The two water names are **kept**: the same archive query confirmed `water` carries no in-view named strait/bay — only ocean-scale names ("Sulu Sea", `min_zoom: 7`, positioned well outside the city view) — so there is no tile equivalent for the Spanish/Chavacano local water names Zamboangueños actually use. This is the "keep only where tiles have no equivalent, or want the Spanish/Chavacano form" branch of the decision the task set out, not "fold everything in" or "retire everything": folding would have meant inventing a `label-water-point` entry for "Mar de Basilán"/"Bahía de Zamboanga" the archive has no feature for at all, which isn't folding, it's re-curating under a different name. | The two label systems (DOM pane 450, canvas tile pane 200) don't share one collision index (D3, unchanged) — cutting the curated list to 2 entries is what keeps that from mattering in practice, not a new coordination mechanism between them. This also resolved the separate reported bug of labels piling up on the waterfront at phone width: the landmark cluster that used to collide there (Fort Pilar/Paseo del Mar/Puerto/Rio Hondo, all near the water) no longer exists as DOM markers — it's drawn by the tile system's own collision-managed labels instead. |
+| 2026-09-21 | `PlaceKind`/`createPlaceLabelIcon`/`visiblePlaceLabels` (`src/lib/places.ts`, `src/lib/place-label-icon.ts`) and the `.zpots-place-label--landmark`/`--barangay` CSS classes are all left in place, unused by current data, rather than deleted or narrowed to `"water"` only. | These are generic, already-tested utilities (`place-label-icon.test.ts` exercises all three kinds directly) with no cost to keeping them — narrowing the type would be a second, unrequested API change bundled into this one, and the classes may be needed again for a future one-off Spanish/Chavacano exception the tiles will never carry (the same category `mar-de-basilan`/`bahia-zamboanga` are in). |
+| 2026-09-21 | `src/__tests__/places.test.ts`'s "roughly eight labels downtown at z14" headline test and its "no barangay below z15"/`la-vieja-zamboanga` tests are deleted, not reworded — they asserted on curated data that no longer exists. Replaced with a test locking `ZAMBOANGA_PLACES` to exactly the two water entries. | Density and de-cluttering are now the tile system's job, and canvas text isn't jsdom-measurable (the same limitation D2 point 3 named) — `BasemapLayer.label-rules.test.ts`'s structural coverage (every zoom z11-15 has an active rule; each tier's filter matches/rejects the right feature shape) is this repo's equivalent for the new system, the same kind of test `buildPaintRules`' geometry-filter suite already used for ground painting. |
