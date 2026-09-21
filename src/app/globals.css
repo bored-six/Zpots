@@ -56,6 +56,18 @@
      --color-ink / --color-stone-deep / --color-teal-deep / --color-cream
      above, not a new token -- only the dot gets one. */
   --color-pergamino-poi: #6b4a2c;
+
+  /* Paseo motion pass (.claude/prds/paseo-motion.md) -- the shared easing
+     curves and durations every card/map/confirm/vinta animation below
+     draws from, so Wave 2 only ever names an animation, never invents a
+     new timing value. --ease-paseo is the general-purpose entrance curve;
+     --ease-settle is reserved for the photo settle (a slower, softer
+     landing). */
+  --ease-paseo: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 180ms;
+  --dur-base: 320ms;
+  --dur-slow: 640ms;
 }
 
 /* `inline` because these point at the CSS variables next/font injects on
@@ -123,16 +135,39 @@ select:focus-visible,
   box-shadow: 0 6px 18px rgb(31 24 19 / 0.22);
 }
 
+/* `--vinta-angle` is what .paseo-vinta-spin (paseo-motion.md) animates --
+   registering it as an <angle> (rather than leaving it a plain custom
+   property) is what lets the browser interpolate the conic-gradient's
+   rotation smoothly instead of snapping between values. `inherits: false`
+   keeps each ring's angle independent of any ancestor; the 0deg initial
+   value is also .vinta-ring's resting rotation when nothing is animating
+   it (the non-fresh case). */
+@property --vinta-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 /* Vinta-stripe ring around the Hoy row avatars (social-spots.md, "Hoy row")
    -- same four sail-stripe tokens as .vinta-rule, wrapped into a ring
-   instead of a straight divider. */
+   instead of a straight divider. Rotated `from var(--vinta-angle)` so the
+   "fresh" state below (a Hoy poster who dropped a spot today) can spin the
+   whole ring instead of only being able to fade/pulse it. */
 .vinta-ring {
   background: conic-gradient(
+    from var(--vinta-angle),
     var(--color-vinta-red) 0deg 90deg,
     var(--color-vinta-yellow) 90deg 180deg,
     var(--color-vinta-blue) 180deg 270deg,
     var(--color-vinta-green) 270deg 360deg
   );
+}
+
+/* Fresh Hoy poster (dropped a spot today) -- the ring itself spins slowly
+   via --vinta-angle instead of the avatar or the row around it moving, so
+   it reads as "alive" without disturbing layout. */
+.vinta-ring[data-fresh="true"] {
+  animation: paseo-vinta-spin 8s linear infinite;
 }
 
 /* `isolation: isolate` forces this element to open its own stacking
@@ -297,6 +332,17 @@ select:focus-visible,
   filter: drop-shadow(0 1px 1px rgb(31 24 19 / 0.35));
 }
 
+/* Added by createPinIcon (lib/pin-icon.ts) directly on the pin's combined
+   halo path for one render right after a pin flips Unconfirmed ->
+   Confirmed -- draws the halo on with the same stroke-dasharray technique
+   as .paseo-mark, so the moment reads as "just earned" instead of the
+   badge simply appearing. */
+.zpots-pin-icon--just-confirmed {
+  stroke-dasharray: 64;
+  stroke-dashoffset: 64;
+  animation: paseo-mark-draw var(--dur-base) var(--ease-paseo) both;
+}
+
 /* Popup shell: warm card, soft corners, a VintaRule across the top edge
    (rendered as a child element in SpotMap.tsx, not CSS) and real breathing
    room. */
@@ -395,4 +441,175 @@ select:focus-visible,
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--color-cardinal);
+}
+
+/**
+ * Paseo motion pass (.claude/prds/paseo-motion.md) -- Wave 1 owns this
+ * whole section: tokens (in @theme above), keyframes, the hook classes
+ * Wave 2 attaches to markup, and the reduced-motion kill switch. Wave 2
+ * agents must not add keyframes/tokens/animation rules of their own; they
+ * only apply the class names and data attributes documented here.
+ *
+ * Every animation below except the confirm-pulse and pin-confirm ones is
+ * scoped under `.paseo-slot[data-active="true"]` -- the slot SpotsDeck
+ * marks as the one currently in view -- so off-screen cards sit still.
+ * Never animate `.paseo-slot` itself: it's already a transform-based
+ * containing block for the absolutely positioned map inset (see the
+ * `.leaflet-container { isolation: isolate }` comment above), so animating
+ * it would drag the map inset along for the ride.
+ */
+
+@keyframes paseo-photo-settle {
+  from {
+    transform: scale(1.06);
+    opacity: 0.85;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes paseo-veil-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes paseo-line-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes paseo-ken-burns {
+  from {
+    transform: scale(1) translate(0, 0);
+  }
+  to {
+    transform: scale(1.04) translate(-1%, -1%);
+  }
+}
+
+/* Draw-on stroke technique shared by .paseo-mark and
+   .zpots-pin-icon--just-confirmed below. Neither path sets a `pathLength`
+   attribute in its markup, so the dasharray/dashoffset values on each
+   class have to be a plain guess at (or slight overestimate of) that
+   path's real length rather than the usual `pathLength="1"` normalised
+   0-to-1 pattern -- if Wave 2 adds `pathLength="1"` to either path, these
+   values should become 1 and 1 instead. */
+@keyframes paseo-mark-draw {
+  from {
+    stroke-dashoffset: 64;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes paseo-ring-pulse {
+  from {
+    transform: scale(0.8);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+@keyframes paseo-vinta-spin {
+  from {
+    --vinta-angle: 0deg;
+  }
+  to {
+    --vinta-angle: 360deg;
+  }
+}
+
+/* Photo layer wrapper in SpotCardView -- carries the ken-burns drift at
+   rest (paused) so switching a slot to active never has to wait for the
+   animation to attach, only to start running. Settle only ever plays on
+   the transition into `data-active="true"` below. */
+.paseo-photo {
+  animation: paseo-ken-burns 8s var(--ease-paseo) var(--dur-base) infinite
+    alternate;
+  animation-play-state: paused;
+}
+
+.paseo-slot[data-active="true"] .paseo-photo {
+  animation:
+    paseo-photo-settle var(--dur-slow) var(--ease-settle) both,
+    paseo-ken-burns 8s var(--ease-paseo) var(--dur-base) infinite alternate;
+  animation-play-state: running;
+}
+
+/* The tinta gradient div over the photo -- rises in just after the photo
+   settle starts (`--dur-fast` delay), and only on the active slot. */
+.paseo-veil {
+  opacity: 0;
+}
+
+.paseo-slot[data-active="true"] .paseo-veil {
+  animation: paseo-veil-rise var(--dur-base) var(--ease-paseo) var(--dur-fast)
+    both;
+}
+
+/* Name / note / distance lines in SpotCardView. Wave 2 sets
+   `--paseo-line-index` inline (1, 2, 3) so each line staggers 60ms behind
+   the last, on top of the shared `--dur-fast` head start every line gets
+   before any of them starts moving. */
+.paseo-line {
+  opacity: 0;
+}
+
+.paseo-slot[data-active="true"] .paseo-line {
+  animation: paseo-line-rise var(--dur-base) var(--ease-paseo) both;
+  animation-delay: calc(var(--paseo-line-index, 0) * 60ms + var(--dur-fast));
+}
+
+/* The checkmark `<path>` inside CheckIcon (16x16 viewBox,
+   `M3 8.5 L6.5 12 L13 4.5`). 20 is a deliberate overestimate of that
+   path's real length (~14.9 units) so the draw-on never clips short. */
+.paseo-mark {
+  stroke-dasharray: 20;
+  stroke-dashoffset: 20;
+  animation: paseo-mark-draw var(--dur-base) var(--ease-paseo) both;
+}
+
+/* Single ring `<span>` rendered beside the confirmed badge -- fires once
+   on mount (event-driven, not slot-scoped) and never intercepts clicks. */
+.paseo-confirm-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 2px solid var(--color-vinta-yellow);
+  pointer-events: none;
+  animation: paseo-ring-pulse var(--dur-slow) var(--ease-paseo) both;
+}
+
+/* Kill switch: anyone with prefers-reduced-motion set gets every
+   animation and transition in the app disabled outright, not just the
+   ones added by this pass. Kept top level and outside every other rule in
+   this file on purpose -- .vinta-rule, .leaflet-container and
+   .leaflet-tile-pane are all parsed with a `[^}]*` regex in
+   theme-tokens.test.ts/pergamino-tokens.test.ts that a nested block would
+   break. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }
