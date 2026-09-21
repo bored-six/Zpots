@@ -88,7 +88,10 @@ describe("SpotMap -- just-confirmed pin wiring", () => {
   it("passes justConfirmed: false for a spot that has not been confirmed this session", () => {
     render(<SpotMap {...baseProps()} />);
 
-    expect(createPinIconSpy).toHaveBeenCalledWith("unconfirmed", { justConfirmed: false });
+    expect(createPinIconSpy).toHaveBeenCalledWith(
+      "unconfirmed",
+      expect.objectContaining({ justConfirmed: false, size: 32 }),
+    );
   });
 
   it("marks the spot's own pin justConfirmed: true once its confirm click resolves", async () => {
@@ -102,8 +105,31 @@ describe("SpotMap -- just-confirmed pin wiring", () => {
     await waitFor(() => expect(props.onConfirmSpot).toHaveBeenCalledWith(unconfirmedSpot.id));
 
     await waitFor(() =>
-      expect(createPinIconSpy).toHaveBeenCalledWith("unconfirmed", { justConfirmed: true }),
+      expect(createPinIconSpy).toHaveBeenCalledWith(
+        "unconfirmed",
+        expect.objectContaining({ justConfirmed: true, size: 32 }),
+      ),
     );
+  });
+
+  it("threads the density size on every call and never changes it on confirm", async () => {
+    const user = userEvent.setup();
+    const props = baseProps();
+    render(<SpotMap {...props} spots={[unconfirmedSpot]} />);
+
+    const popup = screen.getByTestId("popup");
+    await user.click(within(popup).getByRole("button", { name: /confirm.*been here/i }));
+
+    await waitFor(() => expect(props.onConfirmSpot).toHaveBeenCalledWith(unconfirmedSpot.id));
+
+    expect(
+      createPinIconSpy.mock.calls.every(([, options]) => (options as { size?: unknown }).size === 32),
+    ).toBe(true);
+    expect(
+      createPinIconSpy.mock.calls.every(
+        ([, options]) => typeof (options as { justConfirmed?: unknown }).justConfirmed === "boolean",
+      ),
+    ).toBe(true);
   });
 
   /**

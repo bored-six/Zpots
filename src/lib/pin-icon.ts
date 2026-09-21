@@ -133,8 +133,9 @@ function escapeHtmlAttribute(value: string): string {
 export interface CreatePhotoPinIconOptions {
   /** Flags this render as the one right after a pin flipped Unconfirmed -> Confirmed (spec section 4.7). */
   justConfirmed?: boolean;
-  /** Read cue on the pin (spec section 2). Photo pins never draw a glyph (A2) -- accepted for interface parity, unused. */
-  category?: SpotCategory;
+  // No `category` here: a photo pin never renders a glyph (A2), so the field
+  // would be dead. When the tier drops the photo, SpotMap calls
+  // createPinIcon, which is where category goes (spec section 7.3).
   /** Default 44. 44 or 32 render the photo; anything else throws `RangeError`. */
   size?: PhotoPinSize;
 }

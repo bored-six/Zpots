@@ -24,6 +24,7 @@ const { fakeMap } = vi.hoisted(() => ({
     setMaxBounds: () => {},
     on: () => {},
     off: () => {},
+    getZoom: () => 14,
   } as unknown as LeafletMap,
 }));
 

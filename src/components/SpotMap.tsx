@@ -61,18 +61,6 @@ function hasFiniteCoords(spot: { lat: number; lng: number }): boolean {
   return Number.isFinite(spot.lat) && Number.isFinite(spot.lng);
 }
 
-/**
- * `leafletMap.getZoom()`, guarded the same way `leafletMap` itself is
- * guarded (spec E10): some react-leaflet test doubles in this suite (e.g.
- * SpotMap.pergamino.test.tsx's fake map) only implement the handful of
- * methods that file exercises, not the full Leaflet `Map` interface. A test
- * double missing `getZoom` behaves like `leafletMap` being null -- fall
- * back to `DEFAULT_ZOOM` rather than throwing.
- */
-function readZoom(map: LeafletMap): number {
-  return typeof map.getZoom === "function" ? map.getZoom() : DEFAULT_ZOOM;
-}
-
 interface SpotMapProps {
   /**
    * Write-mode spots (tap-to-place, confirm, report). Omitted entirely by
@@ -259,14 +247,16 @@ function tierFor(tiers: ReadonlyMap<string, PinTier>, key: string, wantsPhoto: b
 }
 
 /**
- * Only "mine"/"preview" (and, forward-compatibly, a future "famoso" source --
- * spec assumption A5) pins are ever the spot's own photo. Widened to
- * `string` before comparing so this keeps compiling if `MapSource` gains
- * "famoso" later without this file needing to change.
+ * `saved`/`been` are the two sources Mi mapa renders as *status* pins by
+ * rule (social-spots.md: `been` = solid, `saved` = hollow); every other
+ * source with a photo is the photo (spec section 5.4/A5). Written as a
+ * denylist typed on `MapSource` on purpose: it compiles against today's
+ * union with no literal for a member (e.g. a future famous-place source,
+ * famous-spots-seed.md) that does not exist yet, and that source starts
+ * showing its photo the moment `MapSource` gains it, with no edit here.
  */
 function isPhotoEligibleSource(source: MapSource): boolean {
-  const value: string = source;
-  return value === "mine" || value === "preview" || value === "famoso";
+  return source !== "saved" && source !== "been";
 }
 
 /** `wantsPhoto` mirrors `iconForMapSpot`'s own photo-eligibility rule (spec section 5.4). */
@@ -408,9 +398,9 @@ export default function SpotMap({
   useEffect(() => {
     if (!leafletMap) return;
     const map = leafletMap;
-    setZoom(readZoom(map));
+    setZoom(map.getZoom());
     function handleZoomEnd() {
-      setZoom(readZoom(map));
+      setZoom(map.getZoom());
     }
     map.on("zoomend", handleZoomEnd);
     return () => {
