@@ -60,7 +60,7 @@ describe(".zpots-city-mask -- fully opaque, nothing outside the city renders", (
   });
 });
 
-describe("cityMask pane sits above the tile pane and below the placeLabels pane", () => {
+describe("cityMask pane sits above the tile pane AND above the placeLabels pane (label-tuning defect 3)", () => {
   it("CityMask.tsx's cityMask pane is z-index 350", () => {
     const source = fs.readFileSync(CITY_MASK_PATH, "utf-8");
     const match = source.match(/pane\.style\.zIndex\s*=\s*["'](\d+)["']/);
@@ -68,7 +68,7 @@ describe("cityMask pane sits above the tile pane and below the placeLabels pane"
     expect(Number(match?.[1])).toBe(350);
   });
 
-  it("PlaceLabelsLayer.tsx's placeLabels pane is a higher z-index than CityMask's cityMask pane", () => {
+  it("PlaceLabelsLayer.tsx's placeLabels pane is a lower z-index than CityMask's cityMask pane", () => {
     const cityMaskSource = fs.readFileSync(CITY_MASK_PATH, "utf-8");
     const placeLabelsSource = fs.readFileSync(PLACE_LABELS_LAYER_PATH, "utf-8");
     const cityMaskZ = Number(
@@ -77,11 +77,16 @@ describe("cityMask pane sits above the tile pane and below the placeLabels pane"
     const placeLabelsZ = Number(
       placeLabelsSource.match(/pane\.style\.zIndex\s*=\s*["'](\d+)["']/)?.[1],
     );
-    // Leaflet's own tile pane defaults to z-index 200 (not something this
-    // codebase sets) -- the mask (350) sits above that and below
-    // placeLabels (450), so it hides tile labels but never a Zpots pin or
-    // a Zpots-drawn label.
-    expect(cityMaskZ).toBeGreaterThan(200);
-    expect(cityMaskZ).toBeLessThan(placeLabelsZ);
+    // Reversed from the original design (label-tuning defect 3): placeLabels
+    // used to sit at 450, *above* the mask (350), so "Mar de Basilán" and
+    // "Bahía de Zamboanga" painted over masked-out territory outside the
+    // city whenever their anchor point fell there, while every canvas
+    // label underneath was correctly hidden. Leaflet's own tile pane
+    // defaults to z-index 200 (not something this codebase sets) --
+    // placeLabels now sits between that and the mask, so it still draws
+    // over the ground/roads but is masked exactly like every canvas label
+    // once the mask (350) is composited on top.
+    expect(placeLabelsZ).toBeGreaterThan(200);
+    expect(placeLabelsZ).toBeLessThan(cityMaskZ);
   });
 });

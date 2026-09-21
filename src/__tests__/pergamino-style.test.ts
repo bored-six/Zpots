@@ -3,12 +3,14 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   NATURAL_POI_KINDS,
+  NATURAL_POI_NAME_MAX_CHARS,
   PERGAMINO_LAYERS,
   PERGAMINO_WEIGHTS,
   isNaturalLandscapePoi,
   landuseGroup,
   poiHasName,
   roadClass,
+  shortenNaturalPoiName,
 } from "@/lib/pergamino-style";
 import { PERGAMINO_TOKEN_NAMES } from "@/lib/pergamino-palette";
 
@@ -448,6 +450,61 @@ describe("NATURAL_POI_KINDS / isNaturalLandscapePoi -- the Pasonanca naming fix 
       isNaturalLandscapePoi(undefined as unknown as Record<string, unknown>),
     ).not.toThrow();
     expect(isNaturalLandscapePoi({ kind: 42, name: "x" })).toBe(false);
+  });
+});
+
+describe("shortenNaturalPoiName -- capping the label-poi-natural tier (label-tuning defect 1)", () => {
+  it("leaves a name at or under the max length untouched, byte for byte", () => {
+    expect(shortenNaturalPoiName("Pasonanca Natural Park")).toBe("Pasonanca Natural Park");
+    expect(shortenNaturalPoiName("Fort Pilar")).toBe("Fort Pilar");
+  });
+
+  it("a real over-long protected-area name is cut to the part before its qualifier phrase", () => {
+    // The exact reported name: four stacked lines over a small island at z12.
+    expect(
+      shortenNaturalPoiName(
+        "Great and Little Santa Cruz Islands Protected Landscape & Seascape",
+      ),
+    ).toBe("Great and Little Santa Cruz Islands");
+  });
+
+  it("matches the qualifier whether it's written with '&' or 'and'", () => {
+    expect(shortenNaturalPoiName("Example Reef Protected Landscape and Seascape")).toBe(
+      "Example Reef",
+    );
+    expect(shortenNaturalPoiName("Example Reef Protected Landscape & Seascape")).toBe(
+      "Example Reef",
+    );
+  });
+
+  it("recognises other common protected-area qualifiers, not just Protected Landscape", () => {
+    expect(shortenNaturalPoiName("Very Long Hypothetical Mountain Range Natural Park")).toBe(
+      "Very Long Hypothetical Mountain Range",
+    );
+    expect(
+      shortenNaturalPoiName("Very Long Hypothetical Coral Reef System Marine Sanctuary"),
+    ).toBe("Very Long Hypothetical Coral Reef System");
+  });
+
+  it("an over-long name with no qualifier match falls back to a word-boundary cut with an ellipsis", () => {
+    const result = shortenNaturalPoiName(
+      "A Very Long Hypothetical Landscape Name Without Any Qualifier Word At All",
+    );
+    expect(result.length).toBeLessThanOrEqual(NATURAL_POI_NAME_MAX_CHARS + 1);
+    expect(result.endsWith("…")).toBe(true);
+    // Word-boundary cut: never splits a word in half before the ellipsis.
+    expect(result.slice(0, -1).endsWith(" ")).toBe(false);
+    expect(result.startsWith("A Very Long")).toBe(true);
+  });
+
+  it("trims surrounding whitespace before measuring", () => {
+    expect(shortenNaturalPoiName("  Pasonanca Natural Park  ")).toBe("Pasonanca Natural Park");
+  });
+
+  it("a qualifier match at the very start of the name (nothing before it) falls through to the length rule instead of returning an empty string", () => {
+    const name = "Protected Landscape and Seascape of a Very Long Hypothetical Place Name Here";
+    const result = shortenNaturalPoiName(name);
+    expect(result.length).toBeGreaterThan(0);
   });
 });
 
