@@ -41,6 +41,16 @@ const EXPECTED_GROUND_TOKENS: Record<string, string> = {
   "--color-pergamino-street": "#c5a87d",
   "--color-pergamino-minor": "#d5c09a",
   "--color-pergamino-river": "#a9b79e",
+  // Step 2 (pergamino-map.md): landuse groups, buildings, boundaries --
+  // the layers that give the map its texture/depth.
+  "--color-pergamino-green": "#cbd0a8",
+  "--color-pergamino-civic": "#e2d3c4",
+  "--color-pergamino-works": "#dfd1ac",
+  "--color-pergamino-cemetery": "#ccc9ac",
+  "--color-pergamino-aeroway": "#e4d9c0",
+  "--color-pergamino-building": "#dccaa3",
+  "--color-pergamino-building-edge": "#bfa574",
+  "--color-pergamino-boundary": "#a58d64",
 };
 
 describe("Pergamino ground tokens (globals.css)", () => {

@@ -21,6 +21,15 @@ export const PERGAMINO_TOKEN_NAMES = [
   "--color-pergamino-street",
   "--color-pergamino-minor",
   "--color-pergamino-river",
+  // Step 2: landuse groups, buildings, boundaries.
+  "--color-pergamino-green",
+  "--color-pergamino-civic",
+  "--color-pergamino-works",
+  "--color-pergamino-cemetery",
+  "--color-pergamino-aeroway",
+  "--color-pergamino-building",
+  "--color-pergamino-building-edge",
+  "--color-pergamino-boundary",
 ] as const;
 
 export type PergaminoTokenName = (typeof PERGAMINO_TOKEN_NAMES)[number];
@@ -35,6 +44,14 @@ export const PERGAMINO_FALLBACK_HEX: Record<PergaminoTokenName, string> = {
   "--color-pergamino-street": "#c5a87d",
   "--color-pergamino-minor": "#d5c09a",
   "--color-pergamino-river": "#a9b79e",
+  "--color-pergamino-green": "#cbd0a8",
+  "--color-pergamino-civic": "#e2d3c4",
+  "--color-pergamino-works": "#dfd1ac",
+  "--color-pergamino-cemetery": "#ccc9ac",
+  "--color-pergamino-aeroway": "#e4d9c0",
+  "--color-pergamino-building": "#dccaa3",
+  "--color-pergamino-building-edge": "#bfa574",
+  "--color-pergamino-boundary": "#a58d64",
 };
 
 /**

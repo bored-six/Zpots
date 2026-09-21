@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   PERGAMINO_LAYERS,
   PERGAMINO_WEIGHTS,
+  landuseGroup,
   roadClass,
 } from "@/lib/pergamino-style";
 import { PERGAMINO_TOKEN_NAMES } from "@/lib/pergamino-palette";
@@ -234,6 +235,152 @@ describe("PERGAMINO_LAYERS -- every referenced token is a real palette token (te
         expect(tokenNames.has(layer.strokeToken)).toBe(true);
       }
     }
+  });
+});
+
+describe("landuseGroup -- kind -> one of five groups, or null (Step 2)", () => {
+  it("green: park, garden, grass, grassland, forest, nature_reserve, pitch, recreation_ground", () => {
+    for (const kind of [
+      "park",
+      "garden",
+      "grass",
+      "grassland",
+      "forest",
+      "nature_reserve",
+      "pitch",
+      "recreation_ground",
+    ]) {
+      expect(landuseGroup({ kind })).toBe("green");
+    }
+  });
+
+  it("civic: hospital, school, university, college, government, military", () => {
+    for (const kind of [
+      "hospital",
+      "school",
+      "university",
+      "college",
+      "government",
+      "military",
+    ]) {
+      expect(landuseGroup({ kind })).toBe("civic");
+    }
+  });
+
+  it("works: industrial, commercial, retail", () => {
+    for (const kind of ["industrial", "commercial", "retail"]) {
+      expect(landuseGroup({ kind })).toBe("works");
+    }
+  });
+
+  it("cemetery: cemetery", () => {
+    expect(landuseGroup({ kind: "cemetery" })).toBe("cemetery");
+  });
+
+  it("aeroway: aerodrome, airfield, runway, taxiway", () => {
+    for (const kind of ["aerodrome", "airfield", "runway", "taxiway"]) {
+      expect(landuseGroup({ kind })).toBe("aeroway");
+    }
+  });
+
+  it("an unrecognised kind never falls into a catch-all -- it is null, not painted", () => {
+    expect(landuseGroup({ kind: "residential" })).toBeNull();
+    expect(landuseGroup({ kind: "pedestrian" })).toBeNull();
+    expect(landuseGroup({ kind: "something_new" })).toBeNull();
+  });
+
+  it("empty props, or no kind at all, -> null", () => {
+    expect(landuseGroup({})).toBeNull();
+  });
+
+  it("never throws on garbage", () => {
+    expect(() => landuseGroup({ kind: 42 })).not.toThrow();
+    expect(landuseGroup({ kind: 42 })).toBeNull();
+    expect(() => landuseGroup({ kind: null })).not.toThrow();
+    expect(landuseGroup({ kind: null })).toBeNull();
+    expect(() => landuseGroup({ kind: [] })).not.toThrow();
+    expect(landuseGroup({ kind: [] })).toBeNull();
+  });
+});
+
+describe("PERGAMINO_LAYERS -- landuse, buildings, boundaries (Step 2)", () => {
+  it("has one layer per landuse group, reading the landuse data layer as polygons", () => {
+    const groups = ["green", "civic", "works", "cemetery", "aeroway"] as const;
+    for (const group of groups) {
+      const layer = PERGAMINO_LAYERS.find((l) => l.id === `landuse-${group}`);
+      expect(layer, `landuse-${group} layer missing`).toBeDefined();
+      expect(layer?.dataLayer).toBe("landuse");
+      expect(layer?.geometry).toBe("polygon");
+      expect(layer?.fillToken).toBe(`--color-pergamino-${group}`);
+    }
+  });
+
+  it("each landuse layer's match agrees with landuseGroup, and only with its own group", () => {
+    const groups = ["green", "civic", "works", "cemetery", "aeroway"] as const;
+    const sample: Record<(typeof groups)[number], string> = {
+      green: "park",
+      civic: "hospital",
+      works: "industrial",
+      cemetery: "cemetery",
+      aeroway: "runway",
+    };
+    for (const group of groups) {
+      const layer = PERGAMINO_LAYERS.find((l) => l.id === `landuse-${group}`);
+      expect(layer?.match?.({ kind: sample[group] })).toBe(true);
+      for (const other of groups) {
+        if (other === group) continue;
+        expect(layer?.match?.({ kind: sample[other] })).toBe(false);
+      }
+      expect(layer?.match?.({ kind: "residential" })).toBe(false);
+    }
+  });
+
+  it("draws buildings from the buildings data layer as polygons, from z14 up, with a fill and a hairline stroke", () => {
+    const buildings = PERGAMINO_LAYERS.find((l) => l.id === "buildings");
+    expect(buildings).toBeDefined();
+    expect(buildings?.dataLayer).toBe("buildings");
+    expect(buildings?.geometry).toBe("polygon");
+    expect(buildings?.minZoom).toBe(14);
+    expect(buildings?.fillToken).toBe("--color-pergamino-building");
+    expect(buildings?.strokeToken).toBe("--color-pergamino-building-edge");
+    expect(buildings?.widthPx).toBeGreaterThan(0);
+  });
+
+  it("draws boundaries from the boundaries data layer as a thin dashed line", () => {
+    const boundaries = PERGAMINO_LAYERS.find((l) => l.id === "boundaries");
+    expect(boundaries).toBeDefined();
+    expect(boundaries?.dataLayer).toBe("boundaries");
+    expect(boundaries?.geometry).toBe("line");
+    expect(boundaries?.strokeToken).toBe("--color-pergamino-boundary");
+    expect(boundaries?.dashPx?.length).toBeGreaterThan(0);
+  });
+
+  it("draws landuse, then buildings, then boundaries -- below the roads and above earth/water", () => {
+    const ids = PERGAMINO_LAYERS.map((l) => l.id);
+    const waterIndices = ids
+      .map((id, i) => (id.startsWith("water") ? i : -1))
+      .filter((i) => i !== -1);
+    const roadIndices = ids
+      .map((id, i) => (id.startsWith("road-") ? i : -1))
+      .filter((i) => i !== -1);
+    const landuseIndices = ["green", "civic", "works", "cemetery", "aeroway"].map((group) =>
+      ids.indexOf(`landuse-${group}`),
+    );
+    const buildingsIndex = ids.indexOf("buildings");
+    const boundariesIndex = ids.indexOf("boundaries");
+
+    // landuse -> buildings -> boundaries, in that order
+    expect(Math.max(...landuseIndices)).toBeLessThan(buildingsIndex);
+    expect(buildingsIndex).toBeLessThan(boundariesIndex);
+
+    // the whole trio sits after earth/water and before the roads
+    expect(Math.min(...landuseIndices)).toBeGreaterThan(Math.max(...waterIndices));
+    expect(boundariesIndex).toBeLessThan(Math.min(...roadIndices));
+  });
+
+  it("still has unique ids with the new layers added", () => {
+    const ids = PERGAMINO_LAYERS.map((l) => l.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
 
