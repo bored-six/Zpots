@@ -37,7 +37,7 @@ function HomeContent() {
   const [activeCard, setActiveCard] = useState<SpotCard | null>(null);
 
   return (
-    <div className="flex h-dvh w-full flex-col lg:flex-row">
+    <div className="flex h-[calc(100dvh-4rem)] w-full flex-col lg:h-dvh lg:flex-row">
       <div className="min-h-0 w-full flex-1 lg:w-[480px] lg:flex-none lg:border-r lg:border-stone">
         <SpotsDeck onActiveCardChange={setActiveCard} />
       </div>
