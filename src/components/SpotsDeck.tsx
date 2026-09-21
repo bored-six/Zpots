@@ -18,7 +18,7 @@ import { confirmSpot, fetchMyConfirmedSpotIds, reportSpot } from "@/lib/spots-re
 import { useLocation } from "@/lib/use-location";
 import type { ReportReason } from "@/lib/validation";
 
-type Lane = "cerca" | "nuevo" | "siguiendo";
+type Lane = "cerca" | "nuevo" | "siguiendo" | "famosos";
 
 /**
  * Where an `activeIndex` change came from -- the deck's own arrow keys, a
@@ -35,7 +35,7 @@ interface ActiveMove {
   origin: ActiveMoveOrigin;
 }
 
-const LANES: readonly Lane[] = ["cerca", "nuevo", "siguiendo"];
+const LANES: readonly Lane[] = ["cerca", "nuevo", "siguiendo", "famosos"];
 const PAGE_SIZE = 10;
 /** Prefetch the next page once the active card is this close to the end. */
 const PREFETCH_THRESHOLD = 3;
@@ -62,11 +62,11 @@ const ACTIVE_VISIBILITY_THRESHOLD = 0.6;
 const PROGRAMMATIC_SCROLL_SETTLE_MS = 600;
 
 const TAB_BASE_CLASS =
-  "min-h-10 rounded-full px-4 py-1.5 text-sm font-bold uppercase tracking-wide transition";
+  "min-h-10 shrink-0 rounded-full px-4 py-1.5 text-sm font-bold uppercase tracking-wide transition";
 const TAB_ACTIVE_CLASS = "bg-teal text-cream";
 const TAB_INACTIVE_CLASS = "bg-transparent text-stone-deep hover:bg-cream-deep";
 
-function laneCopyKey(lane: Lane): "cerca" | "nuevo" | "siguiendo" {
+function laneCopyKey(lane: Lane): "cerca" | "nuevo" | "siguiendo" | "famosos" {
   return lane;
 }
 
@@ -185,6 +185,8 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
     });
   }
 
+  // Famosos needs no account (famosos-lane.md Task 2) -- this stays scoped
+  // to "siguiendo" on purpose, no branch to add here.
   const showSignInGate = lane === "siguiendo" && auth.status === "signed-out";
 
   /**
@@ -208,12 +210,16 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
 
   // Load the active lane's first page whenever the lane, sign-in state, or
   // (for Cerca) the resolved coordinates change -- or Retry is pressed
-  // after a failed load (retryToken).
+  // after a failed load (retryToken). The coordinate deps double as
+  // Famosos's own distance recompute when `location` resolves after mount;
+  // no dependency-array change was needed to add that lane.
   useEffect(() => {
     let cancelled = false;
     fetchingMoreRef.current = false;
 
     async function loadFirstPage() {
+      // Famosos needs no account -- this early return stays scoped to
+      // "siguiendo" on purpose, no branch to add here.
       if (lane === "siguiendo" && auth.status === "signed-out") {
         setCards([]);
         setIsPreview(false);
@@ -233,15 +239,25 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
           result = await feedCerca(location.coords.lat, location.coords.lng, PAGE_SIZE, 0);
         } else if (lane === "nuevo") {
           result = await feedNuevo(PAGE_SIZE);
+        } else if (lane === "famosos") {
+          // The curated famous-spots set (src/lib/preview-spots.ts) *is*
+          // this lane's real content, not a fallback for an empty one --
+          // fetched synchronously (no network round trip) and never routed
+          // through the preview-fallback branch below, so Famosos can never
+          // fall back onto itself.
+          result = previewCards({ lat: location.coords.lat, lng: location.coords.lng });
         } else {
           result = await feedSiguiendo(PAGE_SIZE);
         }
         if (cancelled) return;
-        if (result.length === 0 && lane !== "siguiendo") {
+        if (result.length === 0 && lane !== "siguiendo" && lane !== "famosos") {
           // Preview fallback: a public lane with nothing in it yet shows the
           // famous-places preview (src/lib/preview-spots.ts) so a first
           // visit still has something to swipe. Siguiendo stays empty on
-          // purpose (you follow nobody), and a failed load stays an error.
+          // purpose (you follow nobody), Famosos is excluded because its
+          // own "result" already *is* the preview set (see above -- an
+          // empty preview set would otherwise re-enter this branch and
+          // double up), and a failed load stays an error.
           setCards(previewCards({ lat: location.coords.lat, lng: location.coords.lng }));
           setIsPreview(true);
           moveActiveIndexTo(0);
@@ -250,7 +266,8 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
         }
         setCards(result);
         moveActiveIndexTo(consumeDeepLink(result) ?? 0);
-        setHasMore(result.length >= PAGE_SIZE);
+        // Famosos is a fixed-size curated set -- there is never a next page.
+        setHasMore(lane === "famosos" ? false : result.length >= PAGE_SIZE);
       } catch {
         if (cancelled) return;
         setCards([]);
@@ -299,7 +316,10 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
   }, [cards, activeIndex, onActiveCardChange]);
 
   // Prefetch the next page once the active card is within
-  // PREFETCH_THRESHOLD of the end of what's loaded.
+  // PREFETCH_THRESHOLD of the end of what's loaded. Famosos is excluded via
+  // `hasMore` being permanently false for that lane (set above) rather than
+  // a branch here -- its curated set is fixed-size, so there is never a
+  // next page to prefetch and no feed function to call.
   useEffect(() => {
     if (loading || !hasMore || cards.length === 0 || fetchingMoreRef.current) return;
     if (cards.length - activeIndex > PREFETCH_THRESHOLD) return;
@@ -546,7 +566,22 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
       onKeyDown={handleKeyDown}
       className="relative flex h-full w-full flex-col outline-none"
     >
-      <div className="flex items-center gap-2 border-b border-stone bg-cream-deep px-4 py-2">
+      {/*
+        Four pills (Cerca/Nuevo/Siguiendo/Famosos) no longer fit a 375px
+        viewport at their natural width -- "Siguiendo" alone is already the
+        widest label, and a fourth same-size pill pushes the row past
+        available space. Scrolling horizontally (flex-nowrap +
+        overflow-x-auto, each pill shrink-0) was chosen over shrinking the
+        pills: the stacked cv/en text inside each pill (Bilingual
+        layout="stack") is already tight, and compressing padding or font
+        size further risked clipping "Siguiendo"/"Famosos" or breaking the
+        44px min-h-10 tap target. A native scroll strip keeps every label
+        fully legible at its intended size.
+      */}
+      <div
+        data-testid="lane-tabs"
+        className="flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-stone bg-cream-deep px-4 py-2"
+      >
         {LANES.map((laneKey) => (
           <button
             key={laneKey}
@@ -573,6 +608,14 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
         </p>
       )}
 
+      {/*
+        Famosos deliberately keeps the Hoy row: `lane !== "nuevo"` already
+        includes it, matching the existing precedent that a preview-fallback
+        Cerca/Nuevo lane still shows Hoy even though the cards on screen
+        aren't the tapped person's own feed -- a Hoy tap that can't find its
+        spotId in `cards` (findIndex returns -1) is already a no-op in
+        handleHoySelect, so this is harmless even when it doesn't apply.
+      */}
       {lane !== "nuevo" && !showSignInGate && <HoyRow entries={hoyEntries} onSelect={handleHoySelect} />}
 
       <div className="relative min-h-0 flex-1">

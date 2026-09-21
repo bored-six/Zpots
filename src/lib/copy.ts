@@ -31,6 +31,11 @@ export const COPY = {
   cerca: { cv: "Cerca", en: "Near me" },
   nuevo: { cv: "Nuevo", en: "New" },
   siguiendo: { cv: "Siguiendo", en: "Following" },
+  // famosos-lane.md PRD (Task 2) -- 4th lane, the curated famous-Zamboanga
+  // spots set (src/lib/preview-spots.ts). "Famous" deliberately avoids
+  // substring overlap with "new"/"near me"/"following" so the frozen
+  // English-name-regex tab tests keep resolving one button each.
+  famosos: { cv: "Famosos", en: "Famous" },
   hoy: { cv: "Hoy", en: "Today" },
   miMapa: { cv: "Mi mapa", en: "My map" },
   gente: { cv: "Gente", en: "People" },
