@@ -3,7 +3,7 @@
 **Ticket:** None (ad-hoc request, 2026-09-20)
 **Status:** Complete (live in the app; one label-collision polish item open)
 **Created:** 2026-09-20
-**Last Updated:** 2026-09-20
+**Last Updated:** 2026-09-21 (blob bug fix + depth: buildings/landuse/boundaries -- see Change Log)
 **Supersedes (partially):** the raster-tile + CSS-tint decision in `.claude/prds/ciudad-latina-redesign.md`
 
 ---
@@ -344,11 +344,19 @@ export const PERGAMINO_WEIGHTS = {
 
 export interface PergaminoLayer {
   id: string;                        // "earth" | "water-fill" | "road-major" | …
-  dataLayer: string;                 // Protomaps tile layer: earth | water | roads
+  dataLayer: string;                 // Protomaps tile layer: earth | water | roads | landuse | buildings | boundaries
+  // Load-bearing, not documentation (see "Blob bug and depth fix" below):
+  // buildPaintRules (BasemapLayer.tsx) turns this into a real filter
+  // against the feature's own geomType, using the protomaps.GeomType enum
+  // handed to it by its caller. Originally this field was consulted only
+  // to pick a symbolizer class, which is what let LineStrings in the
+  // "water" layer (rivers, straits) reach PolygonSymbolizer.draw and get
+  // closed into filled blobs.
   geometry: "polygon" | "line";
   fillToken?: PergaminoTokenName;
   strokeToken?: PergaminoTokenName;
   widthPx?: number;
+  dashPx?: readonly number[];        // LineSymbolizer's dash pattern, e.g. boundaries
   minZoom?: number;
   match?: (props: Record<string, unknown>) => boolean;
 }
@@ -357,6 +365,9 @@ export interface PergaminoLayer {
 export const PERGAMINO_LAYERS: readonly PergaminoLayer[];
 
 export function roadClass(props: Record<string, unknown>): RoadClass | null;
+
+export type LanduseGroup = "green" | "civic" | "works" | "cemetery" | "aeroway";
+export function landuseGroup(props: Record<string, unknown>): LanduseGroup | null;
 ```
 
 **Road mapping.** The user's palette is written in OSM terms; the Protomaps v4 schema normalises
@@ -389,10 +400,18 @@ Other ground rules:
 | `earth` | `earth` | polygon | fill land, stroke coast @ 1.3 px — the coastline *is* the earth polygon's edge in this schema; there is no separate coastline layer |
 | `water-fill` | `water` | polygon | fill sea, no stroke |
 | `water-line` | `water` | line, `kind ∈ {river, stream}` | stroke river @ 1.2 px, minZoom 13 |
+| `landuse-green` / `-civic` / `-works` / `-cemetery` / `-aeroway` | `landuse` | polygon, grouped by `landuseGroup(kind)` | fill only, one token per group; an unrecognised `kind` matches none of the five and is not painted |
+| `buildings` | `buildings` | polygon | fill + hairline stroke, minZoom 14 |
+| `boundaries` | `boundaries` | line | thin dashed stroke, no `minZoom` |
 | `road-*` | `roads` | line | per the table above |
 
 Background colour of the map canvas is **sea**, not land: Zamboanga is coastal, and the `earth`
 polygon paints land over it.
+
+Draw order, bottom to top: `earth` → `water-fill` → `water-line` → the five `landuse-*` layers →
+`buildings` → `boundaries` → `road-minor` → `road-street` → `road-arterial` → `road-major` — i.e.
+landuse/buildings/boundaries sit below the roads and above the ground, in that order among
+themselves (see "Blob bug and depth fix" below).
 
 ### Palette (`src/lib/pergamino-palette.ts`)
 
@@ -401,6 +420,10 @@ export const PERGAMINO_TOKEN_NAMES = [
   "--color-pergamino-land", "--color-pergamino-sea", "--color-pergamino-coast",
   "--color-pergamino-major", "--color-pergamino-arterial", "--color-pergamino-street",
   "--color-pergamino-minor", "--color-pergamino-river",
+  // Depth (Blob bug and depth fix, below): landuse groups, buildings, boundaries.
+  "--color-pergamino-green", "--color-pergamino-civic", "--color-pergamino-works",
+  "--color-pergamino-cemetery", "--color-pergamino-aeroway", "--color-pergamino-building",
+  "--color-pergamino-building-edge", "--color-pergamino-boundary",
 ] as const;
 
 export type PergaminoTokenName = (typeof PERGAMINO_TOKEN_NAMES)[number];
@@ -431,6 +454,16 @@ is the narrowest way to get one.
 --color-pergamino-street:   #c5a87d;
 --color-pergamino-minor:    #d5c09a;
 --color-pergamino-river:    #a9b79e;
+
+/* Depth (Blob bug and depth fix, below): landuse groups, buildings, boundaries. */
+--color-pergamino-green:         #cbd0a8;
+--color-pergamino-civic:         #e2d3c4;
+--color-pergamino-works:         #dfd1ac;
+--color-pergamino-cemetery:      #ccc9ac;
+--color-pergamino-aeroway:       #e4d9c0;
+--color-pergamino-building:      #dccaa3;
+--color-pergamino-building-edge: #bfa574;
+--color-pergamino-boundary:      #a58d64;
 ```
 
 ### Place labels (`src/lib/places.ts` + `src/data/zamboanga-places.ts`)
@@ -743,8 +776,9 @@ jsdom, so `BasemapLayer` renders nothing and `PlaceLabelsLayer` does nothing.
   outline, `CityMask`, pin icons, or popup markup.
 - Any automated pipeline to refresh the `.pmtiles` archive on a schedule. It is cut by hand; note
   the build date in the PRD's change log when it is.
-- Buildings, landuse, landcover, boundaries, POI icons, contours, hillshade. Ground and lettering
-  only.
+- Landcover, POI icons, contours, hillshade. **Buildings, landuse and boundaries are now in
+  scope** (see the "Blob bug and depth fix" Change Log entry below) — this line originally
+  excluded them, which is now wrong; ground, depth, and lettering only.
 - Offline caching / service worker.
 - MapLibre GL. Recorded as a fallback in D1; not built.
 
@@ -853,3 +887,9 @@ already drawing over the raster ground.
 | 2026-09-20 | T3.6 added after live visual check: the tile-pane tint is now scoped to `[data-basemap="raster"]`, set by `BasemapLayer` on the map container. | `protomaps-leaflet` subclasses `L.GridLayer`, so the vector canvas rendered into the same pane and was being pushed through the raster fallback's sepia filter, washing out a palette chosen outright. Not caught by any test; found by looking at the real map. |
 | 2026-09-20 | T4.1 resolved against the T1.6 decision: the 4.2MB archive is committed to `public/basemap/` rather than uploaded to Supabase Storage. | The decision assumed 8-40MB. At 4.2MB the plan's own fallback is the better trade, and the only credential on the machine is the public anon key, which cannot create a bucket or upload. The env var keeps the move reversible. |
 | 2026-09-20 | T5.1 verified: desktop and 375px, both the full map and the card inset report `pergamino` mode with no fallback chip. | Checkpoint. |
+
+## Blob bug and depth fix (post-launch)
+
+| 2026-09-21 | `PergaminoLayer.geometry` made load-bearing: `buildPaintRules` now emits a real `filter` per rule, combining a geometry-type guard (against `protomaps.GeomType`, handed in via the same lazily-imported module) with the existing `layer.match(props)`. | `geometry` was documentation-only — it picked a symbolizer class and nothing else. protomaps-leaflet's painter has no geometry dispatch of its own: it hands every feature in a data layer to the symbolizer's `draw()`, and `PolygonSymbolizer.draw` always does `beginPath()` -> `fill()`, which canvas implicitly closes. Every LineString in the `water` layer (rivers, streams, straits, canals — measured at 60 per z13 tile in the real archive) was therefore being closed into a shape and filled as sea: the "blob" the user reported. The official Protomaps style guards `water`/`earth` with `["==", "$type", "Polygon"]`; this is that guard, restored. `layer.match` (pergamino-style.ts) only ever sees a feature's `props`, never its geometry, so this couldn't be expressed there — `pergamino-style.ts` stays free of any Leaflet/protomaps-leaflet import (test 13), and the fix lives in `BasemapLayer.tsx`, where the real `GeomType` enum is available. `PergaminoLayer` gained an optional `dashPx?: readonly number[]` field for `boundaries`' dashed stroke. Two existing faithful `vi.mock("protomaps-leaflet", ...)` doubles (`BasemapLayer.test.tsx`, `BasemapLayer.container-attr.test.tsx`) were extended with `GeomType: { Point: 1, Line: 2, Polygon: 3 }` to stay faithful, same pattern as the T3.3 mock-extension entry above. |
+| 2026-09-21 | Nine layers now drawn instead of three: five `landuse-*` layers (grouped by `landuseGroup(kind)` into green/civic/works/cemetery/aeroway — an unrecognised `kind` matches none of the five and is not painted, never a catch-all), `buildings` (fill + hairline stroke, minZoom 14) and `boundaries` (thin dashed stroke), inserted into `PERGAMINO_LAYERS` below the roads and above earth/water, in that order (landuse -> buildings -> boundaries). Eight new `--color-pergamino-*` tokens added to `globals.css`, mirrored in `pergamino-palette.ts`'s `PERGAMINO_TOKEN_NAMES`/`PERGAMINO_FALLBACK_HEX`, and pinned by `pergamino-tokens.test.ts`. | The map only painted ground (earth/water/roads) and read as flat next to a real map — a single z15 tile over Zamboanga carries 382 buildings and 42 landuse polygons the map was simply not drawing. This also retires the "Out of scope" line that excluded buildings/landuse/boundaries; it is now wrong and has been struck through in that section, with a pointer back to this entry. |
+| 2026-09-21 | Colour-distinction note, not a defect: `--color-pergamino-civic` (`#e2d3c4`) and `--color-pergamino-aeroway` (`#e4d9c0`) are close enough in the parchment family that they may be hard to tell apart at a glance on a small phone screen; both are deliberately warm/pale since hospitals, schools and airfields are all "institutional" ground in this style. Not retuned without a stated design reason, per the "Original requirements" rule at the top of this PRD — flagged for a human look at T5.1-style verification rather than silently adjusted. | Caught while choosing the eight new hex values; recorded so nobody re-derives the same close call. |
