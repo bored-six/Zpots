@@ -304,6 +304,8 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
     confirmations: 2,
     createdAt: PREVIEW_CREATED_AT,
     author: PREVIEW_AUTHOR,
+    photoUrl: "https://upload.wikimedia.org/wikipedia/commons/b/be/Barter_goods_1022.jpg",
+    photoCredit: "LuzViMindaLife, CC BY-SA 4.0, Wikimedia Commons",
   },
 ];
 

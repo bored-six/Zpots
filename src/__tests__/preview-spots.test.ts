@@ -67,10 +67,19 @@ describe("PREVIEW_SPOTS -- data contract", () => {
       expect(spot.photoUrl).toMatch(/^https:\/\//);
       expect(spot.photoCredit?.trim().length ?? 0).toBeGreaterThan(0);
     }
-    // Duyan Spot, Muruk Haven, Yakan Weaving Village, Canelar Barter Trade
-    // Center are real, user-named spots with verified coordinates but no
-    // freely-licensed photo.
-    expect(withoutPhoto).toBe(4);
+    // Duyan Spot, Muruk Haven, Yakan Weaving Village are real, user-named
+    // spots with verified coordinates but no freely-licensed photo. Canelar
+    // Barter Trade Center gained one (see the dedicated test below).
+    expect(withoutPhoto).toBe(3);
+  });
+
+  it("has a photo and credit for Canelar Barter Trade Center", () => {
+    const canelar = PREVIEW_SPOTS.find((spot) => spot.id === "preview-canelar-barter-trade-center");
+    expect(canelar).toBeDefined();
+    expect(canelar?.photoUrl).toBe(
+      "https://upload.wikimedia.org/wikipedia/commons/b/be/Barter_goods_1022.jpg",
+    );
+    expect(canelar?.photoCredit).toBe("LuzViMindaLife, CC BY-SA 4.0, Wikimedia Commons");
   });
 
   it("is authored by the shared preview account, which is not a real profile", () => {
