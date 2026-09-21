@@ -107,3 +107,50 @@ Three real failures hitting a live project with migration 0004, worth not repeat
 - **Plan assumptions about mocks need checking per file.** The spec asserted no existing `react-leaflet` mock would need changing because the map stays null in jsdom. True only for the files that never forward a live ref; the ones that do exercise click and fitBounds wiring broke immediately.
 - **Parallel agents in one tree work if none of them touch git.** Ten tasks ran as five-then-two-then-two concurrent agents, each forbidden from `git add`/`commit`, with the orchestrator committing per task from a known file list afterwards. No index races, and commits stayed atomic. This is the answer to the earlier "two coder agents merged two tasks into one commit" anti-pattern.
 - **Give each parallel agent a disjoint file list and say who owns what.** Where a Wave 1 task genuinely needed a type from a sibling task's unwritten file, the agent correctly deferred one assertion rather than improvising scope; that deferral then had to be tracked and backfilled, so it is cheaper to order such pairs across waves than to call them independent.
+
+## [2026-09-21] - Motion pass (paseo-motion): mocked layers hide real bugs
+
+**Anti-pattern: a green suite means nothing when the test mocks the layer the bug lives in.**
+Two review rounds each found ship-blocking bugs behind a fully green 1245-test suite. Both times
+the test mocked out exactly the mechanism that was broken:
+- `MapInsetInner.just-confirmed.test.tsx` / `SpotMap.just-confirmed.test.tsx` mocked react-leaflet's
+  `Marker` as `<div data-testid="marker" />`, dropping the `icon` prop — so they could not see that
+  inline `createPinIcon(...)` in JSX allocated a new `L.DivIcon` every render, which react-leaflet
+  reference-compares and Leaflet answers with `div.innerHTML = options.html`, restarting the
+  one-shot halo animation. Fix: mocks now capture the `icon` prop by reference and assert identity
+  stability across unrelated re-renders.
+- `SpotsDeck.motion.test.tsx` had a test literally titled "does not fight a programmatic move" that
+  never fired an intersection event mid-gesture. It tested nothing.
+
+**Rule:** when mocking a library boundary, ask what the real library does with the value you are
+dropping. If the answer is "compares it by reference" or "writes it to the DOM", the mock has
+erased the contract.
+
+**Anti-pattern: animating on a state value instead of a transition.** `ConfirmButton` fired the
+"earned" confirm animation whenever `status === "confirmed"`. Because `SpotsDeck` mounts/unmounts
+cards in a ±2 window, scrolling past an old confirmed spot replayed it every time. A one-shot
+celebration must be driven by the `false → true` transition on a mounted instance
+(`src/lib/use-just-confirmed.ts`), never by the current value.
+
+**Pattern: `IntersectionObserver` only fires on threshold crossings.** Any guard that waits for a
+specific element's crossing can stick forever if the user lands somewhere else — nothing arrives to
+self-correct. Guards need a reconciliation path, not just a timeout that nulls a ref. Cancelling on
+`wheel`/`touchstart`/`pointerdown` works because `scrollIntoView` never dispatches those, so they
+are an unambiguous "the user took over" signal.
+
+**Gotcha: `useMemo` cannot memoize per item inside a `.map()`.** `SpotMap` needed a `useRef`-backed
+cache (`usePinIconCache`) keyed on the inputs the icon actually consumes. Bounded because the spot
+arrays are a bounded per-city fetch, not infinite scroll.
+
+**Verified, contrary to expectation: `var()` DOES resolve in an SVG presentation attribute.**
+`setAttribute('stroke', 'var(--color-terracotta)')` computes correctly in Chromium 152, same as
+setting it as a CSS property. Leaflet `pathOptions={{ color: "var(--...)" }}` therefore works.
+
+**Repo constraint worth remembering:** `theme-tokens.test.ts` regex-parses `globals.css` with
+`/\.SELECTOR\s*\{([^}]*)\}/` for `.vinta-rule`, `.leaflet-container`, `.leaflet-tile-pane` — a
+nested block inside any of those three breaks the match. It also bans any `--zpots-` prefixed
+custom property outright.
+
+**Process note:** the dev server from a parallel session served a stale HMR chunk throwing
+`getSlotRef is not defined` long after the source stopped referencing it. `npm run build` is the
+authoritative check when a console error contradicts clean source.
