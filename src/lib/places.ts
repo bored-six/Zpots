@@ -1,9 +1,11 @@
 /**
  * Types and visibility logic for the curated place-name labels drawn on the
- * Pergamino map (see .claude/prds/pergamino-map.md, D2). Labels never come
- * from the vector tile data -- `labelRules: []` is passed to
- * protomaps-leaflet -- so the label count and staging are entirely
- * controlled here, by hand, by zoom.
+ * Pergamino map (see .claude/prds/pergamino-map.md, D2). Most map naming
+ * (settlement, district, street, POI) now comes from the tile archive's
+ * own labelRules (`buildLabelRules`, BasemapLayer.tsx) -- this module and
+ * `src/data/zamboanga-places.ts` are left for the small, deliberate
+ * exception list of names the tiles don't carry (currently: two
+ * Spanish/Chavacano water names). See the PRD's Change Log for why.
  */
 
 export type PlaceKind = "landmark" | "barangay" | "water";

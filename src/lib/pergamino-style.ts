@@ -24,7 +24,7 @@ export const PERGAMINO_WEIGHTS = {
 export interface PergaminoLayer {
   /** Unique id, e.g. "earth" | "water-fill" | "road-major". */
   id: string;
-  /** Protomaps tile layer this rule reads from: earth | water | roads | landuse | buildings | boundaries. */
+  /** Protomaps tile layer this rule reads from: earth | water | roads | landuse | buildings | boundaries | pois. */
   dataLayer: string;
   /**
    * Which geometry type this rule paints. Load-bearing, not documentation:
@@ -32,13 +32,17 @@ export interface PergaminoLayer {
    * against the feature's own `geomType`, so a LineString in a polygon
    * data layer (a river closed into a shape, for instance) is rejected
    * before it ever reaches a symbolizer. See pergamino-map.md, "Step 1".
+   * "point" was added for the `pois` ground layer (see "Step 3" below) --
+   * a `protomaps.CircleSymbolizer`, not Polygon/Line.
    */
-  geometry: "polygon" | "line";
+  geometry: "polygon" | "line" | "point";
   fillToken?: PergaminoTokenName;
   strokeToken?: PergaminoTokenName;
   widthPx?: number;
   /** Line dash pattern in px (LineSymbolizer's `dash` option), e.g. boundaries. */
   dashPx?: readonly number[];
+  /** Circle radius in px (CircleSymbolizer's `radius` option) -- point geometry only. */
+  radiusPx?: number;
   minZoom?: number;
   match?: (props: Record<string, unknown>) => boolean;
 }
@@ -112,9 +116,25 @@ export function roadClass(props: Record<string, unknown>): RoadClass | null {
   return null;
 }
 
-function isWaterLine(props: Record<string, unknown>): boolean {
+/**
+ * True for the `water` layer's named line features (rivers, streams) --
+ * shared by the `water-line` paint rule below and the matching label rule
+ * in `buildLabelRules` (BasemapLayer.tsx), so a river is drawn and named
+ * from the same definition of "this is a river line", not two.
+ */
+export function isWaterLine(props: Record<string, unknown>): boolean {
   const kind = typeof props?.kind === "string" ? props.kind : undefined;
   return kind === "river" || kind === "stream";
+}
+
+/**
+ * True for a `pois` layer feature carrying a real (non-empty) `name` --
+ * the ground dot (Step 3) only marks named points; an unnamed feature
+ * (a lone "tree", a "crossing") would just be noise at close zoom. Never
+ * throws, regardless of what shape `props` is (mirrors `roadClass`).
+ */
+export function poiHasName(props: Record<string, unknown>): boolean {
+  return typeof props?.name === "string" && props.name.trim().length > 0;
 }
 
 /**
@@ -173,7 +193,9 @@ export function landuseGroup(props: Record<string, unknown>): LanduseGroup | nul
  * Draw order, first painted first (bottom) to last (top): earth, then water
  * fill, then rivers, then landuse / buildings / boundaries (below the roads,
  * above the ground -- Step 2), then roads thinnest (minor) to thickest
- * (major) -- thin roads under thick ones, every road over the ground.
+ * (major) -- thin roads under thick ones, every road over the ground --
+ * then, last of all, the named `pois` dots (Step 3), so a point of
+ * interest always sits on top of the street it's next to, never under it.
  */
 export const PERGAMINO_LAYERS: readonly PergaminoLayer[] = [
   {
@@ -290,5 +312,20 @@ export const PERGAMINO_LAYERS: readonly PergaminoLayer[] = [
     strokeToken: "--color-pergamino-major",
     widthPx: PERGAMINO_WEIGHTS.major,
     match: (props) => roadClass(props) === "major",
+  },
+  // Named points of interest (Step 3 -- the label pass this belongs with,
+  // see .claude/prds/pergamino-map.md). A small dot, close zoom only: 361
+  // features can land in a single close tile, so this only earns its
+  // place once buildings/streets are already legible (minZoom 15) and
+  // only for features that actually carry a name -- an unnamed "tree" or
+  // "crossing" point would just be noise.
+  {
+    id: "pois",
+    dataLayer: "pois",
+    geometry: "point",
+    fillToken: "--color-pergamino-poi",
+    radiusPx: 1.4,
+    minZoom: 15,
+    match: poiHasName,
   },
 ];

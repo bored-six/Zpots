@@ -50,6 +50,12 @@
   --color-pergamino-building: #dccaa3;
   --color-pergamino-building-edge: #bfa574;
   --color-pergamino-boundary: #a58d64;
+
+  /* "Pergamino" Step 3 -- the named-pois ground dot (see
+     .claude/prds/pergamino-map.md). Map lettering itself reuses
+     --color-ink / --color-stone-deep / --color-teal-deep / --color-cream
+     above, not a new token -- only the dot gets one. */
+  --color-pergamino-poi: #6b4a2c;
 }
 
 /* `inline` because these point at the CSS variables next/font injects on
@@ -129,7 +135,30 @@ select:focus-visible,
   );
 }
 
+/* `isolation: isolate` forces this element to open its own stacking
+   context even though it sets no `position`/`z-index` of its own. Without
+   it, Leaflet's internal panes (tile pane z-index 200 through popup pane
+   z-index 700 -- see leaflet's own CSS) compete directly against every
+   other z-indexed element in the *page's* stacking context, including
+   AppNav's fixed bottom bar (`z-40`, src/components/AppNav.tsx). On a
+   phone-height map, `.leaflet-container` can span the same y-range as the
+   nav, and 200 beats 40, so the map painted over the nav and it went
+   invisible. `position: relative; z-index: 0` would create a stacking
+   context too, but `isolation: isolate` does the same job without
+   introducing a `position` this element didn't already need and without
+   asserting a `z-index` value that then has to be kept in sync with
+   AppNav's -- the only ordering that matters is that AppNav's `z-40`
+   creates its own context *outside* this one, not what number this
+   context's floor is. Every element that's supposed to float above the
+   map (SpotMap.tsx's FAB, banners, overlay, SignInPrompt; HandleGate;
+   PostFlow's toast) already renders as a JSX sibling of `MapContainer`,
+   not a child of it, so none of them are descendants of this element and
+   none of them get trapped by this new context -- only Leaflet's own
+   panes, controls and popups live inside `.leaflet-container`, and their
+   ordering *relative to each other* is unaffected by isolating the whole
+   group from the rest of the page. */
 .leaflet-container {
+  isolation: isolate;
   background: var(--color-cream-deep);
   font-family: var(--font-body);
 }
@@ -154,12 +183,21 @@ select:focus-visible,
   filter: sepia(0.55) saturate(0.55) brightness(1.06) contrast(0.9) hue-rotate(-8deg);
 }
 
-/* Place labels ("Pergamino" lettering) -- Leaflet divIcon markers created
-   by createPlaceLabelIcon (src/lib/place-label-icon.ts), rendered on the
+/* Curated place labels -- Leaflet divIcon markers created by
+   createPlaceLabelIcon (src/lib/place-label-icon.ts), rendered on the
    dedicated "placeLabels" pane (PlaceLabelsLayer.tsx, z-index 450: above
    the city mask, below spot pins). iconSize is [0, 0] so the marker box
    contributes no chrome of its own -- the inner span is the whole label
-   and centers itself on the anchor point via translateX(-50%). */
+   and centers itself on the anchor point via translateX(-50%).
+
+   Since the labels reversal (.claude/prds/pergamino-map.md Change Log),
+   this is a small exception list (currently: two water names with no tile
+   equivalent), not the map's naming system -- the tile-drawn canvas
+   labels (buildLabelRules, BasemapLayer.tsx) reuse these same three
+   typefaces directly in canvas `font` strings, not these classes; the
+   --landmark/--barangay modifiers below stay declared (and tested by
+   place-label-icon.test.ts) for createPlaceLabelIcon's general contract,
+   even though ZAMBOANGA_PLACES currently only ever supplies "water". */
 .zpots-place-label {
   background: none;
   border: 0;

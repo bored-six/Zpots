@@ -41,6 +41,10 @@ function createFakeProtomaps(): FakeProtomapsModule {
     LineSymbolizer: vi.fn().mockImplementation(function (options: unknown) {
       return { kind: "line", options };
     }),
+    // The pois ground dot (Step 3) -- geometry: "point".
+    CircleSymbolizer: vi.fn().mockImplementation(function (options: unknown) {
+      return { kind: "circle", options };
+    }),
   } as unknown as FakeProtomapsModule;
 }
 
@@ -101,6 +105,20 @@ describe("buildPaintRules -- real geometry-type filter (the blob bug)", () => {
       false,
     );
     expect(rule?.filter?.(15, featureWith(GeomType.Line, { kind: "highway" }))).toBe(true);
+  });
+
+  it("pois' filter rejects a Polygon feature and accepts a Point feature carrying a name", () => {
+    const protomaps = createFakeProtomaps();
+    const rules = buildPaintRules(protomaps, PERGAMINO_FALLBACK_HEX);
+    const pois = rules.find((rule) => rule.id === "pois");
+
+    expect(pois).toBeDefined();
+    expect(pois?.filter?.(15, featureWith(GeomType.Polygon, { name: "Fort Pilar" }))).toBe(
+      false,
+    );
+    expect(pois?.filter?.(15, featureWith(GeomType.Point, { name: "Fort Pilar" }))).toBe(true);
+    // Right geometry, no name -- still rejected (poiHasName).
+    expect(pois?.filter?.(15, featureWith(GeomType.Point, {}))).toBe(false);
   });
 
   it("water-line still applies its own props match on top of the geometry guard", () => {

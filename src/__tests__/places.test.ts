@@ -7,16 +7,33 @@ import { isInsideCityOutline } from "@/lib/city-outline";
 import { isWithinZamboangaCity } from "@/lib/city-bounds";
 import { MIN_ZOOM, MAX_ZOOM } from "@/lib/map-config";
 
-/** Matches the PRD's DOWNTOWN_BBOX for the "roughly eight labels" contract. */
-const DOWNTOWN_BBOX: [[number, number], [number, number]] = [
-  [6.89, 122.06],
-  [6.93, 122.1],
-];
-
 describe("ZAMBOANGA_PLACES data", () => {
   it("has unique ids", () => {
     const ids = ZAMBOANGA_PLACES.map((p) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  /**
+   * The labels reversal (.claude/prds/pergamino-map.md Change Log): every
+   * curated landmark and barangay entry duplicated a real name the
+   * archive's own `places`/`pois` layers already carry (verified directly
+   * against public/basemap/zamboanga.pmtiles) and has been retired in
+   * favour of `buildLabelRules` (BasemapLayer.tsx). Only the two water
+   * names survive, because that is the one gap the same archive query
+   * confirmed: no in-view named strait/bay, Spanish/Chavacano or
+   * otherwise. This test locks that reduced scope in, so a landmark or
+   * barangay entry can't quietly creep back in and fight the tile labels'
+   * collision index (see the PRD's Change Log for why that's a problem).
+   */
+  it("contains only the two water names with no tile equivalent -- landmark/barangay are retired", () => {
+    expect(ZAMBOANGA_PLACES).toHaveLength(2);
+    for (const place of ZAMBOANGA_PLACES) {
+      expect(place.kind).toBe("water");
+    }
+    expect(ZAMBOANGA_PLACES.map((p) => p.id).sort()).toEqual([
+      "bahia-zamboanga",
+      "mar-de-basilan",
+    ]);
   });
 
   it("every non-water place sits inside the city outline", () => {
@@ -55,19 +72,16 @@ describe("visiblePlaceLabels", () => {
     expect(visiblePlaceLabels(ZAMBOANGA_PLACES, 11)).toEqual([]);
   });
 
-  it("is the headline contract: roughly eight labels downtown at z14 (between 5 and 10)", () => {
-    const visible = visiblePlaceLabels(ZAMBOANGA_PLACES, 14, DOWNTOWN_BBOX);
-    expect(visible.length).toBeGreaterThanOrEqual(5);
-    expect(visible.length).toBeLessThanOrEqual(10);
-  });
-
-  it("shows no barangay label below z15", () => {
-    for (let zoom = MIN_ZOOM; zoom < 15; zoom++) {
-      const visible = visiblePlaceLabels(ZAMBOANGA_PLACES, zoom);
-      expect(visible.some((p) => p.kind === "barangay")).toBe(false);
-    }
-  });
-
+  /**
+   * The old "roughly eight labels downtown" headline contract lived here
+   * because the curated DOM system used to be the map's only source of
+   * names. That job now belongs to `buildLabelRules` (BasemapLayer.tsx) --
+   * density and de-cluttering are protomaps-leaflet's own built-in label
+   * collision engine's job (canvas, not jsdom-measurable) -- see
+   * BasemapLayer.label-rules.test.ts for that system's own zoom-tier
+   * coverage test. ZAMBOANGA_PLACES' only remaining job is the two water
+   * names, covered above and below.
+   */
   it("a place with maxZoom: 14 (mar-de-basilan) is absent at z15", () => {
     const marDeBasilan = ZAMBOANGA_PLACES.find((p) => p.id === "mar-de-basilan");
     expect(marDeBasilan).toBeDefined();
@@ -77,13 +91,18 @@ describe("visiblePlaceLabels", () => {
     expect(visible.some((p) => p.id === "mar-de-basilan")).toBe(false);
   });
 
-  it("a place with maxZoom: 13 (la-vieja-zamboanga) drops out at z14", () => {
-    const laViejaZamboanga = ZAMBOANGA_PLACES.find((p) => p.id === "la-vieja-zamboanga");
-    expect(laViejaZamboanga).toBeDefined();
-    expect(laViejaZamboanga?.maxZoom).toBe(13);
+  it("a place with maxZoom: 15 (bahia-zamboanga) is present at z14 and absent at z16-equivalent zoom past its floor", () => {
+    const bahia = ZAMBOANGA_PLACES.find((p) => p.id === "bahia-zamboanga");
+    expect(bahia).toBeDefined();
+    expect(bahia?.minZoom).toBe(13);
+    expect(bahia?.maxZoom).toBe(15);
 
-    const visible = visiblePlaceLabels(ZAMBOANGA_PLACES, 14);
-    expect(visible.some((p) => p.id === "la-vieja-zamboanga")).toBe(false);
+    expect(visiblePlaceLabels(ZAMBOANGA_PLACES, 14).some((p) => p.id === "bahia-zamboanga")).toBe(
+      true,
+    );
+    expect(visiblePlaceLabels(ZAMBOANGA_PLACES, 12).some((p) => p.id === "bahia-zamboanga")).toBe(
+      false,
+    );
   });
 
   it("bounds filtering is inclusive on all four edges", () => {

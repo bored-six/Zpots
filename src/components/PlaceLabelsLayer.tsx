@@ -22,6 +22,18 @@ interface PlaceLabelsLayerProps {
  * word). Rebuilds the marker set on every `zoomend`, skipping rebuilds
  * that land on the same zoom so panning doesn't churn markers.
  *
+ * Since the labels reversal (see the PRD's Change Log), this is a small
+ * exception list, not the map's naming system -- settlement, district,
+ * street, and POI names are now drawn from the tile archive itself via
+ * `buildLabelRules` (BasemapLayer.tsx), which carries protomaps-leaflet's
+ * own label collision handling. `ZAMBOANGA_PLACES` now holds only the two
+ * Spanish/Chavacano water names ("Mar de Basilán", "Bahía de Zamboanga")
+ * the archive has no in-view equivalent for -- everything that used to
+ * duplicate a real tile name (every landmark, every barangay) was retired.
+ * Because this pane and the tile canvas don't share one collision index,
+ * keeping this list short is what keeps the two systems from fighting --
+ * not a coordination mechanism between them.
+ *
  * Takes the live Leaflet map as an explicit prop rather than calling
  * `useMap()` (D4): `SpotMap` already holds the instance via
  * `ref={setLeafletMap}`, and the nine existing `react-leaflet` mocks across

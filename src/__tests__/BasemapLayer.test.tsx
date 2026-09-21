@@ -13,16 +13,38 @@ import Leaflet from "leaflet";
  * rather than as a static dependency.
  */
 
-const { leafletLayerMock, PolygonSymbolizerMock, LineSymbolizerMock } = vi.hoisted(() => ({
+const {
+  leafletLayerMock,
+  PolygonSymbolizerMock,
+  LineSymbolizerMock,
+  CircleSymbolizerMock,
+  CenteredTextSymbolizerMock,
+  LineLabelSymbolizerMock,
+  OffsetTextSymbolizerMock,
+} = vi.hoisted(() => ({
   leafletLayerMock: vi.fn(),
   PolygonSymbolizerMock: vi.fn(),
   LineSymbolizerMock: vi.fn(),
+  CircleSymbolizerMock: vi.fn(),
+  CenteredTextSymbolizerMock: vi.fn(),
+  LineLabelSymbolizerMock: vi.fn(),
+  OffsetTextSymbolizerMock: vi.fn(),
 }));
 
 vi.mock("protomaps-leaflet", () => ({
   leafletLayer: leafletLayerMock,
   PolygonSymbolizer: PolygonSymbolizerMock,
   LineSymbolizer: LineSymbolizerMock,
+  // The pois ground dot (Step 3) and the four label symbolizers
+  // buildLabelRules uses -- an unfaithful mock without these would throw
+  // "is not a constructor" the moment buildPaintRules/buildLabelRules run,
+  // not silently pass with the wrong basemap mode.
+  CircleSymbolizer: CircleSymbolizerMock,
+  CenteredTextSymbolizer: CenteredTextSymbolizerMock,
+  LineLabelSymbolizer: LineLabelSymbolizerMock,
+  OffsetTextSymbolizer: OffsetTextSymbolizerMock,
+  // Real numeric values (symbolizer.ts).
+  TextPlacements: { N: 1, Ne: 2, E: 3, Se: 4, S: 5, Sw: 6, W: 7, Nw: 8 },
   // Real numeric values (tilecache.ts): Point=1, Line=2, Polygon=3.
   // buildPaintRules reads this off the module to build its geometry-type
   // filter (pergamino-map.md, "Step 1") -- an unfaithful mock without it
@@ -44,8 +66,11 @@ vi.mock("react-leaflet", () => ({
   ),
 }));
 
-import BasemapLayer from "@/components/BasemapLayer";
-import { PERGAMINO_FALLBACK_HEX } from "@/lib/pergamino-palette";
+import * as protomapsLeaflet from "protomaps-leaflet";
+
+import BasemapLayer, { buildLabelRules } from "@/components/BasemapLayer";
+import { PERGAMINO_FONT_FALLBACK } from "@/lib/pergamino-fonts";
+import { PERGAMINO_FALLBACK_HEX, PERGAMINO_LABEL_FALLBACK_HEX } from "@/lib/pergamino-palette";
 import { PERGAMINO_LAYERS } from "@/lib/pergamino-style";
 import {
   BASEMAP_ATTRIBUTION,
@@ -96,6 +121,10 @@ beforeEach(() => {
   });
   PolygonSymbolizerMock.mockReset();
   LineSymbolizerMock.mockReset();
+  CircleSymbolizerMock.mockReset();
+  CenteredTextSymbolizerMock.mockReset();
+  LineLabelSymbolizerMock.mockReset();
+  OffsetTextSymbolizerMock.mockReset();
   probeMock.mockReset();
 });
 
@@ -124,7 +153,25 @@ describe("BasemapLayer", () => {
 
     const options = leafletLayerMock.mock.calls[0][0] as Record<string, unknown>;
     expect(options.url).toBe(BASEMAP_PMTILES_URL);
-    expect(options.labelRules).toEqual([]);
+    // labelRules: [] used to be the whole bug report (pergamino-map.md's
+    // labels reversal) -- it now carries one LabelRule per
+    // buildLabelRules tier, resolved with the same jsdom font/colour
+    // fallbacks BasemapLayer itself falls back to.
+    expect(Array.isArray(options.labelRules)).toBe(true);
+    const expectedLabelRules = buildLabelRules(
+      protomapsLeaflet,
+      PERGAMINO_FONT_FALLBACK,
+      PERGAMINO_LABEL_FALLBACK_HEX,
+    );
+    expect((options.labelRules as unknown[]).length).toBe(expectedLabelRules.length);
+    expect((options.labelRules as unknown[]).length).toBeGreaterThan(0);
+    // The webfont race fix: BasemapLayer hands protomaps-leaflet one
+    // `document.fonts.load(...)` task per face buildLabelRules draws
+    // with. jsdom has no CSS Font Loading API, so buildFontLoadTasks
+    // degrades to [] here -- verified directly, not assumed (see
+    // pergamino-fonts.test.ts) -- which is itself the guard this test
+    // locks in: `tasks` must never throw or be omitted.
+    expect(options.tasks).toEqual([]);
     expect(options.maxDataZoom).toBe(BASEMAP_MAX_DATA_ZOOM);
     expect(options.attribution).toBe(BASEMAP_ATTRIBUTION);
     expect(options.backgroundColor).toBe(PERGAMINO_FALLBACK_HEX["--color-pergamino-sea"]);

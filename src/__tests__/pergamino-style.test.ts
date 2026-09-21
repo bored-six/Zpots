@@ -5,6 +5,7 @@ import {
   PERGAMINO_LAYERS,
   PERGAMINO_WEIGHTS,
   landuseGroup,
+  poiHasName,
   roadClass,
 } from "@/lib/pergamino-style";
 import { PERGAMINO_TOKEN_NAMES } from "@/lib/pergamino-palette";
@@ -379,6 +380,56 @@ describe("PERGAMINO_LAYERS -- landuse, buildings, boundaries (Step 2)", () => {
   });
 
   it("still has unique ids with the new layers added", () => {
+    const ids = PERGAMINO_LAYERS.map((l) => l.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe("poiHasName -- named-only guard for the pois ground dot (Step 3)", () => {
+  it("true for a feature with a non-empty string name", () => {
+    expect(poiHasName({ name: "Fort Pilar" })).toBe(true);
+  });
+
+  it("false when name is missing, empty, whitespace-only, or not a string", () => {
+    expect(poiHasName({})).toBe(false);
+    expect(poiHasName({ name: "" })).toBe(false);
+    expect(poiHasName({ name: "   " })).toBe(false);
+    expect(poiHasName({ name: 42 })).toBe(false);
+    expect(poiHasName({ name: null })).toBe(false);
+  });
+
+  it("never throws on garbage", () => {
+    expect(() => poiHasName(null as unknown as Record<string, unknown>)).not.toThrow();
+    expect(() => poiHasName(undefined as unknown as Record<string, unknown>)).not.toThrow();
+  });
+});
+
+describe("PERGAMINO_LAYERS -- pois ground layer (Step 3)", () => {
+  it("draws named pois as points, from z15, with a fill and no stroke", () => {
+    const pois = PERGAMINO_LAYERS.find((l) => l.id === "pois");
+    expect(pois).toBeDefined();
+    expect(pois?.dataLayer).toBe("pois");
+    expect(pois?.geometry).toBe("point");
+    expect(pois?.minZoom).toBe(15);
+    expect(pois?.fillToken).toBe("--color-pergamino-poi");
+    expect(pois?.radiusPx).toBeGreaterThan(0);
+  });
+
+  it("its match is poiHasName -- named points only", () => {
+    const pois = PERGAMINO_LAYERS.find((l) => l.id === "pois");
+    expect(pois?.match).toBe(poiHasName);
+  });
+
+  it("sits after every road layer -- pois are drawn on top of streets, never under them", () => {
+    const ids = PERGAMINO_LAYERS.map((l) => l.id);
+    const roadIndices = ids
+      .map((id, i) => (id.startsWith("road-") ? i : -1))
+      .filter((i) => i !== -1);
+    const poisIndex = ids.indexOf("pois");
+    expect(poisIndex).toBeGreaterThan(Math.max(...roadIndices));
+  });
+
+  it("still has unique ids with the pois layer added", () => {
     const ids = PERGAMINO_LAYERS.map((l) => l.id);
     expect(new Set(ids).size).toBe(ids.length);
   });

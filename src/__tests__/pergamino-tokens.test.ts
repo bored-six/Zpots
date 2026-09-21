@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   PERGAMINO_FALLBACK_HEX,
+  PERGAMINO_LABEL_COLOR_NAMES,
+  PERGAMINO_LABEL_FALLBACK_HEX,
   PERGAMINO_TOKEN_NAMES,
 } from "@/lib/pergamino-palette";
 
@@ -51,6 +53,22 @@ const EXPECTED_GROUND_TOKENS: Record<string, string> = {
   "--color-pergamino-building": "#dccaa3",
   "--color-pergamino-building-edge": "#bfa574",
   "--color-pergamino-boundary": "#a58d64",
+  // Step 3 (pergamino-map.md): the named-pois ground dot.
+  "--color-pergamino-poi": "#6b4a2c",
+};
+
+/**
+ * The four existing "Ciudad Latina" tokens the map's lettering reuses
+ * (globals.css's own comment: "map lettering reuses --color-ink /
+ * --color-stone-deep / --color-teal-deep"), transcribed independently of
+ * PERGAMINO_LABEL_FALLBACK_HEX for the same anti-drift reason as
+ * EXPECTED_GROUND_TOKENS above.
+ */
+const EXPECTED_LABEL_TOKENS: Record<string, string> = {
+  "--color-ink": "#2a2017",
+  "--color-stone-deep": "#7a6448",
+  "--color-teal-deep": "#165259",
+  "--color-cream": "#f6eedc",
 };
 
 describe("Pergamino ground tokens (globals.css)", () => {
@@ -108,6 +126,31 @@ describe("Pergamino ground tokens (globals.css)", () => {
       );
       expect(body).not.toMatch(/#[0-9a-fA-F]{3,8}/);
       expect(body).toMatch(/var\(--color-/);
+    }
+  });
+
+  // PERGAMINO_LABEL_FALLBACK_HEX has exactly PERGAMINO_LABEL_COLOR_NAMES as
+  // its keys, and every value string-equals the "Ciudad Latina" theme block
+  // in globals.css -- the same anti-drift lock as tests 2/3, for the four
+  // colours the map's canvas lettering reuses instead of declaring its own.
+  it("PERGAMINO_LABEL_FALLBACK_HEX has exactly PERGAMINO_LABEL_COLOR_NAMES as its keys", () => {
+    const fallbackKeys = Object.keys(PERGAMINO_LABEL_FALLBACK_HEX).sort();
+    const labelNames = [...PERGAMINO_LABEL_COLOR_NAMES].sort();
+    expect(fallbackKeys).toEqual(labelNames);
+  });
+
+  it("PERGAMINO_LABEL_FALLBACK_HEX matches globals.css for every label colour", () => {
+    const css = readGlobalsCss();
+    for (const [name, hex] of Object.entries(EXPECTED_LABEL_TOKENS)) {
+      const pattern = new RegExp(
+        `${name.replace(/-/g, "\\-")}\\s*:\\s*(#[0-9a-fA-F]{3,8})\\b`,
+      );
+      const match = css.match(pattern);
+      expect(match, `${name} not declared in globals.css`).not.toBeNull();
+      expect(PERGAMINO_LABEL_FALLBACK_HEX[name as keyof typeof PERGAMINO_LABEL_FALLBACK_HEX]).toBe(
+        hex,
+      );
+      expect(match?.[1]).toBe(hex);
     }
   });
 });

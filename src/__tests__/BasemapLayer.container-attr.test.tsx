@@ -25,6 +25,15 @@ vi.mock("protomaps-leaflet", () => ({
   leafletLayer: leafletLayerMock,
   PolygonSymbolizer: PolygonSymbolizerMock,
   LineSymbolizer: LineSymbolizerMock,
+  // The pois ground dot (Step 3) and the four label symbolizers
+  // buildLabelRules uses -- an unfaithful mock without these would throw
+  // "is not a constructor" the moment buildPaintRules/buildLabelRules run,
+  // not silently pass with the wrong basemap mode (see BasemapLayer.test.tsx).
+  CircleSymbolizer: vi.fn(),
+  CenteredTextSymbolizer: vi.fn(),
+  LineLabelSymbolizer: vi.fn(),
+  OffsetTextSymbolizer: vi.fn(),
+  TextPlacements: { N: 1, Ne: 2, E: 3, Se: 4, S: 5, Sw: 6, W: 7, Nw: 8 },
   // Real numeric values (tilecache.ts): Point=1, Line=2, Polygon=3 --
   // buildPaintRules' geometry-type filter reads this off the module.
   GeomType: { Point: 1, Line: 2, Polygon: 3 },

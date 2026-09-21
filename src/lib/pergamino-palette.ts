@@ -30,6 +30,8 @@ export const PERGAMINO_TOKEN_NAMES = [
   "--color-pergamino-building",
   "--color-pergamino-building-edge",
   "--color-pergamino-boundary",
+  // Step 3: the named-pois ground dot (see .claude/prds/pergamino-map.md).
+  "--color-pergamino-poi",
 ] as const;
 
 export type PergaminoTokenName = (typeof PERGAMINO_TOKEN_NAMES)[number];
@@ -52,7 +54,53 @@ export const PERGAMINO_FALLBACK_HEX: Record<PergaminoTokenName, string> = {
   "--color-pergamino-building": "#dccaa3",
   "--color-pergamino-building-edge": "#bfa574",
   "--color-pergamino-boundary": "#a58d64",
+  "--color-pergamino-poi": "#6b4a2c",
 };
+
+/**
+ * Colour tokens the map's *lettering* reuses rather than declaring its own
+ * (see globals.css's "Pergamino" comment: "map lettering reuses
+ * --color-ink / --color-stone-deep / --color-teal-deep"). Not part of
+ * PERGAMINO_TOKEN_NAMES/PERGAMINO_FALLBACK_HEX above -- those are the
+ * *ground* palette (anti-drift-locked against pergamino-tokens.test.ts's
+ * own separate list); these four already exist in the "Ciudad Latina"
+ * theme block at the top of globals.css, for the app's ordinary UI chrome.
+ * `buildLabelRules` (BasemapLayer.tsx) resolves these the same way
+ * `readPergaminoPalette` resolves ground tokens, so canvas text uses the
+ * exact same ink/halo colours the rest of the app already does.
+ */
+export const PERGAMINO_LABEL_COLOR_NAMES = [
+  "--color-ink",
+  "--color-stone-deep",
+  "--color-teal-deep",
+  "--color-cream",
+] as const;
+
+export type PergaminoLabelColorName = (typeof PERGAMINO_LABEL_COLOR_NAMES)[number];
+
+/** Byte-identical to the "Ciudad Latina" @theme block in globals.css. */
+export const PERGAMINO_LABEL_FALLBACK_HEX: Record<PergaminoLabelColorName, string> = {
+  "--color-ink": "#2a2017",
+  "--color-stone-deep": "#7a6448",
+  "--color-teal-deep": "#165259",
+  "--color-cream": "#f6eedc",
+};
+
+/** Same resolve-with-fallback contract as readPergaminoPalette, for the four label colours. */
+export function readPergaminoLabelColors(
+  root?: HTMLElement,
+): Record<PergaminoLabelColorName, string> {
+  const element =
+    root ?? (typeof document !== "undefined" ? document.documentElement : undefined);
+  const styles = element ? getComputedStyle(element) : undefined;
+
+  const result = {} as Record<PergaminoLabelColorName, string>;
+  for (const name of PERGAMINO_LABEL_COLOR_NAMES) {
+    const value = styles?.getPropertyValue(name).trim();
+    result[name] = value ? value : PERGAMINO_LABEL_FALLBACK_HEX[name];
+  }
+  return result;
+}
 
 /**
  * Reads the live computed value of each Pergamino token off `root` (or

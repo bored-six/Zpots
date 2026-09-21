@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { Layer as LeafletLayerInstance, Map as LeafletMap } from "leaflet";
 import Leaflet from "leaflet";
 import { TileLayer } from "react-leaflet";
-import type { PaintRule } from "protomaps-leaflet";
+import type { LabelRule, PaintRule } from "protomaps-leaflet";
 
 import { probeBasemapArchive } from "@/lib/basemap-source";
 import {
@@ -14,8 +14,18 @@ import {
   TILE_ATTRIBUTION,
   TILE_URL,
 } from "@/lib/map-config";
-import { readPergaminoPalette, type PergaminoTokenName } from "@/lib/pergamino-palette";
-import { PERGAMINO_LAYERS } from "@/lib/pergamino-style";
+import {
+  buildFontLoadTasks,
+  readPergaminoFontStack,
+  type PergaminoFontStack,
+} from "@/lib/pergamino-fonts";
+import {
+  readPergaminoLabelColors,
+  readPergaminoPalette,
+  type PergaminoLabelColorName,
+  type PergaminoTokenName,
+} from "@/lib/pergamino-palette";
+import { PERGAMINO_LAYERS, isWaterLine, poiHasName, roadClass } from "@/lib/pergamino-style";
 
 /**
  * "protomaps-leaflet" is ~45kB gzipped and only matters once a live
@@ -109,11 +119,18 @@ export function buildPaintRules(
             stroke: layer.strokeToken ? palette[layer.strokeToken] : undefined,
             width: layer.widthPx,
           })
-        : new protomaps.LineSymbolizer({
-            color: layer.strokeToken ? palette[layer.strokeToken] : undefined,
-            width: layer.widthPx,
-            dash: layer.dashPx ? [...layer.dashPx] : undefined,
-          });
+        : layer.geometry === "point"
+          ? new protomaps.CircleSymbolizer({
+              fill: layer.fillToken ? palette[layer.fillToken] : undefined,
+              stroke: layer.strokeToken ? palette[layer.strokeToken] : undefined,
+              width: layer.widthPx,
+              radius: layer.radiusPx,
+            })
+          : new protomaps.LineSymbolizer({
+              color: layer.strokeToken ? palette[layer.strokeToken] : undefined,
+              width: layer.widthPx,
+              dash: layer.dashPx ? [...layer.dashPx] : undefined,
+            });
 
     // The "blob bug" fix (pergamino-map.md, Step 1). protomaps-leaflet's
     // painter has no geometry dispatch of its own: it hands every feature
@@ -128,8 +145,13 @@ export function buildPaintRules(
     // `protomaps.GeomType` enum (Point/Line/Polygon) is available -- it's
     // handed in via the same lazily-imported module `buildPaintRules`
     // already receives, so this stays inside the D8 lazy-load boundary.
+    // "point" (Step 3, the `pois` ground dot) extends the same guard.
     const requiredGeomType =
-      layer.geometry === "polygon" ? protomaps.GeomType.Polygon : protomaps.GeomType.Line;
+      layer.geometry === "polygon"
+        ? protomaps.GeomType.Polygon
+        : layer.geometry === "point"
+          ? protomaps.GeomType.Point
+          : protomaps.GeomType.Line;
 
     return {
       id: layer.id,
@@ -147,6 +169,178 @@ export function buildPaintRules(
       symbolizer,
     } as PaintRule;
   });
+}
+
+type FeatureFilterArg = { props: Record<string, unknown>; geomType: number };
+
+/** True for a feature whose `kind` names one of the water layer's named point bodies (sea/bay/ocean/lake/strait). */
+const WATER_POINT_KINDS = new Set(["ocean", "bay", "strait", "fjord", "sea", "lake"]);
+
+/**
+ * Translates the same source (this time: the tile archive's own names) into
+ * protomaps-leaflet LabelRules, using the library's built-in text
+ * symbolizers -- which carry their own collision handling (see
+ * `node_modules/protomaps-leaflet/src/labeler.ts`'s `Index`), so two
+ * labels from different tiers never pile on top of each other the way the
+ * old DOM-only curated labels could.
+ *
+ * This replaces the `labelRules: []` this component used to pass --
+ * .claude/prds/pergamino-map.md's original "curated DOM labels only"
+ * decision is reversed here; see that PRD's Change Log for why. Every rule
+ * below reuses the exact same classification pergamino-style.ts already
+ * uses to *paint* the ground (`roadClass`, `isWaterLine`, `poiHasName`),
+ * so a road/river/poi is labelled under the same rule it was drawn under,
+ * never a second, independently-drifting one.
+ *
+ * Zoom tiers (never bare between the app's MIN_ZOOM=12 floor and 15,
+ * see map-config.ts): settlement + district names from z11, major/arterial
+ * street names from z12, river/stream and finer-grained district names
+ * from z13, minor street names from z14, named points of interest from
+ * z15 -- wide view reads as districts, close view reads as streets.
+ */
+export function buildLabelRules(
+  protomaps: ProtomapsModule,
+  fonts: PergaminoFontStack,
+  labelColors: Record<PergaminoLabelColorName, string>,
+): LabelRule[] {
+  const ink = labelColors["--color-ink"];
+  const stoneDeep = labelColors["--color-stone-deep"];
+  const tealDeep = labelColors["--color-teal-deep"];
+  const cream = labelColors["--color-cream"];
+
+  return [
+    // Settlement -- "Zamboanga City" itself (places.kind === "locality").
+    {
+      id: "label-settlement",
+      dataLayer: "places",
+      symbolizer: new protomaps.CenteredTextSymbolizer({
+        font: `600 13px ${fonts.wordmark}`,
+        textTransform: "uppercase",
+        letterSpacing: 1.6,
+        fill: ink,
+        stroke: cream,
+        width: 2.5,
+      }),
+      filter: (_zoom: number, feature: FeatureFilterArg) =>
+        feature.props.kind === "locality",
+    },
+    // Districts -- places.kind "macrohood" (barangay/quarter-scale, e.g.
+    // "Baliwasan", "Zone I") then the finer "neighbourhood" -- the real
+    // barangay names the curated list used to hand-guess coordinates for.
+    {
+      id: "label-district-macrohood",
+      dataLayer: "places",
+      minzoom: 11,
+      symbolizer: new protomaps.CenteredTextSymbolizer({
+        font: `500 10px ${fonts.body}`,
+        textTransform: "uppercase",
+        letterSpacing: 1.4,
+        fill: stoneDeep,
+        stroke: cream,
+        width: 2,
+      }),
+      filter: (_zoom: number, feature: FeatureFilterArg) =>
+        feature.props.kind === "macrohood",
+    },
+    {
+      id: "label-district-neighbourhood",
+      dataLayer: "places",
+      minzoom: 13,
+      symbolizer: new protomaps.CenteredTextSymbolizer({
+        font: `500 9.5px ${fonts.body}`,
+        textTransform: "uppercase",
+        letterSpacing: 1.2,
+        fill: stoneDeep,
+        stroke: cream,
+        width: 2,
+      }),
+      filter: (_zoom: number, feature: FeatureFilterArg) =>
+        feature.props.kind === "neighbourhood",
+    },
+    // Streets -- reuses roadClass (pergamino-style.ts) so a road is
+    // labelled under the exact class it was painted under. Major/arterial
+    // read from z12; street/minor only once the view is close (z14).
+    {
+      id: "label-road-major",
+      dataLayer: "roads",
+      minzoom: 12,
+      symbolizer: new protomaps.LineLabelSymbolizer({
+        font: `500 11px ${fonts.body}`,
+        fill: stoneDeep,
+        stroke: cream,
+        width: 2,
+      }),
+      filter: (_zoom: number, feature: FeatureFilterArg) => {
+        const cls = roadClass(feature.props);
+        return cls === "major" || cls === "arterial";
+      },
+    },
+    {
+      id: "label-road-minor",
+      dataLayer: "roads",
+      minzoom: 14,
+      symbolizer: new protomaps.LineLabelSymbolizer({
+        font: `400 10px ${fonts.body}`,
+        fill: stoneDeep,
+        stroke: cream,
+        width: 1.5,
+      }),
+      filter: (_zoom: number, feature: FeatureFilterArg) => {
+        const cls = roadClass(feature.props);
+        return cls === "street" || cls === "minor";
+      },
+    },
+    // Water -- named rivers/streams (line geometry) from z13, matching the
+    // water-line paint layer's own minZoom; named seas/bays/straits (point
+    // geometry) whenever the archive carries one, no floor of its own.
+    {
+      id: "label-water-line",
+      dataLayer: "water",
+      minzoom: 13,
+      symbolizer: new protomaps.LineLabelSymbolizer({
+        font: `italic 500 11px ${fonts.display}`,
+        fill: tealDeep,
+        stroke: cream,
+        width: 1.5,
+      }),
+      filter: (_zoom: number, feature: FeatureFilterArg) =>
+        feature.geomType === protomaps.GeomType.Line && isWaterLine(feature.props),
+    },
+    {
+      id: "label-water-point",
+      dataLayer: "water",
+      symbolizer: new protomaps.CenteredTextSymbolizer({
+        font: `italic 500 13px ${fonts.display}`,
+        letterSpacing: 2,
+        fill: tealDeep,
+        stroke: cream,
+        width: 2,
+      }),
+      filter: (_zoom: number, feature: FeatureFilterArg) =>
+        feature.geomType === protomaps.GeomType.Point &&
+        WATER_POINT_KINDS.has(String(feature.props.kind)),
+    },
+    // Points of interest -- close zoom only (minZoom 15, matches the
+    // `pois` ground dot in pergamino-style.ts), and only named ones
+    // (poiHasName -- the same guard the ground dot uses).
+    {
+      id: "label-poi",
+      dataLayer: "pois",
+      minzoom: 15,
+      symbolizer: new protomaps.OffsetTextSymbolizer({
+        font: `600 10px ${fonts.wordmark}`,
+        textTransform: "uppercase",
+        letterSpacing: 1,
+        fill: ink,
+        stroke: cream,
+        width: 1.5,
+        offsetY: 4,
+        placements: [protomaps.TextPlacements.S],
+      }),
+      filter: (_zoom: number, feature: FeatureFilterArg) =>
+        feature.geomType === protomaps.GeomType.Point && poiHasName(feature.props),
+    },
+  ];
 }
 
 /**
@@ -201,7 +395,24 @@ export default function BasemapLayer({ map, onModeChange }: BasemapLayerProps) {
         }
 
         const palette = readPergaminoPalette();
+        const labelColors = readPergaminoLabelColors();
+        const fonts = readPergaminoFontStack();
         const paintRules = buildPaintRules(protomaps, palette);
+        const labelRules = buildLabelRules(protomaps, fonts, labelColors);
+
+        // The webfont race (see pergamino-fonts.ts): protomaps-leaflet
+        // awaits every one of these before it lays out a tile's labels --
+        // on every tile render, not just the first -- so a tile painted
+        // before Cinzel/Alegreya finished loading waits instead of
+        // locking in a fallback face for good. protomaps-leaflet's own
+        // `Status` type (leaflet.ts) exists only so it can label a
+        // fulfilled-vs-rejected result internally (`reflect()`); it never
+        // inspects a task's resolved *value*, so `Promise<unknown>` is
+        // safe here -- this cast, not `document.fonts.load`'s return
+        // type, is what would need to change if that stopped being true.
+        const tasks = buildFontLoadTasks(fonts) as unknown as NonNullable<
+          Parameters<typeof protomaps.leafletLayer>[0]
+        >["tasks"];
 
         // The dynamically-imported module's own return type structurally
         // matches Leaflet's Layer (it extends L.GridLayer internally), but
@@ -210,7 +421,8 @@ export default function BasemapLayer({ map, onModeChange }: BasemapLayerProps) {
         const layer = protomaps.leafletLayer({
           url: BASEMAP_PMTILES_URL,
           paintRules,
-          labelRules: [],
+          labelRules,
+          tasks,
           maxDataZoom: BASEMAP_MAX_DATA_ZOOM,
           attribution: BASEMAP_ATTRIBUTION,
           backgroundColor: palette["--color-pergamino-sea"],
