@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Map as LeafletMap } from "leaflet";
 import { MapContainer, Marker, Polyline, useMap } from "react-leaflet";
 
@@ -248,6 +248,22 @@ export default function MapInsetInner({
   // an explicit prop -- D4: never `useMap()`.
   const [map, setMap] = useState<LeafletMap | null>(null);
 
+  // paseo-motion.md fix-round-2, finding 1 -- `createPinIcon` used to be
+  // called inline in JSX, allocating a brand-new `L.DivIcon` on every
+  // render regardless of whether `status`/`justConfirmed` changed.
+  // react-leaflet's `Marker` only calls `setIcon` on a reference change,
+  // and Leaflet's `DivIcon.createIcon` unconditionally rewrites the
+  // marker div's `innerHTML` -- so a fresh icon on an unrelated re-render
+  // (e.g. an adjacent card's scroll-driven state update) tore down and
+  // rebuilt this marker's DOM, restarting the one-shot
+  // `.zpots-pin-icon--just-confirmed` halo animation. Memoizing on the
+  // two inputs that actually change the icon's markup keeps the same
+  // object across every other re-render.
+  const pinIcon = useMemo(
+    () => createPinIcon(status, { justConfirmed }),
+    [status, justConfirmed],
+  );
+
   // A missing/non-finite coordinate must never crash the page -- Leaflet's
   // LatLng constructor throws "Invalid LatLng object: (NaN, NaN)" on
   // anything else. A caller can hand this a center before any real spot is
@@ -285,7 +301,7 @@ export default function MapInsetInner({
             112px is too small for either -- ground + pin only. */}
         <BasemapLayer map={map} />
         <CityMask />
-        <Marker position={[center.lat, center.lng]} icon={createPinIcon(status, { justConfirmed })} />
+        <Marker position={[center.lat, center.lng]} icon={pinIcon} />
         <FlyToCenter center={center} />
       </MapContainer>
     </button>

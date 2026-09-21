@@ -1,7 +1,8 @@
 "use client";
 
 import type { LeafletMouseEvent, Map as LeafletMap } from "leaflet";
-import { useEffect, useState } from "react";
+import type L from "leaflet";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MapContainer, Marker, Popup } from "react-leaflet";
 
 import AddSpotForm from "@/components/AddSpotForm";
@@ -183,20 +184,52 @@ function submitErrorMessage(error: unknown): string {
 }
 
 /**
+ * Looks up (or lazily creates) the `L.DivIcon` for a given marker id,
+ * reusing the previous one as long as `key` -- a small string standing in
+ * for whatever actually changes that icon's markup -- hasn't changed.
+ *
+ * paseo-motion.md fix-round-2, finding 1: both marker loops below build
+ * icons inside a `.map()`, so a hook can't run per item the way `useMemo`
+ * would in a plain (non-list) call site (see MapInsetInner.tsx). This is
+ * the same idea carried out by hand, backed by a `useRef` map that lives
+ * for the component instance's lifetime, so react-leaflet's `Marker` (a
+ * reference check on `props.icon`, see node_modules/react-leaflet/lib/
+ * Marker.js) sees the same object across renders that don't affect that
+ * particular spot's icon.
+ */
+function usePinIconCache() {
+  const cacheRef = useRef(new Map<string, { key: string; icon: L.DivIcon }>());
+
+  return useCallback((id: string, key: string, factory: () => L.DivIcon): L.DivIcon => {
+    const cache = cacheRef.current;
+    const cached = cache.get(id);
+    if (cached && cached.key === key) return cached.icon;
+    const icon = factory();
+    cache.set(id, { key, icon });
+    return icon;
+  }, []);
+}
+
+type PinIconCacheGetter = ReturnType<typeof usePinIconCache>;
+
+/**
  * Mi mapa pin-by-source rule (social-spots.md): `mine` is the spot's own
  * photo inside the compass frame, `been` is the solid confirmed pin, and
  * `saved` is the hollow unconfirmed pin -- deliberately independent of the
  * spot's actual confirmation status, since a saved-but-unconfirmed spot and
  * an unconfirmed spot you dropped yourself should still look different.
  */
-function iconForMapSpot(spot: MapSpot) {
-  // Preview pins (famous-places fallback) are photo pins too -- they exist
-  // to show what a filled-in map looks like.
-  if (spot.source === "mine" || spot.source === "preview") {
-    if (spot.photoUrl) return createPhotoPinIcon(spot.photoUrl, spot.status);
-    return createPinIcon(spot.status);
-  }
-  return createPinIcon(spot.source === "been" ? "confirmed" : "unconfirmed");
+function iconForMapSpot(spot: MapSpot, getIcon: PinIconCacheGetter): L.DivIcon {
+  const key = `${spot.source}:${spot.photoUrl ?? ""}:${spot.status}`;
+  return getIcon(spot.id, key, () => {
+    // Preview pins (famous-places fallback) are photo pins too -- they exist
+    // to show what a filled-in map looks like.
+    if (spot.source === "mine" || spot.source === "preview") {
+      if (spot.photoUrl) return createPhotoPinIcon(spot.photoUrl, spot.status);
+      return createPinIcon(spot.status);
+    }
+    return createPinIcon(spot.source === "been" ? "confirmed" : "unconfirmed");
+  });
 }
 
 /**
@@ -244,6 +277,13 @@ export default function SpotMap({
   // slightly ahead of a caller re-fetching the updated status is harmless.
   const [justConfirmedIds, setJustConfirmedIds] = useState<ReadonlySet<string>>(new Set());
   const [gatedAction, setGatedAction] = useState<GatedAction | null>(null);
+  // Two separate caches (not one shared by id) -- `effectiveSpots` and
+  // `visibleMapSpots` can both contain a spot with the same id (a spot the
+  // viewer dropped shows up in the plain "spots" layer and again, styled
+  // differently, in Mi mapa's `mapSpots` layer), and each layer's icon
+  // depends on different inputs (see paseo-motion.md fix-round-2, finding 1).
+  const getSpotIcon = usePinIconCache();
+  const getMapSpotIcon = usePinIconCache();
   const [showOutsideCityBanner, setShowOutsideCityBanner] = useState(false);
 
   function isGateOpen(): boolean {
@@ -416,7 +456,11 @@ export default function SpotMap({
           <Marker
             key={spot.id}
             position={[spot.lat, spot.lng]}
-            icon={createPinIcon(spot.status, { justConfirmed: justConfirmedIds.has(spot.id) })}
+            icon={getSpotIcon(
+              spot.id,
+              `${spot.status}:${justConfirmedIds.has(spot.id)}`,
+              () => createPinIcon(spot.status, { justConfirmed: justConfirmedIds.has(spot.id) }),
+            )}
           >
             <Popup>
               <div className="zpots-popup">
@@ -461,7 +505,7 @@ export default function SpotMap({
           <Marker
             key={spot.id}
             position={[spot.lat, spot.lng]}
-            icon={iconForMapSpot(spot)}
+            icon={iconForMapSpot(spot, getMapSpotIcon)}
             ref={(marker) => {
               if (marker && openSpotId && spot.id === openSpotId) {
                 marker.openPopup();

@@ -10,8 +10,13 @@ import type { Spot } from "@/lib/spots";
  * do the right thing" -- that's pin-icon.just-confirmed.test.ts) and reuses
  * SpotMap.wiring.test.tsx's react-leaflet stand-in shape.
  */
-const { createPinIconSpy, fakeMap } = vi.hoisted(() => ({
+const { createPinIconSpy, fakeMap, markerIconCalls } = vi.hoisted(() => ({
   createPinIconSpy: vi.fn(() => ({ options: { html: "<div/>" } })),
+  // Every `icon` prop react-leaflet's real `Marker` ever received, in
+  // render order -- lets the stability test below check reference
+  // equality across renders, something the old mock (which dropped the
+  // `icon` prop entirely) could never catch.
+  markerIconCalls: [] as unknown[],
   fakeMap: {
     on: () => {},
     off: () => {},
@@ -41,9 +46,10 @@ vi.mock("react-leaflet", async () => {
       return <div data-testid="map-container">{children}</div>;
     }),
     TileLayer: () => <div data-testid="tile-layer" />,
-    Marker: ({ children }: { children?: React.ReactNode }) => (
-      <div data-testid="marker">{children}</div>
-    ),
+    Marker: ({ icon, children }: { icon?: unknown; children?: React.ReactNode }) => {
+      markerIconCalls.push(icon);
+      return <div data-testid="marker">{children}</div>;
+    },
     Popup: ({ children }: { children?: React.ReactNode }) => (
       <div data-testid="popup">{children}</div>
     ),
@@ -98,5 +104,35 @@ describe("SpotMap -- just-confirmed pin wiring", () => {
     await waitFor(() =>
       expect(createPinIconSpy).toHaveBeenCalledWith("unconfirmed", { justConfirmed: true }),
     );
+  });
+
+  /**
+   * paseo-motion.md fix-round-2, finding 1 -- SpotMap called `createPinIcon`
+   * inline in JSX inside the marker `.map()`, so it ran again for every
+   * spot on every re-render whether or not that spot's `status`/
+   * `justConfirmed` changed. react-leaflet's `Marker` only calls `setIcon`
+   * when `props.icon !== prevProps.icon` (a reference check, verified
+   * against node_modules/react-leaflet/lib/Marker.js), and Leaflet's
+   * `DivIcon.createIcon` unconditionally does `div.innerHTML = options.html`
+   * (verified against node_modules/leaflet/src/layer/marker/DivIcon.js) --
+   * so a fresh icon object on an unrelated re-render tears down and
+   * rebuilds the marker's DOM, restarting the one-shot
+   * `.zpots-pin-icon--just-confirmed` halo animation. The old mock's
+   * `Marker: ({ children }) => <div data-testid="marker">{children}</div>`
+   * dropped the `icon` prop entirely and could never have caught this.
+   */
+  it("keeps the spot's own pin icon reference stable across an unrelated re-render", () => {
+    const props = baseProps();
+    const { rerender } = render(<SpotMap {...props} spots={[unconfirmedSpot]} />);
+
+    const callsAfterFirstRender = createPinIconSpy.mock.calls.length;
+    const iconAfterFirstRender = markerIconCalls.at(-1);
+
+    // Unrelated re-render: a new `nickname` value -- not one of
+    // createPinIcon's inputs (status, justConfirmed) -- with the same spot.
+    rerender(<SpotMap {...props} spots={[unconfirmedSpot]} nickname="Different Name" />);
+
+    expect(createPinIconSpy.mock.calls.length).toBe(callsAfterFirstRender);
+    expect(markerIconCalls.at(-1)).toBe(iconAfterFirstRender);
   });
 });

@@ -79,6 +79,13 @@ export default function PostFlow() {
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const photoPreviewUrl = useMemo(() => (photoFile ? objectUrlFor(photoFile) : null), [photoFile]);
+  // paseo-motion.md fix-round-2, finding 1 -- this call takes no inputs
+  // that ever change (always "unconfirmed"), but PostFlow re-renders on
+  // every keystroke in the name/note fields. Without memoizing, each of
+  // those re-renders allocated a fresh `L.DivIcon`, and react-leaflet's
+  // `Marker` treats that as a real icon change (a reference check) and
+  // rebuilds the marker's DOM for no reason.
+  const tappedLocationIcon = useMemo(() => createPinIcon("unconfirmed"), []);
 
   useEffect(() => {
     return () => {
@@ -306,7 +313,7 @@ export default function PostFlow() {
               {tappedLocation && (
                 <Marker
                   position={[tappedLocation.lat, tappedLocation.lng]}
-                  icon={createPinIcon("unconfirmed")}
+                  icon={tappedLocationIcon}
                 />
               )}
             </MapContainer>
