@@ -44,12 +44,20 @@ const WINDOW_RADIUS = 2;
 /** IntersectionObserver ratio a snap slot must clear to become the active card. */
 const ACTIVE_VISIBILITY_THRESHOLD = 0.6;
 /**
- * Safety net for a programmatic move (arrow keys, Hoy tap, `?spot=` deep
- * link): how long the destination guard (see `programmaticTargetRef`)
- * stays armed if the IntersectionObserver never confirms arrival at the
- * target itself -- e.g. no real `scrollIntoView` support (jsdom, SSR) or
- * the observer never fires. Comfortably longer than a real smooth-scroll
- * animation so it never releases the guard mid-flight.
+ * Last-resort safety net for the destination guard (see
+ * `programmaticTargetRef`): how long it stays armed if NEITHER the
+ * IntersectionObserver confirms arrival at the target NOR a genuine user
+ * gesture cancels it first (see the `wheel`/`touchstart`/`pointerdown`
+ * listeners below). In practice this branch is for pathological cases --
+ * no real `scrollIntoView` support (jsdom, SSR) or the observer never
+ * firing at all -- not for interrupted gestures, which the listeners
+ * already resolve immediately. `scrollIntoView({behavior:"smooth"})`
+ * duration is browser-controlled and unbounded for a long jump (a Hoy tap
+ * can cross many cards), so this value can never reliably outrace it; it
+ * doesn't need to, since it no longer carries the "was this interrupted"
+ * decision. The exact number is unimportant as long as it's short enough
+ * that a genuinely stuck guard (the rare case) clears in a human-noticeable
+ * amount of time.
  */
 const PROGRAMMATIC_SCROLL_SETTLE_MS = 600;
 
@@ -119,8 +127,17 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
    * still animating toward this index -- the IntersectionObserver fires for
    * every slot a smooth scroll passes over on the way there, and only the
    * destination itself may adopt activeIndex while this is armed. Cleared
-   * either when the observer confirms arrival, or after
-   * PROGRAMMATIC_SCROLL_SETTLE_MS as a safety net (see the effect below). */
+   * three ways: the observer confirms arrival at the target; a genuine user
+   * gesture (wheel, touch, pointerdown -- see the observer effect below)
+   * shows the user has taken over, so their own scroll outranks the
+   * in-flight programmatic one from that point on; or, failing both,
+   * PROGRAMMATIC_SCROLL_SETTLE_MS as a last-resort safety net. Clearing this
+   * alone is sufficient to fix a stuck guard -- once null, the very next
+   * crossing (any index) is accepted -- unlike a mismatched crossing that
+   * arrives *while still armed*, which is silently dropped and, since a
+   * real IntersectionObserver only fires on threshold crossings, may never
+   * be offered again once that slot settles above the threshold. That is
+   * why cancelling promptly on user input matters more than the timeout. */
   const programmaticTargetRef = useRef<number | null>(null);
 
   /**
@@ -405,7 +422,34 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
 
     slotElementsRef.current.forEach((element) => observer.observe(element));
 
-    return () => observer.disconnect();
+    // Reconciliation for an overtaken programmatic move (paseo-motion.md
+    // Finding 4.2): a real user gesture -- wheel, touch, or a pointer down
+    // on the track -- can interrupt an in-flight scrollIntoView and settle
+    // on a slot that is never the guarded destination. `scrollIntoView`
+    // itself never dispatches any of these three, so seeing one here is an
+    // unambiguous signal the user has taken over; their gesture always
+    // outranks an in-flight programmatic scroll from that point on. This
+    // cancels the guard immediately (rather than waiting on the crossing
+    // that will now never arrive at the original target, or on the
+    // PROGRAMMATIC_SCROLL_SETTLE_MS timeout above), so the very next
+    // crossing -- whatever slot the user actually lands on -- is accepted
+    // as an ordinary observed move. It does not call scrollIntoView itself
+    // and does not touch activeMove directly, so an uninterrupted
+    // programmatic move (no such gesture fires) still ignores every
+    // intermediate crossing exactly as before.
+    function cancelGuardOnUserInput() {
+      programmaticTargetRef.current = null;
+    }
+    root.addEventListener("wheel", cancelGuardOnUserInput, { passive: true });
+    root.addEventListener("touchstart", cancelGuardOnUserInput, { passive: true });
+    root.addEventListener("pointerdown", cancelGuardOnUserInput);
+
+    return () => {
+      observer.disconnect();
+      root.removeEventListener("wheel", cancelGuardOnUserInput);
+      root.removeEventListener("touchstart", cancelGuardOnUserInput);
+      root.removeEventListener("pointerdown", cancelGuardOnUserInput);
+    };
   }, [windowStart, windowEnd]);
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {

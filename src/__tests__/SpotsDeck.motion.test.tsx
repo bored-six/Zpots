@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthStatus, AuthUser } from "@/lib/auth";
@@ -383,6 +383,92 @@ describe("SpotsDeck -- programmatic vs observed moves must not fight (Finding 3)
     )!;
     fireIntersection(observer, nextSlot, 0.9);
     await waitFor(() => expect(deck.getAttribute("data-active-id")).toBe("spot-2"));
+  });
+});
+
+describe("SpotsDeck -- reconciling a programmatic move that gets overtaken (task 4.2)", () => {
+  it("a real user scroll that lands on a different slot before the target's own crossing arrives wins, instead of leaving the guard stuck forever", async () => {
+    feedCerca.mockResolvedValue(makeCards(5));
+    const { container } = render(<SpotsDeck />);
+    await screen.findAllByTestId("spot-card");
+
+    const deck = screen.getByTestId("spots-deck");
+    deck.focus();
+    fireEvent.keyDown(deck, { key: "ArrowDown" }); // programmatic move targeting index 1
+    await waitFor(() => expect(scrollIntoViewMock).toHaveBeenCalledTimes(1));
+
+    // The window shift from the move above re-creates the observer; grab
+    // the current one, same as the app would see in a real browser.
+    const observer = FakeIntersectionObserver.instances.at(-1)!;
+
+    // An ordinary interrupted gesture -- arrow-key-then-flick, or a quick
+    // double swipe -- lands the user on slot 2 before the smooth
+    // scrollIntoView toward slot 1 ever confirms arrival there. The wheel
+    // event is the real signal a genuine gesture is happening; the
+    // intersection crossing is the scroll settling on slot 2.
+    const scroller = container.querySelector(".snap-y") as HTMLElement;
+    fireEvent.wheel(scroller);
+
+    const slot2 = Array.from(container.querySelectorAll(".paseo-slot")).find(
+      (el) => el.getAttribute("data-index") === "2",
+    )!;
+    act(() => fireIntersection(observer, slot2, 0.9));
+
+    expect(deck.getAttribute("data-active-id")).toBe("spot-2");
+    // The user's own gesture is adopted as an ordinary observed move --
+    // it must never provoke a second, fighting scrollIntoView call.
+    expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("the guard cannot remain armed indefinitely: the settle timeout releases it under fake timers", async () => {
+    feedCerca.mockResolvedValue(makeCards(5));
+    const { container } = render(<SpotsDeck />);
+    await screen.findAllByTestId("spot-card");
+    const deck = screen.getByTestId("spots-deck");
+
+    vi.useFakeTimers();
+    try {
+      deck.focus();
+      fireEvent.keyDown(deck, { key: "ArrowDown" }); // arms the guard for index 1
+
+      // Neither the target's own crossing nor a user gesture ever arrives --
+      // the settle timer is the only thing left that can release the guard.
+      act(() => {
+        vi.advanceTimersByTime(600);
+      });
+
+      const observer = FakeIntersectionObserver.instances.at(-1)!;
+      const slot3 = Array.from(container.querySelectorAll(".paseo-slot")).find(
+        (el) => el.getAttribute("data-index") === "3",
+      )!;
+      act(() => fireIntersection(observer, slot3, 0.9));
+
+      expect(deck.getAttribute("data-active-id")).toBe("spot-3");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("the settle timer is cleared on unmount and never fires against an unmounted component", async () => {
+    feedCerca.mockResolvedValue(makeCards(5));
+    const { unmount } = render(<SpotsDeck />);
+    await screen.findAllByTestId("spot-card");
+    const deck = screen.getByTestId("spots-deck");
+
+    vi.useFakeTimers();
+    try {
+      deck.focus();
+      fireEvent.keyDown(deck, { key: "ArrowDown" });
+      unmount();
+
+      expect(() => {
+        act(() => {
+          vi.advanceTimersByTime(600);
+        });
+      }).not.toThrow();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
