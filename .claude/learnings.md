@@ -154,3 +154,56 @@ custom property outright.
 **Process note:** the dev server from a parallel session served a stale HMR chunk throwing
 `getSlotRef is not defined` long after the source stopped referencing it. `npm run build` is the
 authoritative check when a console error contradicts clean source.
+
+## [2026-09-21] - Product model: how a personal map fills up (user-clarified)
+
+User stated the intended model in their own words: *"When first opening an app you only see famous
+pins that are already there... and you would only add if you save a pin that you can see in a snap
+or like a search spot... if you're viewing a spot and see where this spot is located, that is
+shown."*
+
+**This confirms the locked decision rather than changing it** (`prds/social-spots.md:22` — "Map is
+personal: own + saved + been. No all-spots map."). The map is not a directory of everything; it is
+a thing you *build* by walking the Paseo and saving what you like. Three of the four beats already
+exist: famous spots on first open (`preview-spots.ts` — **20** of them, backing the shipped
+Famosos lane, not just an empty-state fallback; see `prds/famosos-lane.md`), save from a deck card
+(`SpotCardView.tsx:195` → `saves` table → `my_map()` `source: "saved"`), and see-where-it-is while
+browsing (`MapInset` panning per card).
+
+**Gap the model exposes — the famous pins are decoration, not a seed.** The described flow "open
+the app, see a famous pin, save it" is *impossible today*: preview spots are hard-blocked from
+saving (`SpotsDeck.tsx:560, 579, 595, 613`, `if (isPreviewSpot(spotId)) return;`) because their
+ids do not exist server-side. So the first thing a new user sees is the one thing they cannot act on, and
+the map stays empty until they find a real spot. Closing this means promoting the five famous
+places to real DB rows (which collides with the `spots.photo_url` CHECK that only admits the
+`spot-photos` bucket), not loosening the client guard. Spec: `prds/famous-spots-seed.md`.
+
+**Second gap: the map popup can only unsave, never save** (`SpotMap.tsx:550`, `onUnsave` +
+`source === "saved"` only). Saving exists solely on the deck card.
+
+**"Or like a search spot" has nothing behind it.** There is no spot search of any kind — only
+people search (`profiles-repo.ts:296`). `CLAUDE.md` lists search as out of scope for v2, so this
+half of the model is a v3 idea, not a missing feature.
+
+**Doc drift found while checking:** `prds/social-spots.md:209` still says Mi mapa is "Signed-out:
+sign-in gate", but `mapa/page.tsx:61-67` deliberately overrode that per `CLAUDE.md:34` (browsing
+the map needs no account). The PRDs also never mention `preview-spots.ts` at all — the whole
+famous-places concept is code-only and undocumented upstream.
+
+**Correction to the above, same day — and a correction to the correction.** The first sweep
+reported "5 preview spots" and guard lines 478/497. Both were stale: `preview-spots.ts` holds
+**20** entries backing a shipped feature (the Famosos lane), not an empty-state placeholder, and
+the guards are at `SpotsDeck.tsx:560, 579, 595, 613`. The 2026-09-20 "Preview spots" entry further
+up says 5 because that was true when written; the count grew when Famosos shipped.
+
+Then the re-check was itself wrong. `grep -c 'id: "preview-'` returns **21**, because
+`PREVIEW_AUTHOR` — the shared `SpotAuthor` every entry points at — is declared above the array with
+`id: "preview-account"` and shares the prefix. The array holds 20.
+
+**Two rules out of this.** (1) A prefix grep counts *matches*, not *entries*; anchor on the
+structure (`^    id: "preview-` for array members) or parse the export, and sanity-check the answer
+against a second signal — here, `photoUrl` and `photoCredit` both count 16, which is the documented
+"4 of 20 have no freely-licensed photo" split from `famosos-lane.md`. (2) A stale count is not a
+typo: it turned "swap a placeholder" into "move a live feature into the database", a different
+piece of work. **Live trap for whoever writes migration 0007:** seeding by grepping `preview-` ids
+yields a 21st row named after the author constant.
