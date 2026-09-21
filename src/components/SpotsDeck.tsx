@@ -316,14 +316,50 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
   }, [cards, activeIndex, onActiveCardChange]);
 
   // Prefetch the next page once the active card is within
-  // PREFETCH_THRESHOLD of the end of what's loaded. Famosos is excluded via
-  // `hasMore` being permanently false for that lane (set above) rather than
-  // a branch here -- its curated set is fixed-size, so there is never a
-  // next page to prefetch and no feed function to call.
+  // PREFETCH_THRESHOLD of the end of what's loaded.
+  //
+  // Famosos (and, in general, any lane a switch just landed on) is kept out
+  // of this effect by `cards.length === 0` below, not by `hasMore`. An
+  // earlier version relied on `hasMore` settling to false for the fixed-
+  // size Famosos set, but `hasMore` is state: setting it inside the
+  // load-first-page effect above only *schedules* the update, it doesn't
+  // apply until the next render, and this effect -- declared later in the
+  // same component, so it re-runs in the very same passive-effect pass
+  // whenever `lane` changes -- would still see the *previous* lane's
+  // still-committed `hasMore` (and `cards`, and `activeIndex`) for that one
+  // pass. On a lane switch away from a paginated lane sitting mid-page near
+  // its end (hasMore still true), that stale read was enough to reach the
+  // implicit `else` in `loadNextPage` below and fire `feedSiguiendo` (or
+  // `feedNuevo`) with a cursor built from the *old* lane's last card, and a
+  // late resolution could then overwrite the new lane's freshly-loaded
+  // cards with that stale merge.
+  //
+  // `handleLaneChange` (the tab `onClick`) closes that window at its root
+  // instead of narrowing it: it resets `cards` to `[]` in the very same
+  // `setState` batch that changes `lane`, so the *one* render this effect
+  // reacts to on any switch already has `cards.length === 0` -- there is no
+  // render in between where `lane` is new but `cards` is still the old
+  // lane's. That guard below is what actually stops this effect from ever
+  // starting a *new* fetch during the switch, for every lane, not just
+  // Famosos.
+  //
+  // That alone isn't enough, though: a prefetch can already be in flight
+  // from *before* the switch (e.g. the user parked the active card near the
+  // end of a paginated lane, which legitimately starts this same fetch,
+  // then switched lanes before it resolved). Its `cards`/`lane` closure was
+  // captured pre-switch, so an unguarded resolution would still call
+  // `setCards(merged)` with the old lane's cards -- clobbering whatever the
+  // new lane's own load had just set, after the fact, with the tab already
+  // showing the new lane selected. `cancelled` (the same pattern the
+  // load-first-page effect above already uses) is what stops *that*: it's
+  // set the moment any dep this effect cares about changes -- including
+  // `lane` -- so a resolution that arrives after a switch is discarded
+  // instead of applied.
   useEffect(() => {
     if (loading || !hasMore || cards.length === 0 || fetchingMoreRef.current) return;
     if (cards.length - activeIndex > PREFETCH_THRESHOLD) return;
 
+    let cancelled = false;
     fetchingMoreRef.current = true;
 
     async function loadNextPage() {
@@ -335,6 +371,8 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
         const cursor: FeedCursor = { createdAt: last.createdAt, id: last.id };
         next = lane === "nuevo" ? await feedNuevo(PAGE_SIZE, cursor) : await feedSiguiendo(PAGE_SIZE, cursor);
       }
+
+      if (cancelled) return;
 
       if (next.length === 0) {
         setHasMore(false);
@@ -353,6 +391,16 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
     }
 
     loadNextPage();
+
+    return () => {
+      cancelled = true;
+      // A cancelled fetch never reaches its own `fetchingMoreRef.current =
+      // false` above (it returns early instead) -- reset it here too, or
+      // this ref would stay stuck `true` and silently block every future
+      // prefetch attempt, on any lane, until the next lane switch happens
+      // to reset it via the load-first-page effect.
+      fetchingMoreRef.current = false;
+    };
   }, [activeIndex, cards, hasMore, lane, loading, consumeDeepLink, location.coords.lat, location.coords.lng]);
 
   const windowStart = Math.max(0, activeIndex - WINDOW_RADIUS);
@@ -482,6 +530,20 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
     }
   }
 
+  /**
+   * Switches the active lane. Resets `cards` (and `loading`, so the empty
+   * state doesn't flash before the spinner does) synchronously, in the
+   * same `setLane` batch, rather than leaving that to the load-first-page
+   * effect -- see the prefetch effect's comment above for why only a
+   * same-batch reset (not an effect reacting to the lane change one render
+   * later) actually closes the stale-state window on a switch.
+   */
+  function handleLaneChange(next: Lane) {
+    setLane(next);
+    setCards([]);
+    setLoading(true);
+  }
+
   function handleHoySelect(spotId: string) {
     const index = cards.findIndex((card) => card.id === spotId);
     if (index !== -1) moveActiveIndexTo(index);
@@ -586,7 +648,7 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
           <button
             key={laneKey}
             type="button"
-            onClick={() => setLane(laneKey)}
+            onClick={() => handleLaneChange(laneKey)}
             aria-label={bilingualLabel(laneCopyKey(laneKey))}
             aria-pressed={lane === laneKey}
             className={`${TAB_BASE_CLASS} ${lane === laneKey ? TAB_ACTIVE_CLASS : TAB_INACTIVE_CLASS}`}

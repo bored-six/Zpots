@@ -217,6 +217,71 @@ describe("SpotsDeck -- Famosos lane", () => {
     expect(confirmSpot).not.toHaveBeenCalled();
   });
 
+  it("does not call feedSiguiendo/feedNuevo when switching to Famosos right after Cerca loaded a full page (hasMore=true) near the end, and actually shows the Famosos cards, not stale Cerca ones", async () => {
+    // PAGE_SIZE in SpotsDeck.tsx is 10 and isn't exported -- mirrored here.
+    const PAGE_SIZE = 10;
+    const cercaPage: SpotCard[] = Array.from({ length: PAGE_SIZE }, (_, i) => ({
+      id: `cerca-${i}`,
+      name: `Cerca Spot ${i}`,
+      note: "A note.",
+      lat: 6.9 + i * 0.001,
+      lng: 122.05,
+      status: "unconfirmed" as const,
+      confirmations: 0,
+      createdAt: new Date(2026, 0, i + 1).toISOString(),
+      author: { id: "user-2", handle: "kuya_ben", displayName: "Kuya Ben", avatarUrl: null },
+    }));
+    // Every call resolves the same full page -- deliberate: the point is to
+    // reach and click Famosos *before* Cerca's own next-page prefetch (also
+    // legitimately triggered by walking this close to the end) has settled,
+    // so `hasMore` is still true and `cards` is still Cerca's 10 at the
+    // exact moment of the switch. Waiting for that own-lane prefetch to
+    // resolve first would grow `cards` well past
+    // `activeIndex + PREFETCH_THRESHOLD` and mask the race this test
+    // targets -- it would pass even on the unfixed component for the wrong
+    // reason.
+    feedCerca.mockResolvedValue(cercaPage);
+    const user = userEvent.setup();
+    render(<SpotsDeck />);
+    // Only the +/-2 window around activeIndex (0) mounts at first -- wait
+    // for the load rather than the full page count.
+    await waitFor(() => expect(feedCerca).toHaveBeenCalledTimes(1));
+    await screen.findAllByTestId("spot-card");
+
+    // Walk near the end of the full Cerca page -- inside PREFETCH_THRESHOLD
+    // (3) of the last card -- exactly the window famosos-lane.md's
+    // Task-3 fix targets: a lane switch from here must not read `hasMore`
+    // (still true, carried over from Cerca) or `cards` (still Cerca's)
+    // before Famosos's own load has replaced them.
+    const deck = screen.getByTestId("spots-deck");
+    deck.focus();
+    for (let i = 0; i < 7; i++) {
+      await user.keyboard("{ArrowDown}");
+    }
+
+    feedNuevo.mockClear();
+    feedSiguiendo.mockClear();
+
+    await switchToFamosos(user);
+
+    await waitFor(() => {
+      const ids = renderedIds();
+      expect(ids.length).toBeGreaterThan(0);
+      expect(ids.every((id) => id?.startsWith("preview-"))).toBe(true);
+    });
+    // Give any in-flight Cerca prefetch (started before the switch, from
+    // walking near the end above) a chance to resolve and, if the fix
+    // regressed, clobber the cards back to stale Cerca ones.
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    // Not just "no spurious call" -- the reviewed failure mode was a late
+    // resolution clobbering the correct Famosos cards back to Cerca's, with
+    // the tab still reporting selected. Guard the actual rendered content.
+    expect(renderedIds().some((id) => id?.startsWith("cerca-"))).toBe(false);
+    expect(renderedIds().every((id) => id?.startsWith("preview-"))).toBe(true);
+    expect(feedSiguiendo).not.toHaveBeenCalled();
+    expect(feedNuevo).not.toHaveBeenCalled();
+  });
+
   it("the lane tab strip can hold four pills without wrapping at phone width (horizontal scroll, not wrap)", async () => {
     render(<SpotsDeck />);
     await screen.findByRole("button", { name: new RegExp(COPY.famosos.en, "i") });
