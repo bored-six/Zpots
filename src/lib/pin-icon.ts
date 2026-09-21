@@ -25,6 +25,19 @@ const PIN_COLOR: Record<PinStatus, string> = {
   confirmed: "#1f6f78",
 };
 
+export interface CreatePinIconOptions {
+  /**
+   * Flags this render as the one right after a pin flipped Unconfirmed ->
+   * Confirmed. Only meaningful for `status: "confirmed"`. `pin-icons.tsx`
+   * is plain React with no hook into this static string, so the class
+   * gets spliced directly onto the halo `<path>` in the serialized markup
+   * -- see `.zpots-pin-icon--just-confirmed` in globals.css for why it has
+   * to land there rather than on a wrapper (stroke-dasharray/animation
+   * only take effect on the element that carries them).
+   */
+  justConfirmed?: boolean;
+}
+
 /**
  * Renders the matching hand-drawn pin (see pin-icons.tsx) to static markup
  * and wraps it in a Leaflet DivIcon so it can be used as a marker icon.
@@ -32,15 +45,23 @@ const PIN_COLOR: Record<PinStatus, string> = {
  * SVG components, not image files, and `zpots-pin-icon` opts the wrapper
  * out of Leaflet's default marker background/border/shadow styling.
  */
-export function createPinIcon(status: PinStatus): L.DivIcon {
+export function createPinIcon(status: PinStatus, options?: CreatePinIconOptions): L.DivIcon {
   const PinComponent = status === "confirmed" ? ConfirmedPin : UnconfirmedPin;
 
-  const markup = renderToStaticMarkup(
+  let markup = renderToStaticMarkup(
     createElement(PinComponent, {
       size: ICON_SIZE,
       style: { color: PIN_COLOR[status] },
     })
   );
+
+  if (status === "confirmed" && options?.justConfirmed) {
+    // The first <path> ConfirmedPin renders is the combined
+    // compass+tail halo outline (see pin-icons.tsx COMPASS_POINTS +
+    // PIN_TAIL) -- exactly the "combined halo path" the CSS comment
+    // describes.
+    markup = markup.replace("<path ", '<path class="zpots-pin-icon--just-confirmed" ');
+  }
 
   return L.divIcon({
     html: markup,

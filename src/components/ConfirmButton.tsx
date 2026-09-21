@@ -16,7 +16,7 @@ interface ConfirmButtonProps {
 }
 
 const BADGE_CLASS =
-  "inline-flex items-center gap-1.5 rounded-full bg-teal px-3 py-1.5 text-xs font-bold " +
+  "relative inline-flex items-center gap-1.5 rounded-full bg-teal px-3 py-1.5 text-xs font-bold " +
   "uppercase tracking-wide text-cream";
 
 const CTA_CLASS =
@@ -34,8 +34,12 @@ export default function ConfirmButton({ spot, onConfirm }: ConfirmButtonProps) {
   if (spot.status === "confirmed") {
     return (
       <span className={BADGE_CLASS}>
-        <CheckIcon />
+        <CheckIcon animate />
         <Bilingual k="statusConfirmed" />
+        {/* Fires once on mount, vinta-colored, never intercepts clicks --
+            aria-hidden and empty so it can't touch the badge's accessible
+            text (ConfirmButton.test.tsx pins that to /^confirmed$/i). */}
+        <span className="paseo-confirm-pulse" aria-hidden="true" />
       </span>
     );
   }

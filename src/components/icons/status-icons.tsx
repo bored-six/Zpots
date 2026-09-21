@@ -5,12 +5,22 @@ export interface StatusIconProps extends SVGProps<SVGSVGElement> {
   size?: number;
 }
 
+export interface CheckIconProps extends StatusIconProps {
+  /**
+   * Draws the checkmark on stroke-first via `.paseo-mark` (globals.css
+   * `paseo-mark-draw`) instead of rendering it already complete. Opt-in
+   * per instance -- CheckIcon backs both the always-static confirm CTA
+   * button and the confirmed badge, and only the badge should animate.
+   */
+  animate?: boolean;
+}
+
 /**
  * Small checkmark used on the "Confirmed" state. A single continuous
  * stroke, same rounded-join language as the map pins, so the two states
  * of a spot (map pin vs. popup control) read as one visual system.
  */
-export function CheckIcon({ size = 16, className, ...props }: StatusIconProps) {
+export function CheckIcon({ size = 16, className, animate = false, ...props }: CheckIconProps) {
   return (
     <svg
       viewBox="0 0 16 16"
@@ -28,6 +38,7 @@ export function CheckIcon({ size = 16, className, ...props }: StatusIconProps) {
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
+        className={animate ? "paseo-mark" : undefined}
       />
     </svg>
   );
