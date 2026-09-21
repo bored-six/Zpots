@@ -26,6 +26,8 @@ const PAGE_SIZE = 10;
 const PREFETCH_THRESHOLD = 3;
 /** At most this many cards on either side of the active one stay mounted. */
 const WINDOW_RADIUS = 2;
+/** IntersectionObserver ratio a snap slot must clear to become the active card. */
+const ACTIVE_VISIBILITY_THRESHOLD = 0.6;
 
 const TAB_BASE_CLASS =
   "min-h-10 rounded-full px-4 py-1.5 text-sm font-bold uppercase tracking-wide transition";
@@ -77,6 +79,24 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
    * whether a newer call for the *same* spot already settled, so a stale
    * failure never reverts a state a later, successful call already set. */
   const saveTokensRef = useRef<Map<string, number>>(new Map());
+  /** The scroll container the snap slots live in -- IntersectionObserver root. */
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  /** Absolute index -> mounted slot element, kept current by each slot's own
+   * ref callback (see `getSlotRef`) as the +/-2 window mounts/unmounts them. */
+  const slotElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  // Returns a fresh ref callback closing over `index` -- it only ever
+  // touches `slotElementsRef.current` when React actually invokes it as a
+  // ref (on mount/unmount), never synchronously here during render.
+  function getSlotRef(index: number) {
+    return (element: HTMLDivElement | null) => {
+      if (element) {
+        slotElementsRef.current.set(index, element);
+      } else {
+        slotElementsRef.current.delete(index);
+      }
+    };
+  }
 
   const showSignInGate = lane === "siguiendo" && auth.status === "signed-out";
 
@@ -228,6 +248,56 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
     loadNextPage();
   }, [activeIndex, cards, hasMore, lane, loading, consumeDeepLink, location.coords.lat, location.coords.lng]);
 
+  const windowStart = Math.max(0, activeIndex - WINDOW_RADIUS);
+  const windowEnd = Math.min(cards.length, activeIndex + WINDOW_RADIUS + 1);
+  const windowedCards = cards.slice(windowStart, windowEnd).map((card, offset) => ({
+    card,
+    index: windowStart + offset,
+  }));
+
+  // Scrolls the active slot into view whenever the active index changes,
+  // whichever of the deck's own programmatic drivers set it (arrow keys, a
+  // Hoy tap, the ?spot= deep link) -- previously nothing did this at all,
+  // so activeIndex moving never actually moved the visible scroll position.
+  // Also fires when the observer below sets the same index it just
+  // scrolled to; that's a harmless no-op since the slot is already in view.
+  useEffect(() => {
+    const element = slotElementsRef.current.get(activeIndex);
+    if (element && typeof element.scrollIntoView === "function") {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [activeIndex]);
+
+  // Scroll-driven active index (paseo-motion.md prerequisite fix): a finger
+  // swipe never updated activeIndex at all -- it only moved on arrow keys, a
+  // Hoy tap, or the ?spot= deep link -- desyncing the desktop map
+  // (onActiveCardChange) and the +/-2 render window from what's actually on
+  // screen. Observes every currently mounted slot against the scroller
+  // itself and adopts whichever one crosses ACTIVE_VISIBILITY_THRESHOLD.
+  // Re-created whenever the +/-2 window shifts, since slots outside it
+  // unmount and the newly mounted ones need to be observed in their place.
+  useEffect(() => {
+    const root = scrollerRef.current;
+    if (!root || typeof IntersectionObserver !== "function") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting || entry.intersectionRatio < ACTIVE_VISIBILITY_THRESHOLD) continue;
+          const indexAttr = (entry.target as HTMLElement).dataset.index;
+          if (indexAttr === undefined) continue;
+          const index = Number(indexAttr);
+          setActiveIndex((current) => (current === index ? current : index));
+        }
+      },
+      { root, threshold: ACTIVE_VISIBILITY_THRESHOLD },
+    );
+
+    slotElementsRef.current.forEach((element) => observer.observe(element));
+
+    return () => observer.disconnect();
+  }, [windowStart, windowEnd]);
+
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key === "ArrowDown") {
       event.preventDefault();
@@ -313,12 +383,6 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
   }
 
   const activeCard = cards[activeIndex];
-  const windowStart = Math.max(0, activeIndex - WINDOW_RADIUS);
-  const windowEnd = Math.min(cards.length, activeIndex + WINDOW_RADIUS + 1);
-  const windowedCards = cards.slice(windowStart, windowEnd).map((card, offset) => ({
-    card,
-    index: windowStart + offset,
-  }));
 
   return (
     <div
@@ -400,9 +464,18 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
             </p>
           </div>
         ) : (
-          <div className="flex h-full flex-col snap-y snap-mandatory overflow-y-auto scroll-smooth">
-            {windowedCards.map(({ card }) => (
-              <div key={card.id} className="h-full w-full shrink-0 snap-start">
+          <div
+            ref={scrollerRef}
+            className="flex h-full flex-col snap-y snap-mandatory overflow-y-auto scroll-smooth"
+          >
+            {windowedCards.map(({ card, index }) => (
+              <div
+                key={card.id}
+                ref={getSlotRef(index)}
+                data-index={index}
+                data-active={String(index === activeIndex)}
+                className="paseo-slot h-full w-full shrink-0 snap-start"
+              >
                 <SpotCardView
                   card={card}
                   isSaved={savedIds.has(card.id)}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -50,6 +51,13 @@ const SAVE_BUTTON_BASE_CLASS =
   "inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded px-4 py-1.5 text-sm font-bold";
 const SAVE_BUTTON_UNSAVED_CLASS = "border border-cream bg-transparent text-cream hover:bg-cream/10";
 const SAVE_BUTTON_SAVED_CLASS = "bg-teal text-cream hover:bg-teal-deep";
+
+/** Inline `--paseo-line-index` for a `.paseo-line` element (paseo-motion.md,
+ * globals.css) -- name is 1, note is 2, distance is 3, each staggering 60ms
+ * behind the last on top of the shared head-start delay. */
+function paseoLineStyle(index: number): CSSProperties {
+  return { "--paseo-line-index": index } as CSSProperties;
+}
 
 /**
  * One full-height card in the Spots deck (social-spots.md, "Spots deck"
@@ -118,11 +126,11 @@ export default function SpotCardView({
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-tinta">
-      <div className="absolute inset-0">
-        <SpotPhoto photoUrl={card.photoUrl} name={card.name} />
+      <div className="paseo-photo absolute inset-0">
+        <SpotPhoto photoUrl={card.photoUrl} name={card.name} variant="fill" />
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-tinta via-tinta/70 to-transparent" />
+      <div className="paseo-veil pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-tinta via-tinta/70 to-transparent" />
 
       <div className="pointer-events-none absolute right-3 top-3 z-10">
         <div className="pointer-events-auto">
@@ -151,15 +159,21 @@ export default function SpotCardView({
 
         <div>
           <h2
-            className="text-2xl font-bold text-cream"
-            style={{ fontFamily: "var(--font-display)" }}
+            className="paseo-line text-2xl font-bold text-cream"
+            style={{ fontFamily: "var(--font-display)", ...paseoLineStyle(1) }}
           >
             {card.name}
           </h2>
-          <p className="line-clamp-2 text-sm text-cream/90">{card.note}</p>
+          <p className="paseo-line line-clamp-2 text-sm text-cream/90" style={paseoLineStyle(2)}>
+            {card.note}
+          </p>
         </div>
 
-        {distanceText && <p className="text-xs text-cream/80">{distanceText}</p>}
+        {distanceText && (
+          <p className="paseo-line text-xs text-cream/80" style={paseoLineStyle(3)}>
+            {distanceText}
+          </p>
+        )}
 
         {isPreview && card.photoCredit && (
           <p className="text-[11px] text-cream/70">{`Foto: ${card.photoCredit}`}</p>
