@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap } from "leaflet";
-import { MapContainer, Marker, useMap } from "react-leaflet";
+import { MapContainer, Marker, Polyline, useMap } from "react-leaflet";
 
 import BasemapLayer from "@/components/BasemapLayer";
 import CityMask from "@/components/CityMask";
@@ -16,6 +16,80 @@ const INSET_ZOOM = 16;
 
 /** Default square size (px) for the deck-card inset. */
 const DEFAULT_SIZE = 112;
+
+/** Floor for a flight's duration -- even a few-meter hop still reads as travel, not a snap. */
+const MIN_FLY_SECONDS = 0.35;
+/** Ceiling for a flight's duration -- past this a pan starts to feel sluggish inside a swipe deck. */
+const MAX_FLY_SECONDS = 1.1;
+/** Extra flight seconds added per kilometer of hop distance. */
+const FLY_SECONDS_PER_KM = 0.12;
+/**
+ * Leaflet's default `easeLinearity` (0.25) eases hard out of the start,
+ * which reads as a snap on a short hop. Pushed toward linear so the pan
+ * reads as travel across the ground instead of an ease curve settling
+ * into place.
+ */
+const FLY_EASE_LINEARITY = 0.5;
+
+/** Trail color -- routed through the terracotta token, never a raw hex. */
+const TRAIL_COLOR = "var(--color-terracotta)";
+const TRAIL_WEIGHT = 3;
+const TRAIL_MAX_OPACITY = 0.55;
+/** How often the trail's opacity steps down while it fades. */
+const TRAIL_FADE_TICK_MS = 30;
+/** How much longer the trail lingers past the flight itself -- "a beat". */
+const TRAIL_LINGER_MS = 250;
+
+interface TrailSegment {
+  /** Bumped per segment so React remounts `FadingTrail` instead of reusing a stale fade timer. */
+  key: number;
+  from: LatLng;
+  to: LatLng;
+  fadeMs: number;
+}
+
+/**
+ * A polyline from the previous inset center to the new one that fades out
+ * over roughly the flight duration plus a beat, then unmounts itself via
+ * `onDone`. Driven by a plain interval rather than a CSS animation -- the
+ * Paseo motion pass's CSS contract (globals.css) doesn't cover this trail,
+ * and `pathOptions.opacity` is just a normal React-controlled prop either
+ * way.
+ */
+function FadingTrail({ segment, onDone }: { segment: TrailSegment; onDone: () => void }) {
+  const [opacity, setOpacity] = useState(TRAIL_MAX_OPACITY);
+
+  useEffect(() => {
+    const start = Date.now();
+    const id = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const progress = Math.min(1, elapsed / segment.fadeMs);
+      setOpacity(TRAIL_MAX_OPACITY * (1 - progress));
+      if (progress >= 1) {
+        clearInterval(id);
+        onDone();
+      }
+    }, TRAIL_FADE_TICK_MS);
+
+    return () => clearInterval(id);
+    // `segment.fadeMs` is stable for the lifetime of a given segment --
+    // the caller keys this component by `segment.key`, so a new segment
+    // means a fresh mount (and a fresh `opacity` state) rather than this
+    // effect resetting state on an existing one. `onDone` is stable from
+    // the caller's `useCallback` but isn't part of the fade math itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [segment.fadeMs]);
+
+  return (
+    <Polyline
+      positions={[
+        [segment.from.lat, segment.from.lng],
+        [segment.to.lat, segment.to.lng],
+      ]}
+      pathOptions={{ color: TRAIL_COLOR, weight: TRAIL_WEIGHT, opacity }}
+    />
+  );
+}
 
 export interface MapInsetProps {
   center: LatLng;
@@ -76,6 +150,9 @@ function safeSetView(map: LeafletMap, center: LatLng) {
 function FlyToCenter({ center }: { center: LatLng }) {
   const map = useMap();
   const previousCenterRef = useRef<LatLng | null>(null);
+  const trailKeyRef = useRef(0);
+  const [trail, setTrail] = useState<TrailSegment | null>(null);
+  const clearTrail = useCallback(() => setTrail(null), []);
 
   // If the container is already usably sized at mount, there's nothing to
   // fix here -- MapContainer's own `center` prop already positioned it
@@ -108,15 +185,33 @@ function FlyToCenter({ center }: { center: LatLng }) {
     if (!isUsableCenter(center)) return;
 
     const previous = previousCenterRef.current;
-    const isFirstRun = previous === null;
-    const isUnchanged = previous !== null && previous.lat === center.lat && previous.lng === center.lng;
     previousCenterRef.current = center;
 
-    if (isFirstRun || isUnchanged) return;
+    // MapContainer's own `center` prop already positioned it -- see the
+    // doc comment above for why this must not also pan.
+    if (previous === null) return;
+    if (previous.lat === center.lat && previous.lng === center.lng) return;
 
     if (hasUsableMapSize(map)) {
+      // Scale the flight with hop distance -- a 40m hop and a cross-city
+      // hop shouldn't take the same quarter-second. Clamped at both ends
+      // so neither a near-zero hop nor a very far one breaks the feel.
+      const km = map.distance([previous.lat, previous.lng], [center.lat, center.lng]) / 1000;
+      const rawSeconds = MIN_FLY_SECONDS + km * FLY_SECONDS_PER_KM;
+      const duration = Math.min(MAX_FLY_SECONDS, Math.max(MIN_FLY_SECONDS, rawSeconds));
+
       try {
-        map.flyTo([center.lat, center.lng], map.getZoom(), { duration: 0.25 });
+        map.flyTo([center.lat, center.lng], map.getZoom(), {
+          duration,
+          easeLinearity: FLY_EASE_LINEARITY,
+        });
+        trailKeyRef.current += 1;
+        setTrail({
+          key: trailKeyRef.current,
+          from: previous,
+          to: center,
+          fadeMs: duration * 1000 + TRAIL_LINGER_MS,
+        });
       } catch {
         // A pan must never take the whole page down.
       }
@@ -128,7 +223,7 @@ function FlyToCenter({ center }: { center: LatLng }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [center.lat, center.lng]);
 
-  return null;
+  return trail ? <FadingTrail key={trail.key} segment={trail} onDone={clearTrail} /> : null;
 }
 
 export default function MapInsetInner({

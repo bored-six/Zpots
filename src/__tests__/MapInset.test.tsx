@@ -36,10 +36,24 @@ vi.mock("next/dynamic", () => ({
 // flip what `getSize()` reports (a real size vs. the zero-size container
 // that's the whole point of this regression suite) without needing a fresh
 // mock per test.
-const { flyToSpy, setViewSpy, invalidateSizeSpy, sizeRef } = vi.hoisted(() => ({
+const { flyToSpy, setViewSpy, invalidateSizeSpy, distanceSpy, sizeRef } = vi.hoisted(() => ({
   flyToSpy: vi.fn(),
   setViewSpy: vi.fn(),
   invalidateSizeSpy: vi.fn(),
+  // Deterministic haversine test double -- production code goes through
+  // the real Leaflet map's own `distance()`. Only needs to be directionally
+  // correct (further apart -> bigger number) for this file's assertions.
+  distanceSpy: vi.fn((a: [number, number], b: [number, number]) => {
+    const R = 6371000;
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const [lat1, lng1] = a;
+    const [lat2, lng2] = b;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const h =
+      Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }),
   sizeRef: { current: { x: 800, y: 600 } },
 }));
 
@@ -53,10 +67,17 @@ vi.mock("react-leaflet", async () => {
     Marker: ({ position }: { position: unknown }) => (
       <div data-testid="marker" data-position={JSON.stringify(position)} />
     ),
+    // Stand-in for the fading trail line (paseo-motion task 2.2) -- this
+    // file doesn't assert on it directly, but a real Polyline import
+    // rendering as `undefined` would crash every test that triggers a pan.
+    Polyline: ({ positions }: { positions: unknown }) => (
+      <div data-testid="trail" data-positions={JSON.stringify(positions)} />
+    ),
     useMap: () => ({
       flyTo: flyToSpy,
       setView: setViewSpy,
       invalidateSize: invalidateSizeSpy,
+      distance: distanceSpy,
       getZoom: () => 16,
       getSize: () => sizeRef.current,
     }),
@@ -76,6 +97,7 @@ beforeEach(() => {
   flyToSpy.mockClear();
   setViewSpy.mockClear();
   invalidateSizeSpy.mockClear();
+  distanceSpy.mockClear();
   sizeRef.current = { x: 800, y: 600 };
 });
 
