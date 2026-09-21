@@ -108,6 +108,14 @@ export interface MapInsetProps {
    * desktop two-column layout's right-hand map (`app/page.tsx`).
    */
   fill?: boolean;
+  /**
+   * True for the render span right after this spot's own confirm action
+   * completed (paseo-motion.md fix-round-2 finding 2) -- forwarded straight
+   * to `createPinIcon`'s `justConfirmed` option so the pin draws its halo
+   * once. Optional and defaults to `false`; a no-op unless `status` is also
+   * `"confirmed"`.
+   */
+  justConfirmed?: boolean;
 }
 
 /** True only for a `LatLng` Leaflet can actually plot -- both coordinates present and finite. */
@@ -232,6 +240,7 @@ export default function MapInsetInner({
   onExpand,
   size = DEFAULT_SIZE,
   fill = false,
+  justConfirmed = false,
 }: MapInsetProps) {
   // Declared before the `isUsableCenter` early return below so hook order
   // never varies across renders (PostFlow.tsx's own early returns follow
@@ -276,7 +285,7 @@ export default function MapInsetInner({
             112px is too small for either -- ground + pin only. */}
         <BasemapLayer map={map} />
         <CityMask />
-        <Marker position={[center.lat, center.lng]} icon={createPinIcon(status)} />
+        <Marker position={[center.lat, center.lng]} icon={createPinIcon(status, { justConfirmed })} />
         <FlyToCenter center={center} />
       </MapContainer>
     </button>

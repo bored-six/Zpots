@@ -18,6 +18,7 @@ import { bilingualLabel, COPY } from "@/lib/copy";
 import { formatDistance } from "@/lib/geo";
 import { isPreviewSpot } from "@/lib/preview-spots";
 import type { Spot, SpotCard } from "@/lib/spots";
+import { useJustConfirmed } from "@/lib/use-just-confirmed";
 import type { ReportReason } from "@/lib/validation";
 
 interface SpotCardViewProps {
@@ -80,6 +81,11 @@ export default function SpotCardView({
   const [insetExpanded, setInsetExpanded] = useState(false);
   const [showSaveGate, setShowSaveGate] = useState(false);
   const router = useRouter();
+  // Same "did this just transition" signal ConfirmButton uses for its own
+  // draw-on mark/pulse (paseo-motion.md fix-round-2 finding 2) -- so the
+  // inset's pin halo fires for the same confirm, once, and never replays
+  // when this card scrolls back into view already confirmed.
+  const justConfirmed = useJustConfirmed(card.status === "confirmed");
 
   const spotBase: Spot = card;
   // A preview spot (famous-places fallback) is read-only: its author has
@@ -137,6 +143,7 @@ export default function SpotCardView({
           <MapInset
             center={{ lat: card.lat, lng: card.lng }}
             status={card.status}
+            justConfirmed={justConfirmed}
             size={insetExpanded ? 240 : 112}
             onExpand={handleInsetTap}
           />

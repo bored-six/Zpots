@@ -235,6 +235,14 @@ export default function SpotMap({
   const [tappedLocation, setTappedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [reportedSpotIds, setReportedSpotIds] = useState<ReadonlySet<string>>(new Set());
+  // Ids whose confirm just completed in this SpotMap instance -- paseo-motion.md
+  // fix-round-2 finding 2, mirroring reportedSpotIds above: the mutation that
+  // flips a spot's status lives in handleConfirm below, so this is where the
+  // "just confirmed" signal for that spot's own pin belongs too, rather than
+  // new global state. `createPinIcon`'s justConfirmed option is a no-op
+  // unless the spot's status is also already "confirmed", so this being set
+  // slightly ahead of a caller re-fetching the updated status is harmless.
+  const [justConfirmedIds, setJustConfirmedIds] = useState<ReadonlySet<string>>(new Set());
   const [gatedAction, setGatedAction] = useState<GatedAction | null>(null);
   const [showOutsideCityBanner, setShowOutsideCityBanner] = useState(false);
 
@@ -364,6 +372,7 @@ export default function SpotMap({
 
     try {
       await onConfirmSpot(spotId);
+      setJustConfirmedIds((prev) => new Set(prev).add(spotId));
     } catch {
       // No error-display contract on ConfirmButton -- it just stays
       // clickable again so the user can retry.
@@ -404,7 +413,11 @@ export default function SpotMap({
         <CityMask />
         <PlaceLabelsLayer map={leafletMap} />
         {effectiveSpots.map((spot) => (
-          <Marker key={spot.id} position={[spot.lat, spot.lng]} icon={createPinIcon(spot.status)}>
+          <Marker
+            key={spot.id}
+            position={[spot.lat, spot.lng]}
+            icon={createPinIcon(spot.status, { justConfirmed: justConfirmedIds.has(spot.id) })}
+          >
             <Popup>
               <div className="zpots-popup">
                 <VintaRule />

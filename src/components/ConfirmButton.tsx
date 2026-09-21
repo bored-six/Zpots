@@ -4,6 +4,7 @@ import Bilingual from "@/components/Bilingual";
 import { CheckIcon } from "@/components/icons/status-icons";
 import { bilingualLabel } from "@/lib/copy";
 import type { Spot } from "@/lib/spots";
+import { useJustConfirmed } from "@/lib/use-just-confirmed";
 
 interface ConfirmButtonProps {
   /**
@@ -31,15 +32,25 @@ const CTA_CLASS =
  * spot gets a disabled, distinct state rather than the live call to action.
  */
 export default function ConfirmButton({ spot, onConfirm }: ConfirmButtonProps) {
+  // Fires only on the render span right after `spot.status` flips from
+  // "unconfirmed" to "confirmed" while this ConfirmButton stays mounted --
+  // never for a spot that is already confirmed the moment it renders (a
+  // deck card scrolling into the +/-2 window, a popup reopened later, any
+  // page load). See use-just-confirmed.ts for why that's a safe stand-in
+  // for "the confirm action actually completing" in this codebase.
+  const justConfirmed = useJustConfirmed(spot.status === "confirmed");
+
   if (spot.status === "confirmed") {
     return (
       <span className={BADGE_CLASS}>
-        <CheckIcon animate />
+        <CheckIcon animate={justConfirmed} />
         <Bilingual k="statusConfirmed" />
-        {/* Fires once on mount, vinta-colored, never intercepts clicks --
-            aria-hidden and empty so it can't touch the badge's accessible
-            text (ConfirmButton.test.tsx pins that to /^confirmed$/i). */}
-        <span className="paseo-confirm-pulse" aria-hidden="true" />
+        {justConfirmed && (
+          // Fires once, vinta-colored, never intercepts clicks -- aria-hidden
+          // and empty so it can't touch the badge's accessible text
+          // (ConfirmButton.test.tsx pins that to /^confirmed$/i).
+          <span className="paseo-confirm-pulse" aria-hidden="true" />
+        )}
       </span>
     );
   }
