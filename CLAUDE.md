@@ -16,7 +16,9 @@ Build these, nothing else:
 
 1. **Paseo (home)** — full-screen vertical swipe deck of spot cards: photo, spotter avatar and
    @handle, spot name, barangay, distance from you. Lanes: **Cerca** (near me), **Nuevo**
-   (newest), **Siguiendo** (people I follow).
+   (newest), **Siguiendo** (people I follow), **Famosos** (a curated set of well-known
+   Zamboanga places, browsable without an account — added 2026-09-21, see
+   `.claude/prds/famosos-lane.md`).
 2. **Map inset and Mapa tab** — a small live map on each card pans as you swipe; tap to expand
    to the full map. On the full map every pin is the spot's photo inside the compass-rose frame,
    clusters stack. Map stays clamped to Zamboanga City.
