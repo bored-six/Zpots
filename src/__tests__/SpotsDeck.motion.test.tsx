@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthStatus, AuthUser } from "@/lib/auth";
@@ -143,10 +143,18 @@ function fireIntersection(observer: FakeIntersectionObserver, target: Element, r
   );
 }
 
+/** jsdom has no scrollIntoView implementation at all -- SpotsDeck
+ * feature-detects it before calling it, so without this stub the call
+ * site is always skipped and every scrollIntoView assertion below would
+ * be vacuously true regardless of whether the component actually
+ * distinguishes programmatic from observed moves. */
+const scrollIntoViewMock = vi.fn();
+
 beforeEach(() => {
   vi.clearAllMocks();
   FakeIntersectionObserver.instances = [];
   vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
+  Element.prototype.scrollIntoView = scrollIntoViewMock;
   searchParams = new URLSearchParams();
   useAuthMock.mockReturnValue(authValue("signed-out"));
   useLocationMock.mockReturnValue({
@@ -264,6 +272,117 @@ describe("SpotsDeck -- scroll-driven active index", () => {
     await waitFor(() => expect(deck.getAttribute("data-active-id")).toBe("spot-1"));
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(deck.getAttribute("data-active-id")).toBe("spot-1");
+  });
+});
+
+describe("SpotsDeck -- programmatic vs observed moves must not fight (Finding 3)", () => {
+  it("an observer-driven index change does NOT call scrollIntoView", async () => {
+    feedCerca.mockResolvedValue(makeCards(5));
+    const { container } = render(<SpotsDeck />);
+    await screen.findAllByTestId("spot-card");
+    scrollIntoViewMock.mockClear();
+
+    const observer = FakeIntersectionObserver.instances.at(-1)!;
+    const targetSlot = Array.from(container.querySelectorAll(".paseo-slot")).find(
+      (el) => el.getAttribute("data-index") === "2",
+    )!;
+
+    fireIntersection(observer, targetSlot, 0.9);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("spots-deck").getAttribute("data-active-id")).toBe("spot-2"),
+    );
+    // The user's own finger already put this slot on screen -- a JS smooth
+    // scroll here would fight the in-progress touch scroll and the CSS
+    // snap-mandatory that already settled it there.
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
+  });
+
+  it("a keyboard move (ArrowDown) DOES call scrollIntoView for the destination slot", async () => {
+    feedCerca.mockResolvedValue(makeCards(5));
+    render(<SpotsDeck />);
+    await screen.findAllByTestId("spot-card");
+    scrollIntoViewMock.mockClear();
+
+    const deck = screen.getByTestId("spots-deck");
+    deck.focus();
+    await userEvent.keyboard("{ArrowDown}");
+
+    await waitFor(() => expect(deck.getAttribute("data-active-id")).toBe("spot-1"));
+    expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("a Hoy tap DOES call scrollIntoView for the destination slot", async () => {
+    feedCerca.mockResolvedValue(makeCards(5));
+    hoyRow.mockResolvedValue([
+      { spotId: "spot-3", author: { id: "u", handle: "h", displayName: "H", avatarUrl: null } },
+    ]);
+    const user = userEvent.setup();
+    render(<SpotsDeck />);
+    await screen.findByText("hoy-spot-3");
+    scrollIntoViewMock.mockClear();
+
+    await user.click(screen.getByText("hoy-spot-3"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("spots-deck").getAttribute("data-active-id")).toBe("spot-3"),
+    );
+    expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("a ?spot= deep link DOES call scrollIntoView once the first page resolves", async () => {
+    searchParams = new URLSearchParams("spot=spot-3");
+    feedCerca.mockResolvedValue(makeCards(5));
+    render(<SpotsDeck />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("spots-deck").getAttribute("data-active-id")).toBe("spot-3"),
+    );
+    expect(scrollIntoViewMock).toHaveBeenCalled();
+  });
+
+  it("an intersection event for a slot the animation merely passes over does not hijack a programmatic move's destination", async () => {
+    feedCerca.mockResolvedValue(makeCards(5));
+    const { container } = render(<SpotsDeck />);
+    await screen.findAllByTestId("spot-card");
+
+    const deck = screen.getByTestId("spots-deck");
+    deck.focus();
+    await userEvent.keyboard("{ArrowDown}"); // programmatic move targeting index 1
+
+    await waitFor(() => expect(deck.getAttribute("data-active-id")).toBe("spot-1"));
+
+    // The window shift from the move above re-creates the observer; grab
+    // the current one, same as the app would see in a real browser.
+    const observer = FakeIntersectionObserver.instances.at(-1)!;
+    const passedOverSlot = Array.from(container.querySelectorAll(".paseo-slot")).find(
+      (el) => el.getAttribute("data-index") === "3",
+    )!;
+
+    // A real IntersectionObserver fires for every slot a smooth-scroll
+    // animation passes over on its way to the destination, not just the
+    // destination itself. None of those intermediate crossings may steal
+    // activeIndex away from where the ArrowDown press actually asked to go.
+    // Wrapped in `act` so a hijacking state update (the bug) is flushed and
+    // visible to the very next assertion, instead of silently passing
+    // because React hadn't re-rendered yet.
+    act(() => fireIntersection(observer, passedOverSlot, 0.9));
+    expect(deck.getAttribute("data-active-id")).toBe("spot-1");
+
+    // Once the observer confirms the *actual* destination crossed the
+    // threshold, the guard must release -- observed moves resume working
+    // normally, they are not bounced or left permanently jammed.
+    const targetSlot = Array.from(container.querySelectorAll(".paseo-slot")).find(
+      (el) => el.getAttribute("data-index") === "1",
+    )!;
+    act(() => fireIntersection(observer, targetSlot, 0.9));
+    expect(deck.getAttribute("data-active-id")).toBe("spot-1");
+
+    const nextSlot = Array.from(container.querySelectorAll(".paseo-slot")).find(
+      (el) => el.getAttribute("data-index") === "2",
+    )!;
+    fireIntersection(observer, nextSlot, 0.9);
+    await waitFor(() => expect(deck.getAttribute("data-active-id")).toBe("spot-2"));
   });
 });
 

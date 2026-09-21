@@ -20,6 +20,21 @@ import type { ReportReason } from "@/lib/validation";
 
 type Lane = "cerca" | "nuevo" | "siguiendo";
 
+/**
+ * Where an `activeIndex` change came from -- the deck's own arrow keys, a
+ * Hoy tap, or the `?spot=` deep link ("programmatic") versus the
+ * IntersectionObserver adopting whatever slot the user's own scroll
+ * gesture already settled on ("observed"). Only a programmatic move should
+ * ever call `scrollIntoView`; the viewport is already correct for an
+ * observed one (paseo-motion.md Finding 3).
+ */
+type ActiveMoveOrigin = "programmatic" | "observed";
+
+interface ActiveMove {
+  index: number;
+  origin: ActiveMoveOrigin;
+}
+
 const LANES: readonly Lane[] = ["cerca", "nuevo", "siguiendo"];
 const PAGE_SIZE = 10;
 /** Prefetch the next page once the active card is this close to the end. */
@@ -28,6 +43,15 @@ const PREFETCH_THRESHOLD = 3;
 const WINDOW_RADIUS = 2;
 /** IntersectionObserver ratio a snap slot must clear to become the active card. */
 const ACTIVE_VISIBILITY_THRESHOLD = 0.6;
+/**
+ * Safety net for a programmatic move (arrow keys, Hoy tap, `?spot=` deep
+ * link): how long the destination guard (see `programmaticTargetRef`)
+ * stays armed if the IntersectionObserver never confirms arrival at the
+ * target itself -- e.g. no real `scrollIntoView` support (jsdom, SSR) or
+ * the observer never fires. Comfortably longer than a real smooth-scroll
+ * animation so it never releases the guard mid-flight.
+ */
+const PROGRAMMATIC_SCROLL_SETTLE_MS = 600;
 
 const TAB_BASE_CLASS =
   "min-h-10 rounded-full px-4 py-1.5 text-sm font-bold uppercase tracking-wide transition";
@@ -68,7 +92,14 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
   /** True while the deck is showing the famous-places preview instead of a real (empty) lane. */
   const [isPreview, setIsPreview] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [activeIndex, setActiveIndex] = useState(0);
+  // Starts as "observed", not "programmatic": there's no slot rendered yet
+  // to scroll to at mount (no data has loaded), and "programmatic" here
+  // would arm the mid-flight guard against index 0 before anything real
+  // ever asked to move there, silently swallowing the first genuine
+  // observed move until it happened to land back on index 0 or the settle
+  // timer expired.
+  const [activeMove, setActiveMove] = useState<ActiveMove>({ index: 0, origin: "observed" });
+  const activeIndex = activeMove.index;
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set());
   const [hoyEntries, setHoyEntries] = useState<HoyEntry[]>([]);
@@ -81,21 +112,60 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
   const saveTokensRef = useRef<Map<string, number>>(new Map());
   /** The scroll container the snap slots live in -- IntersectionObserver root. */
   const scrollerRef = useRef<HTMLDivElement | null>(null);
-  /** Absolute index -> mounted slot element, kept current by each slot's own
-   * ref callback (see `getSlotRef`) as the +/-2 window mounts/unmounts them. */
+  /** Absolute index -> mounted slot element, kept current by `registerSlot`
+   * (below) as the +/-2 window mounts/unmounts them. */
   const slotElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
+  /** Non-null while a programmatic move (arrow keys, Hoy tap, deep link) is
+   * still animating toward this index -- the IntersectionObserver fires for
+   * every slot a smooth scroll passes over on the way there, and only the
+   * destination itself may adopt activeIndex while this is armed. Cleared
+   * either when the observer confirms arrival, or after
+   * PROGRAMMATIC_SCROLL_SETTLE_MS as a safety net (see the effect below). */
+  const programmaticTargetRef = useRef<number | null>(null);
 
-  // Returns a fresh ref callback closing over `index` -- it only ever
-  // touches `slotElementsRef.current` when React actually invokes it as a
-  // ref (on mount/unmount), never synchronously here during render.
-  function getSlotRef(index: number) {
-    return (element: HTMLDivElement | null) => {
-      if (element) {
-        slotElementsRef.current.set(index, element);
-      } else {
-        slotElementsRef.current.delete(index);
-      }
+  /**
+   * Single stable identity across every render (`useCallback` with no
+   * dependencies) so React never detaches and reattaches a slot's ref just
+   * because some unrelated piece of state changed elsewhere in the
+   * component -- previously `getSlotRef(index)` returned a brand-new
+   * closure on every render, thrashing every mounted slot's ref on every
+   * re-render (paseo-motion.md Finding 4).
+   *
+   * Reads the index it needs off the element's own `data-index` attribute
+   * -- which React has already applied to the DOM node by the time it
+   * invokes a ref callback -- rather than closing over `index` or reading a
+   * Map during render (the latter is what tripped `react-hooks/refs`,
+   * "Cannot access refs during render", in an earlier attempt). Returns a
+   * cleanup (React 19 ref-callback cleanup) that removes the same entry on
+   * unmount, so bookkeeping only ever happens when React actually invokes
+   * this as a ref, never synchronously during the JSX `.map()`.
+   */
+  const registerSlot = useCallback((element: HTMLDivElement | null) => {
+    if (!element) return;
+    const indexAttr = element.dataset.index;
+    if (indexAttr === undefined) return;
+    const index = Number(indexAttr);
+    slotElementsRef.current.set(index, element);
+    return () => {
+      slotElementsRef.current.delete(index);
     };
+  }, []);
+
+  /** Moves `activeIndex` for one of the deck's own programmatic drivers
+   * (arrow keys, Hoy tap, the ?spot= deep link) -- as opposed to the
+   * IntersectionObserver adopting a user scroll. See `ActiveMove`. */
+  function moveActiveIndexTo(next: number | ((current: number) => number)) {
+    setActiveMove((current) => {
+      const index = typeof next === "function" ? next(current.index) : next;
+      // Bail out (same object, React skips the render) when the computed
+      // destination is where the deck already is -- e.g. the first page
+      // loading with no ?spot= match just confirms index 0, which is
+      // already the initial value. That must not arm the mid-flight guard
+      // against a "move" that never actually moves anything, which would
+      // otherwise block the very first real observed scroll after load.
+      if (index === current.index) return current;
+      return { index, origin: "programmatic" };
+    });
   }
 
   const showSignInGate = lane === "siguiendo" && auth.status === "signed-out";
@@ -130,7 +200,7 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
       if (lane === "siguiendo" && auth.status === "signed-out") {
         setCards([]);
         setIsPreview(false);
-        setActiveIndex(0);
+        moveActiveIndexTo(0);
         setHasMore(false);
         setLoading(false);
         setLoadError(false);
@@ -157,12 +227,12 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
           // purpose (you follow nobody), and a failed load stays an error.
           setCards(previewCards({ lat: location.coords.lat, lng: location.coords.lng }));
           setIsPreview(true);
-          setActiveIndex(0);
+          moveActiveIndexTo(0);
           setHasMore(false);
           return;
         }
         setCards(result);
-        setActiveIndex(consumeDeepLink(result) ?? 0);
+        moveActiveIndexTo(consumeDeepLink(result) ?? 0);
         setHasMore(result.length >= PAGE_SIZE);
       } catch {
         if (cancelled) return;
@@ -240,7 +310,7 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
         const merged = [...cards, ...deduped];
         setCards(merged);
         const deepLinkIndex = consumeDeepLink(merged);
-        if (deepLinkIndex != null) setActiveIndex(deepLinkIndex);
+        if (deepLinkIndex != null) moveActiveIndexTo(deepLinkIndex);
       }
       fetchingMoreRef.current = false;
     }
@@ -255,18 +325,37 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
     index: windowStart + offset,
   }));
 
-  // Scrolls the active slot into view whenever the active index changes,
-  // whichever of the deck's own programmatic drivers set it (arrow keys, a
-  // Hoy tap, the ?spot= deep link) -- previously nothing did this at all,
-  // so activeIndex moving never actually moved the visible scroll position.
-  // Also fires when the observer below sets the same index it just
-  // scrolled to; that's a harmless no-op since the slot is already in view.
+  // Scrolls the active slot into view -- but only for a programmatic move
+  // (arrow keys, a Hoy tap, the ?spot= deep link). An observed move means
+  // the IntersectionObserver below is only reporting where the user's own
+  // touch scroll already put the viewport; calling scrollIntoView there
+  // would fire a JS smooth-scroll against a finger still dragging and
+  // against the CSS snap-mandatory that already settled it (Finding 3).
+  //
+  // Also arms `programmaticTargetRef` for the duration of the move: a
+  // programmatic scrollIntoView animates past every slot between the old
+  // and new positions, and the observer below fires for each one it
+  // passes over. None of those intermediate crossings may hijack
+  // activeIndex away from this destination -- only the observer entry that
+  // matches `activeMove.index` itself is allowed to clear the guard. The
+  // settle timer is a safety net for when the observer never confirms
+  // arrival at all (no real scrollIntoView support, e.g. jsdom/SSR).
   useEffect(() => {
-    const element = slotElementsRef.current.get(activeIndex);
+    if (activeMove.origin !== "programmatic") return;
+
+    programmaticTargetRef.current = activeMove.index;
+
+    const element = slotElementsRef.current.get(activeMove.index);
     if (element && typeof element.scrollIntoView === "function") {
       element.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [activeIndex]);
+
+    const settleTimer = setTimeout(() => {
+      programmaticTargetRef.current = null;
+    }, PROGRAMMATIC_SCROLL_SETTLE_MS);
+
+    return () => clearTimeout(settleTimer);
+  }, [activeMove]);
 
   // Scroll-driven active index (paseo-motion.md prerequisite fix): a finger
   // swipe never updated activeIndex at all -- it only moved on arrow keys, a
@@ -274,8 +363,18 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
   // (onActiveCardChange) and the +/-2 render window from what's actually on
   // screen. Observes every currently mounted slot against the scroller
   // itself and adopts whichever one crosses ACTIVE_VISIBILITY_THRESHOLD.
-  // Re-created whenever the +/-2 window shifts, since slots outside it
-  // unmount and the newly mounted ones need to be observed in their place.
+  //
+  // Disconnects and re-creates on every +/-2 window shift, which in
+  // practice is almost every activeIndex move -- real churn, not just a
+  // one-off on mount. Left this way deliberately rather than incrementally
+  // observing/unobserving only the slots that entered or left: it isn't a
+  // correctness bug (a real IntersectionObserver replays each observed
+  // element's current intersection state immediately on `observe()`, so
+  // nothing is missed by the rebuild), and an incremental version would
+  // have to track its own "already observed" set in a ref and coordinate
+  // it with the `programmaticTargetRef` guard above for no measured
+  // performance win -- not worth the added surface for a Medium/no-bug
+  // finding.
   useEffect(() => {
     const root = scrollerRef.current;
     if (!root || typeof IntersectionObserver !== "function") return;
@@ -287,7 +386,18 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
           const indexAttr = (entry.target as HTMLElement).dataset.index;
           if (indexAttr === undefined) continue;
           const index = Number(indexAttr);
-          setActiveIndex((current) => (current === index ? current : index));
+
+          // A programmatic move is still animating toward
+          // programmaticTargetRef.current -- ignore every crossing except
+          // the destination itself, and release the guard once it's seen.
+          if (programmaticTargetRef.current !== null) {
+            if (programmaticTargetRef.current !== index) continue;
+            programmaticTargetRef.current = null;
+          }
+
+          setActiveMove((current) =>
+            current.index === index ? current : { index, origin: "observed" },
+          );
         }
       },
       { root, threshold: ACTIVE_VISIBILITY_THRESHOLD },
@@ -301,16 +411,16 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setActiveIndex((index) => Math.min(index + 1, Math.max(cards.length - 1, 0)));
+      moveActiveIndexTo((index) => Math.min(index + 1, Math.max(cards.length - 1, 0)));
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      setActiveIndex((index) => Math.max(index - 1, 0));
+      moveActiveIndexTo((index) => Math.max(index - 1, 0));
     }
   }
 
   function handleHoySelect(spotId: string) {
     const index = cards.findIndex((card) => card.id === spotId);
-    if (index !== -1) setActiveIndex(index);
+    if (index !== -1) moveActiveIndexTo(index);
   }
 
   /** Bumps and returns this spot's save/unsave sequence token (B3). */
@@ -471,7 +581,7 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
             {windowedCards.map(({ card, index }) => (
               <div
                 key={card.id}
-                ref={getSlotRef(index)}
+                ref={registerSlot}
                 data-index={index}
                 data-active={String(index === activeIndex)}
                 className="paseo-slot h-full w-full shrink-0 snap-start"
