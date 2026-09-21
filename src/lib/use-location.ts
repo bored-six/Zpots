@@ -29,6 +29,27 @@ export interface LocationResult {
 /** Plaza Pershing, Zamboanga City -- the fallback point when a real fix isn't available. */
 export const FALLBACK_COORDS: LatLng = { lat: 6.9106, lng: 122.0736 };
 
+/**
+ * `PositionOptions` for `getCurrentPosition()` (spec `ubicacion` A.3). This is a
+ * walking-scale city app: a coarse, cheap fix is plenty, so high accuracy is off,
+ * a 10s browser-side timeout stops a stalled acquisition, and a 5 minute cached
+ * fix is accepted since the hook fetches once per session and never refreshes.
+ */
+export const GEOLOCATION_OPTIONS: PositionOptions = {
+  enableHighAccuracy: false,
+  timeout: 10_000,
+  maximumAge: 300_000,
+};
+
+/**
+ * Wall-clock watchdog (spec `ubicacion` A.2): `PositionOptions.timeout` only
+ * starts counting once the browser's permission prompt is answered, so it does
+ * not cover an unanswered prompt. This watchdog does. Deliberately longer than
+ * `GEOLOCATION_OPTIONS.timeout` so the browser's own timeout gets a chance to
+ * fire first through the normal error callback.
+ */
+export const LOCATION_WATCHDOG_MS = 12_000;
+
 let state: LocationResult = { status: "loading", coords: FALLBACK_COORDS, isFallback: true };
 let started = false;
 const listeners = new Set<() => void>();
@@ -48,8 +69,19 @@ function startLocating(): void {
     return;
   }
 
+  let settled = false;
+
+  const watchdog = setTimeout(() => {
+    if (settled) return;
+    settled = true;
+    setState({ status: "denied", coords: FALLBACK_COORDS, isFallback: true });
+  }, LOCATION_WATCHDOG_MS);
+
   geolocation.getCurrentPosition(
     (position) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(watchdog);
       const coords: LatLng = { lat: position.coords.latitude, lng: position.coords.longitude };
       if (isWithinZamboangaCity(coords.lat, coords.lng)) {
         setState({ status: "granted", coords, isFallback: false });
@@ -58,8 +90,12 @@ function startLocating(): void {
       }
     },
     () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(watchdog);
       setState({ status: "denied", coords: FALLBACK_COORDS, isFallback: true });
     },
+    GEOLOCATION_OPTIONS,
   );
 }
 
