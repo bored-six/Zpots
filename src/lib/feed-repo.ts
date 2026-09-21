@@ -92,6 +92,9 @@ export async function feedSiguiendo(
 /** One entry in the Hoy row: a followee who dropped a spot in the last 24h. */
 export interface HoyEntry {
   spotId: string;
+  /** When the spot was dropped -- lets HoyRow tell a fresh post (paseo-motion
+   * vinta ring) from an older one within the same 24h window. */
+  createdAt: string;
   author: {
     id: string;
     handle: string;
@@ -118,11 +121,19 @@ export async function hoyRow(): Promise<HoyEntry[]> {
 
   const rows =
     (data as
-      | { spot_id: string; id: string; handle: string; display_name: string; avatar_url: string | null }[]
+      | {
+          spot_id: string;
+          id: string;
+          handle: string;
+          display_name: string;
+          avatar_url: string | null;
+          created_at: string;
+        }[]
       | null) ?? [];
 
   return rows.map((row) => ({
     spotId: row.spot_id,
+    createdAt: row.created_at,
     author: {
       id: row.id,
       handle: row.handle,

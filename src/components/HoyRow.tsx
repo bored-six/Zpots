@@ -8,6 +8,21 @@ interface HoyRowProps {
   onSelect: (spotId: string) => void;
 }
 
+/** A post this recent or newer gets the spinning vinta ring (paseo-motion.md,
+ * "the vinta ring rotates only for people who posted in the last hour"). */
+const FRESH_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * True when `createdAt` is within `FRESH_WINDOW_MS` of now. A missing or
+ * unparseable timestamp is never fresh -- `Date.parse` returns `NaN` for
+ * those, and every comparison against `NaN` is false, so this falls through
+ * to `false` without throwing.
+ */
+function isFresh(createdAt: string): boolean {
+  const postedAt = Date.parse(createdAt);
+  return Date.now() - postedAt < FRESH_WINDOW_MS;
+}
+
 /**
  * "Hoy" row under the lane tabs (social-spots.md, "Spots deck"):
  * followees with a spot in the last 24h, each a tappable avatar in a
@@ -26,7 +41,10 @@ export default function HoyRow({ entries, onSelect }: HoyRowProps) {
           onClick={() => onSelect(entry.spotId)}
           className="flex shrink-0 flex-col items-center gap-1"
         >
-          <span className="vinta-ring inline-flex rounded-full p-[2px]">
+          <span
+            className="vinta-ring inline-flex rounded-full p-[2px]"
+            data-fresh={String(isFresh(entry.createdAt))}
+          >
             <Avatar
               handle={entry.author.handle}
               avatarUrl={entry.author.avatarUrl}

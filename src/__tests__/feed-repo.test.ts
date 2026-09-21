@@ -224,6 +224,27 @@ describe("hoyRow", () => {
       author: { id: "user-2", handle: "kuya_ben", displayName: "Kuya Ben" },
     });
   });
+
+  it("carries the row's created_at through as createdAt (paseo-motion: vinta ring freshness)", async () => {
+    const rpcMock = vi.fn().mockResolvedValue({
+      data: [
+        {
+          spot_id: "spot-1",
+          handle: "kuya_ben",
+          display_name: "Kuya Ben",
+          avatar_url: null,
+          id: "user-2",
+          created_at: "2026-09-21T12:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    vi.mocked(getSupabaseClient).mockReturnValue({ rpc: rpcMock } as never);
+
+    const result = await hoyRow();
+
+    expect(result[0]).toMatchObject({ createdAt: "2026-09-21T12:00:00.000Z" });
+  });
 });
 
 // ---------------------------------------------------------------------------
