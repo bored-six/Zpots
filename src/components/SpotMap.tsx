@@ -29,9 +29,26 @@ import {
   MIN_ZOOM,
   ZAMBOANGA_CENTER,
 } from "@/lib/map-config";
-import { createPhotoPinIcon, createPinIcon } from "@/lib/pin-icon";
+import { createPhotoPinIcon, createPinIcon, type PhotoPinSize, type PinSize } from "@/lib/pin-icon";
+import {
+  computePinTiers,
+  PHOTO_CEILING_TIER,
+  PHOTO_LAST_TIER,
+  PIN_TIER_SIZES,
+  PLAIN_CEILING_TIER,
+  type DensityPoint,
+  type PinTier,
+} from "@/lib/pin-density";
 import type { MapSource, MapSpot, Spot } from "@/lib/spots";
 import type { NewSpotInput, ReportReason } from "@/lib/validation";
+
+/**
+ * press 320 + delay 320 + pulse 640 = 1280ms; 1200 sits inside the pulse's
+ * invisible tail (pin-revamp-spec.md section 4.7's "one-shot guarantee") --
+ * every animation's end frame equals the static confirmed render, so
+ * clearing the flag here is invisible even if it lands mid-pulse.
+ */
+const JUST_CONFIRMED_TTL_MS = 1200;
 
 /**
  * True only for a spot Leaflet can actually plot. A row with a missing or
@@ -42,6 +59,18 @@ import type { NewSpotInput, ReportReason } from "@/lib/validation";
  */
 function hasFiniteCoords(spot: { lat: number; lng: number }): boolean {
   return Number.isFinite(spot.lat) && Number.isFinite(spot.lng);
+}
+
+/**
+ * `leafletMap.getZoom()`, guarded the same way `leafletMap` itself is
+ * guarded (spec E10): some react-leaflet test doubles in this suite (e.g.
+ * SpotMap.pergamino.test.tsx's fake map) only implement the handful of
+ * methods that file exercises, not the full Leaflet `Map` interface. A test
+ * double missing `getZoom` behaves like `leafletMap` being null -- fall
+ * back to `DEFAULT_ZOOM` rather than throwing.
+ */
+function readZoom(map: LeafletMap): number {
+  return typeof map.getZoom === "function" ? map.getZoom() : DEFAULT_ZOOM;
 }
 
 interface SpotMapProps {
@@ -213,22 +242,95 @@ function usePinIconCache() {
 type PinIconCacheGetter = ReturnType<typeof usePinIconCache>;
 
 /**
- * Mi mapa pin-by-source rule (social-spots.md): `mine` is the spot's own
- * photo inside the compass frame, `been` is the solid confirmed pin, and
- * `saved` is the hollow unconfirmed pin -- deliberately independent of the
- * spot's actual confirmation status, since a saved-but-unconfirmed spot and
- * an unconfirmed spot you dropped yourself should still look different.
+ * Density-key prefixes (pin-revamp-spec.md section 5.7, E6): `spots` and
+ * `mapSpots` can both contain a spot with the same id, so each layer's
+ * `DensityPoint`/tier lookup needs its own namespaced key.
  */
-function iconForMapSpot(spot: MapSpot, getIcon: PinIconCacheGetter): L.DivIcon {
-  const key = `${spot.source}:${spot.photoUrl ?? ""}:${spot.status}`;
+function spotDensityKey(id: string): string {
+  return `spot:${id}`;
+}
+function mapSpotDensityKey(id: string): string {
+  return `map:${id}`;
+}
+
+/** Largest tier a computed map didn't produce an entry for (E9/defensive) falls back to the kind's ceiling. */
+function tierFor(tiers: ReadonlyMap<string, PinTier>, key: string, wantsPhoto: boolean): PinTier {
+  return tiers.get(key) ?? (wantsPhoto ? PHOTO_CEILING_TIER : PLAIN_CEILING_TIER);
+}
+
+/**
+ * Only "mine"/"preview" (and, forward-compatibly, a future "famoso" source --
+ * spec assumption A5) pins are ever the spot's own photo. Widened to
+ * `string` before comparing so this keeps compiling if `MapSource` gains
+ * "famoso" later without this file needing to change.
+ */
+function isPhotoEligibleSource(source: MapSource): boolean {
+  const value: string = source;
+  return value === "mine" || value === "preview" || value === "famoso";
+}
+
+/** `wantsPhoto` mirrors `iconForMapSpot`'s own photo-eligibility rule (spec section 5.4). */
+function wantsPhotoFor(spot: MapSpot): boolean {
+  return isPhotoEligibleSource(spot.source) && Boolean(spot.photoUrl);
+}
+
+/**
+ * `spots` (write-mode) layer icon factory + cache key (spec sections 5.7,
+ * 7.5): `${status}:${justConfirmed}:${category ?? "-"}:${tier}`. A `size`
+ * outside `PinSize` never reaches `createPinIcon` here -- `tier` always maps
+ * to one of the plain ladder's four sizes (32/22/16/10) for this layer.
+ */
+function iconForSpot(
+  spot: Spot,
+  tier: PinTier,
+  justConfirmed: boolean,
+  getIcon: PinIconCacheGetter,
+): L.DivIcon {
+  const category = spot.category;
+  const key = `${spot.status}:${justConfirmed}:${category ?? "-"}:${tier}`;
+  return getIcon(spot.id, key, () =>
+    createPinIcon(spot.status, { justConfirmed, category, size: PIN_TIER_SIZES[tier] as PinSize }),
+  );
+}
+
+/**
+ * Mi mapa pin-by-source rule (social-spots.md): `mine`/`preview` use the
+ * spot's own actual `status`; `saved`/`been` derive a pseudo-status from
+ * `source` instead (`been` -> confirmed, `saved` -> unconfirmed) --
+ * deliberately independent of the spot's real confirmation status, since a
+ * saved-but-unconfirmed spot and an unconfirmed spot you dropped yourself
+ * should still look different. `createPhotoPinIcon` is only reached when
+ * the spot wants a photo *and* the current tier still shows one (spec
+ * section 5.4/7.5) -- crowding drops the photo before the glyph returns.
+ */
+function iconForMapSpot(
+  spot: MapSpot,
+  tier: PinTier,
+  justConfirmed: boolean,
+  getIcon: PinIconCacheGetter,
+): L.DivIcon {
+  const category = spot.category;
+  const key = `${spot.source}:${spot.photoUrl ?? ""}:${spot.status}:${category ?? "-"}:${tier}:${justConfirmed}`;
+
   return getIcon(spot.id, key, () => {
-    // Preview pins (famous-places fallback) are photo pins too -- they exist
-    // to show what a filled-in map looks like.
-    if (spot.source === "mine" || spot.source === "preview") {
-      if (spot.photoUrl) return createPhotoPinIcon(spot.photoUrl, spot.status);
-      return createPinIcon(spot.status);
+    if (isPhotoEligibleSource(spot.source)) {
+      if (spot.photoUrl && tier <= PHOTO_LAST_TIER) {
+        return createPhotoPinIcon(spot.photoUrl, spot.status, {
+          justConfirmed,
+          size: PIN_TIER_SIZES[tier] as PhotoPinSize,
+        });
+      }
+      return createPinIcon(spot.status, {
+        justConfirmed,
+        category,
+        size: PIN_TIER_SIZES[tier] as PinSize,
+      });
     }
-    return createPinIcon(spot.source === "been" ? "confirmed" : "unconfirmed");
+    return createPinIcon(spot.source === "been" ? "confirmed" : "unconfirmed", {
+      justConfirmed,
+      category,
+      size: PIN_TIER_SIZES[tier] as PinSize,
+    });
   });
 }
 
@@ -263,6 +365,10 @@ export default function SpotMap({
   ).filter(hasFiniteCoords);
 
   const [leafletMap, setLeafletMap] = useState<LeafletMap | null>(null);
+  // Density-responsive sizing (pin-revamp-spec.md section 5.5): read once the
+  // real map exists, then only on `zoomend` -- never `move`/`moveend`/`zoom`,
+  // since pixel distance between two spots is invariant under panning.
+  const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM);
   const [basemapMode, setBasemapMode] = useState<BasemapMode | null>(null);
   const [isPlacementArmed, setIsPlacementArmed] = useState(false);
   const [tappedLocation, setTappedLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -285,10 +391,64 @@ export default function SpotMap({
   const getSpotIcon = usePinIconCache();
   const getMapSpotIcon = usePinIconCache();
   const [showOutsideCityBanner, setShowOutsideCityBanner] = useState(false);
+  // Pending `justConfirmedIds` removals (spec section 4.7's "one-shot
+  // guarantee"): keyed by spot id so a second confirm before the first
+  // timer fires replaces it instead of stacking two removals.
+  const justConfirmedTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   function isGateOpen(): boolean {
     return effectiveAuthStatus === "signed-in";
   }
+
+  // Density-responsive sizing (spec sections 5.5, 7.5): subscribes once the
+  // real Leaflet map instance exists, reads the zoom immediately, and
+  // recomputes only on `zoomend` -- a fake map in a test double that never
+  // calls back into `on("zoomend", ...)` just leaves `zoom` at DEFAULT_ZOOM.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!leafletMap) return;
+    const map = leafletMap;
+    setZoom(readZoom(map));
+    function handleZoomEnd() {
+      setZoom(readZoom(map));
+    }
+    map.on("zoomend", handleZoomEnd);
+    return () => {
+      map.off("zoomend", handleZoomEnd);
+    };
+  }, [leafletMap]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Clears any pending justConfirmedIds-removal timers on unmount -- a
+  // confirm that resolves right before navigating away must never try to
+  // setState on an unmounted SpotMap (spec E16).
+  useEffect(() => {
+    const timers = justConfirmedTimersRef.current;
+    return () => {
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
+    };
+  }, []);
+
+  // Computed fresh every render (spec 5.5: "the computation runs in render,
+  // it is O(n) and pure" -- the icon cache above is what prevents DOM churn,
+  // not memoizing this). `effectiveSpots`/`visibleMapSpots` can share an id
+  // (E6), so each layer gets its own namespaced density key.
+  const densityPoints: DensityPoint[] = [
+    ...effectiveSpots.map((spot) => ({
+      key: spotDensityKey(spot.id),
+      lat: spot.lat,
+      lng: spot.lng,
+      wantsPhoto: false,
+    })),
+    ...visibleMapSpots.map((spot) => ({
+      key: mapSpotDensityKey(spot.id),
+      lat: spot.lat,
+      lng: spot.lng,
+      wantsPhoto: wantsPhotoFor(spot),
+    })),
+  ];
+  const pinTiers = computePinTiers(densityPoints, zoom);
 
   // Sign-out in another tab while placement/the add form is open: close
   // both, same as Cancel (auth-migration.md section 3.2). This is a
@@ -413,6 +573,22 @@ export default function SpotMap({
     try {
       await onConfirmSpot(spotId);
       setJustConfirmedIds((prev) => new Set(prev).add(spotId));
+
+      const timers = justConfirmedTimersRef.current;
+      const existingTimer = timers.get(spotId);
+      if (existingTimer) clearTimeout(existingTimer);
+      timers.set(
+        spotId,
+        setTimeout(() => {
+          timers.delete(spotId);
+          setJustConfirmedIds((prev) => {
+            if (!prev.has(spotId)) return prev;
+            const next = new Set(prev);
+            next.delete(spotId);
+            return next;
+          });
+        }, JUST_CONFIRMED_TTL_MS),
+      );
     } catch {
       // No error-display contract on ConfirmButton -- it just stays
       // clickable again so the user can retry.
@@ -456,10 +632,11 @@ export default function SpotMap({
           <Marker
             key={spot.id}
             position={[spot.lat, spot.lng]}
-            icon={getSpotIcon(
-              spot.id,
-              `${spot.status}:${justConfirmedIds.has(spot.id)}`,
-              () => createPinIcon(spot.status, { justConfirmed: justConfirmedIds.has(spot.id) }),
+            icon={iconForSpot(
+              spot,
+              tierFor(pinTiers, spotDensityKey(spot.id), false),
+              justConfirmedIds.has(spot.id),
+              getSpotIcon,
             )}
           >
             <Popup>
@@ -505,7 +682,12 @@ export default function SpotMap({
           <Marker
             key={spot.id}
             position={[spot.lat, spot.lng]}
-            icon={iconForMapSpot(spot, getMapSpotIcon)}
+            icon={iconForMapSpot(
+              spot,
+              tierFor(pinTiers, mapSpotDensityKey(spot.id), wantsPhotoFor(spot)),
+              justConfirmedIds.has(spot.id),
+              getMapSpotIcon,
+            )}
             ref={(marker) => {
               if (marker && openSpotId && spot.id === openSpotId) {
                 marker.openPopup();
