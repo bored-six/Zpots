@@ -171,8 +171,17 @@ the city outline polygon; the tab strip fits at 375px.
 - Lantawan Grassland's photo is captioned "Upper Pasonanca" and never "Lantawan"; the photo-to-place
   link is inference.
 - A programmatic scroll interrupted by a lane switch loses its gesture-cancel listeners for the
-  gap while the scroller is unmounted. Bounded and self-healing via the 600 ms settle timer, and
-  pre-existing rather than introduced here.
+  gap while the scroller is unmounted. No traced path leaves `activeIndex` stuck: every
+  `loadFirstPage` calls `moveActiveIndexTo(...)`, which creates a fresh `activeMove`, overwrites
+  the stale `programmaticTargetRef` and clears the stale settle timer; the one case that does not
+  re-arm is a stale target already equal to 0, which is self-consistent. The mechanism is
+  pre-existing, but **this change widens how often it is reachable** — before `2bbecff` only the
+  signed-out Siguiendo path cleared `cards` mid-lane, and now every lane switch does. Saying it is
+  merely "pre-existing" undersells that.
+- `handleLaneChange` resets `cards` and `loading` but not `loadError` or `isPreview`. Verified to
+  cause no visible flash today, because the render ternary checks `loading && cards.length === 0`
+  first and the preview banner gates on `!loading`. That is incidental, not deliberate — reordering
+  the ternary later would silently reintroduce a stale-error flash mid-switch.
 
 ## Research notes — exact photo URLs
 
