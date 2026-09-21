@@ -1,6 +1,19 @@
 /** A spot is Unconfirmed until enough distinct people vouch for it. */
 export type SpotStatus = "unconfirmed" | "confirmed";
 
+/**
+ * Grabado pin categories (pin-revamp-spec.md section 2). Read cue on the pin
+ * only -- no DB column, no filter, no legend yet (section 7.1/"Out of
+ * scope"). Ids are ASCII; labels carry the accents in the UI copy.
+ */
+export const SPOT_CATEGORIES = ["come", "senta", "camina", "agua", "mira", "compra"] as const;
+
+export type SpotCategory = (typeof SPOT_CATEGORIES)[number];
+
+export function isSpotCategory(value: unknown): value is SpotCategory {
+  return typeof value === "string" && (SPOT_CATEGORIES as readonly string[]).includes(value);
+}
+
 export interface Spot {
   id: string;
   name: string;
@@ -14,6 +27,8 @@ export interface Spot {
   nickname?: string;
   /** Public storage URL for the spot's photo. Maps to `photo_url` in 0001_init.sql. */
   photoUrl?: string;
+  /** Read cue on the pin (pin-revamp-spec.md section 2). Not persisted yet. */
+  category?: SpotCategory;
 }
 
 /**
