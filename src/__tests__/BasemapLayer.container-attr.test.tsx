@@ -25,6 +25,9 @@ vi.mock("protomaps-leaflet", () => ({
   leafletLayer: leafletLayerMock,
   PolygonSymbolizer: PolygonSymbolizerMock,
   LineSymbolizer: LineSymbolizerMock,
+  // Real numeric values (tilecache.ts): Point=1, Line=2, Polygon=3 --
+  // buildPaintRules' geometry-type filter reads this off the module.
+  GeomType: { Point: 1, Line: 2, Polygon: 3 },
 }));
 
 const { probeMock } = vi.hoisted(() => ({ probeMock: vi.fn() }));

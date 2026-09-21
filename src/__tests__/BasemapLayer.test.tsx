@@ -23,6 +23,11 @@ vi.mock("protomaps-leaflet", () => ({
   leafletLayer: leafletLayerMock,
   PolygonSymbolizer: PolygonSymbolizerMock,
   LineSymbolizer: LineSymbolizerMock,
+  // Real numeric values (tilecache.ts): Point=1, Line=2, Polygon=3.
+  // buildPaintRules reads this off the module to build its geometry-type
+  // filter (pergamino-map.md, "Step 1") -- an unfaithful mock without it
+  // would throw the moment buildPaintRules runs, not silently pass.
+  GeomType: { Point: 1, Line: 2, Polygon: 3 },
 }));
 
 const { probeMock } = vi.hoisted(() => ({ probeMock: vi.fn() }));

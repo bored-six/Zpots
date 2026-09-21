@@ -92,8 +92,12 @@ function ensureGlobalLeaflet(): void {
  * descriptors (pergamino-style.ts) into protomaps-leaflet PaintRules,
  * resolving each layer's palette token to a real colour string up front
  * -- canvas `fillStyle`/`strokeStyle` can't read a CSS custom property.
+ *
+ * Exported (not just used locally) so pergamino-map.md Step 1's fix --
+ * a real geometry-type filter -- can be tested directly against the
+ * PaintRules it produces, without rendering the component or a real map.
  */
-function buildPaintRules(
+export function buildPaintRules(
   protomaps: ProtomapsModule,
   palette: Record<PergaminoTokenName, string>,
 ): PaintRule[] {
@@ -108,18 +112,38 @@ function buildPaintRules(
         : new protomaps.LineSymbolizer({
             color: layer.strokeToken ? palette[layer.strokeToken] : undefined,
             width: layer.widthPx,
+            dash: layer.dashPx ? [...layer.dashPx] : undefined,
           });
+
+    // The "blob bug" fix (pergamino-map.md, Step 1). protomaps-leaflet's
+    // painter has no geometry dispatch of its own: it hands every feature
+    // in `dataLayer` straight to the symbolizer's `draw()`, and
+    // PolygonSymbolizer.draw always does beginPath() -> ... -> fill(),
+    // which canvas implicitly closes -- so a LineString in the "water"
+    // layer (a river, a strait) was being closed into a shape and filled
+    // as sea. The official Protomaps style guards earth/water with
+    // `["==", "$type", "Polygon"]`; this is that guard. `layer.match`
+    // (pergamino-style.ts) only ever sees a feature's `props`, never its
+    // geometry, so the geometry check has to live here, where the real
+    // `protomaps.GeomType` enum (Point/Line/Polygon) is available -- it's
+    // handed in via the same lazily-imported module `buildPaintRules`
+    // already receives, so this stays inside the D8 lazy-load boundary.
+    const requiredGeomType =
+      layer.geometry === "polygon" ? protomaps.GeomType.Polygon : protomaps.GeomType.Line;
 
     return {
       id: layer.id,
       dataLayer: layer.dataLayer,
       minzoom: layer.minZoom,
-      // pergamino-style.ts's `match` only needs the feature's own
-      // properties; protomaps-leaflet's own Filter type also passes zoom.
-      filter: layer.match
-        ? (_zoom: number, feature: { props: Record<string, unknown> }) =>
-            layer.match!(feature.props)
-        : undefined,
+      filter: (
+        _zoom: number,
+        feature: { props: Record<string, unknown>; geomType: number },
+      ) => {
+        if (feature.geomType !== requiredGeomType) return false;
+        // pergamino-style.ts's `match` only needs the feature's own
+        // properties; the geometry half of the filter is handled above.
+        return layer.match ? layer.match(feature.props) : true;
+      },
       symbolizer,
     } as PaintRule;
   });
