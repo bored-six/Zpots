@@ -58,9 +58,9 @@ const EXPECTED_GROUND_TOKENS: Record<string, string> = {
 };
 
 /**
- * The four existing "Ciudad Latina" tokens the map's lettering reuses
- * (globals.css's own comment: "map lettering reuses --color-ink /
- * --color-stone-deep / --color-teal-deep"), transcribed independently of
+ * The five "Ciudad Latina" tokens the map's lettering reuses (globals.css's
+ * own comment: "map lettering reuses --color-ink / --color-stone-deep /
+ * --color-teal-deep / --color-forest-deep"), transcribed independently of
  * PERGAMINO_LABEL_FALLBACK_HEX for the same anti-drift reason as
  * EXPECTED_GROUND_TOKENS above.
  */
@@ -69,6 +69,9 @@ const EXPECTED_LABEL_TOKENS: Record<string, string> = {
   "--color-stone-deep": "#7a6448",
   "--color-teal-deep": "#165259",
   "--color-cream": "#f6eedc",
+  // The Pasonanca naming fix's fifth lettering colour -- a green for named
+  // natural/landscape pois, distinct from --color-teal-deep's water italic.
+  "--color-forest-deep": "#3d5c2f",
 };
 
 describe("Pergamino ground tokens (globals.css)", () => {

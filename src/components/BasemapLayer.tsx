@@ -25,7 +25,13 @@ import {
   type PergaminoLabelColorName,
   type PergaminoTokenName,
 } from "@/lib/pergamino-palette";
-import { PERGAMINO_LAYERS, isWaterLine, poiHasName, roadClass } from "@/lib/pergamino-style";
+import {
+  PERGAMINO_LAYERS,
+  isNaturalLandscapePoi,
+  isWaterLine,
+  poiHasName,
+  roadClass,
+} from "@/lib/pergamino-style";
 
 /**
  * "protomaps-leaflet" is ~45kB gzipped and only matters once a live
@@ -197,6 +203,18 @@ const WATER_POINT_KINDS = new Set(["ocean", "bay", "strait", "fjord", "sea", "la
  * street names from z12, river/stream and finer-grained district names
  * from z13, minor street names from z14, named points of interest from
  * z15 -- wide view reads as districts, close view reads as streets.
+ *
+ * One deliberate exception to that z15 POI floor: named natural/protected
+ * landscape features (label-poi-natural, isNaturalLandscapePoi) start at
+ * z11 instead. A ~180km2 shape like Pasonanca Natural Park dominates the
+ * screen at z11-13 -- exactly the zooms the general POI rule doesn't reach
+ * -- and the `landuse` layer that actually paints it carries no `name`
+ * field of its own (only `["kind", "sort_rank"]`), so the only place its
+ * name can come from is this `pois`-layer centroid feature. That tier has
+ * no maxzoom, and `label-poi` below excludes natural kinds outright, so a
+ * feature like Pasonanca is never labelled twice in two different styles
+ * as the view crosses z15 -- it reads as landscape at every zoom, not as a
+ * shop past z15.
  */
 export function buildLabelRules(
   protomaps: ProtomapsModule,
@@ -207,6 +225,7 @@ export function buildLabelRules(
   const stoneDeep = labelColors["--color-stone-deep"];
   const tealDeep = labelColors["--color-teal-deep"];
   const cream = labelColors["--color-cream"];
+  const forestDeep = labelColors["--color-forest-deep"];
 
   return [
     // Settlement -- "Zamboanga City" itself (places.kind === "locality").
@@ -320,9 +339,34 @@ export function buildLabelRules(
         feature.geomType === protomaps.GeomType.Point &&
         WATER_POINT_KINDS.has(String(feature.props.kind)),
     },
-    // Points of interest -- close zoom only (minZoom 15, matches the
-    // `pois` ground dot in pergamino-style.ts), and only named ones
-    // (poiHasName -- the same guard the ground dot uses).
+    // Named natural/protected landscape points -- nature_reserve, park,
+    // protected_area, forest, wood, garden (NATURAL_POI_KINDS,
+    // pergamino-style.ts). From z11, not z15: this is the fix for a large
+    // named natural feature (e.g. Pasonanca Natural Park) having no label
+    // at the zooms where it actually dominates the screen -- see the
+    // module doc comment above. Alegreya italic, like the water tier, but
+    // in forestDeep rather than tealDeep so a landscape name reads as
+    // landscape, not as water.
+    {
+      id: "label-poi-natural",
+      dataLayer: "pois",
+      minzoom: 11,
+      symbolizer: new protomaps.CenteredTextSymbolizer({
+        font: `italic 500 12px ${fonts.display}`,
+        letterSpacing: 1.2,
+        fill: forestDeep,
+        stroke: cream,
+        width: 2,
+      }),
+      filter: (_zoom: number, feature: FeatureFilterArg) =>
+        feature.geomType === protomaps.GeomType.Point && isNaturalLandscapePoi(feature.props),
+    },
+    // Every other point of interest -- close zoom only (minZoom 15,
+    // matches the `pois` ground dot in pergamino-style.ts), named
+    // (poiHasName) and *not* one of the natural kinds label-poi-natural
+    // already owns above -- otherwise a feature like Pasonanca Natural
+    // Park would be labelled twice, once per tier, in two different
+    // styles, once the view reached z15.
     {
       id: "label-poi",
       dataLayer: "pois",
@@ -338,7 +382,9 @@ export function buildLabelRules(
         placements: [protomaps.TextPlacements.S],
       }),
       filter: (_zoom: number, feature: FeatureFilterArg) =>
-        feature.geomType === protomaps.GeomType.Point && poiHasName(feature.props),
+        feature.geomType === protomaps.GeomType.Point &&
+        poiHasName(feature.props) &&
+        !isNaturalLandscapePoi(feature.props),
     },
   ];
 }

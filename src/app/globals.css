@@ -20,6 +20,12 @@
   --color-terracotta-deep: #8f3620;
   --color-teal: #1f6f78;
   --color-teal-deep: #165259;
+  /* Map landscape-poi labels only (the Pasonanca naming fix,
+     .claude/prds/pergamino-map.md) -- a green distinct from
+     --color-teal-deep's water italic, for named natural/protected-area
+     points of interest (buildLabelRules's label-poi-natural tier,
+     BasemapLayer.tsx). */
+  --color-forest-deep: #3d5c2f;
   --color-cardinal: #9b2d20;
   --color-vinta-red: #c8342b;
   --color-vinta-yellow: #e8b63a;
@@ -283,10 +289,23 @@ select:focus-visible,
 
 /* CityMask's mask Polygon (world ring, city outline as its hole) -- creams
    out everything past the city boundary. Sits on its own "cityMask" pane
-   (created in CityMask.tsx), above the tile pane and below markers/popups. */
+   (created in CityMask.tsx, z-index 350), above the tile pane (z-index
+   200, Leaflet's own default) and below the placeLabels pane (z-index 450)
+   and markers/popups.
+
+   fill-opacity is 1, not a fractional value: it used to be 0.92, which let
+   8% of the basemap show through -- enough for tile-drawn place names
+   outside the city to stay legible (verified against the archive: 35 of
+   its 256 named places fall outside ZAMBOANGA_CITY_OUTLINE, one of them,
+   "Poblacion" -- the poblacion of Sibuco, Zamboanga del Norte, 11.8km
+   outside the boundary -- already visible on screen). The mask's whole job
+   is "nothing outside the city renders"; only a fully opaque fill actually
+   does that. The dashed .zpots-city-outline stroke below is what keeps the
+   city still reading as a drawn shape instead of a crude cutout now that
+   the fill is solid. */
 .zpots-city-mask {
   fill: var(--color-cream);
-  fill-opacity: 0.92;
+  fill-opacity: 1;
   stroke: none;
 }
 

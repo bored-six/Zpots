@@ -52,7 +52,7 @@ const fonts = PERGAMINO_FONT_FALLBACK;
 const labelColors = PERGAMINO_LABEL_FALLBACK_HEX;
 
 describe("buildLabelRules -- tier coverage", () => {
-  it("returns one rule per tier: settlement, 2 district, 2 road, 2 water, 1 poi", () => {
+  it("returns one rule per tier: settlement, 2 district, 2 road, 2 water, 1 natural poi, 1 general poi", () => {
     const rules = buildLabelRules(createFakeProtomaps(), fonts, labelColors);
     const ids = rules.map((r) => r.id);
     expect(ids).toEqual([
@@ -63,6 +63,7 @@ describe("buildLabelRules -- tier coverage", () => {
       "label-road-minor",
       "label-water-line",
       "label-water-point",
+      "label-poi-natural",
       "label-poi",
     ]);
   });
@@ -178,6 +179,70 @@ describe("buildLabelRules -- points of interest", () => {
     expect(rule.filter?.(15, featureWith(GeomType.Polygon, { name: "Fort Pilar" }))).toBe(
       false,
     );
+  });
+
+  it("label-poi rejects a named natural/landscape kind -- label-poi-natural owns those instead, so a feature is never labelled twice", () => {
+    const rules = buildLabelRules(createFakeProtomaps(), fonts, labelColors);
+    const rule = rules.find((r) => r.id === "label-poi")!;
+    expect(
+      rule.filter?.(
+        15,
+        featureWith(GeomType.Point, { name: "Pasonanca Natural Park", kind: "nature_reserve" }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("buildLabelRules -- named natural landscape points (the Pasonanca fix)", () => {
+  it("label-poi-natural matches a named natural-kind Point from z11, well below the general POI rule's z15", () => {
+    const rules = buildLabelRules(createFakeProtomaps(), fonts, labelColors);
+    const rule = rules.find((r) => r.id === "label-poi-natural")!;
+    expect(rule.dataLayer).toBe("pois");
+    expect(rule.minzoom).toBe(11);
+    expect(
+      rule.filter?.(
+        11,
+        featureWith(GeomType.Point, { name: "Pasonanca Natural Park", kind: "nature_reserve" }),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches every verified natural kind -- nature_reserve, park, protected_area, forest, wood, garden", () => {
+    const rules = buildLabelRules(createFakeProtomaps(), fonts, labelColors);
+    const rule = rules.find((r) => r.id === "label-poi-natural")!;
+    for (const kind of ["nature_reserve", "park", "protected_area", "forest", "wood", "garden"]) {
+      expect(
+        rule.filter?.(11, featureWith(GeomType.Point, { name: "Pasonanca Park", kind })),
+        `kind: ${kind}`,
+      ).toBe(true);
+    }
+  });
+
+  it("rejects an unnamed natural-kind point, a named non-natural point, and a non-Point geometry", () => {
+    const rules = buildLabelRules(createFakeProtomaps(), fonts, labelColors);
+    const rule = rules.find((r) => r.id === "label-poi-natural")!;
+    expect(rule.filter?.(11, featureWith(GeomType.Point, { kind: "nature_reserve" }))).toBe(
+      false,
+    );
+    expect(
+      rule.filter?.(11, featureWith(GeomType.Point, { name: "Chowking", kind: "cafe" })),
+    ).toBe(false);
+    expect(
+      rule.filter?.(
+        11,
+        featureWith(GeomType.Polygon, { name: "Pasonanca Natural Park", kind: "nature_reserve" }),
+      ),
+    ).toBe(false);
+  });
+
+  it("uses the display (Alegreya) font, italic, in a green distinct from the water italic's teal", () => {
+    const rules = buildLabelRules(createFakeProtomaps(), fonts, labelColors);
+    const rule = rules.find((r) => r.id === "label-poi-natural")!;
+    const options = (rule.symbolizer as { options: { font: string; fill: string } }).options;
+    expect(options.font).toContain(fonts.display);
+    expect(options.font).toContain("italic");
+    expect(options.fill).not.toBe(labelColors["--color-teal-deep"]);
+    expect(options.fill).not.toBe(labelColors["--color-ink"]);
   });
 });
 

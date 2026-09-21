@@ -60,20 +60,25 @@ export const PERGAMINO_FALLBACK_HEX: Record<PergaminoTokenName, string> = {
 /**
  * Colour tokens the map's *lettering* reuses rather than declaring its own
  * (see globals.css's "Pergamino" comment: "map lettering reuses
- * --color-ink / --color-stone-deep / --color-teal-deep"). Not part of
- * PERGAMINO_TOKEN_NAMES/PERGAMINO_FALLBACK_HEX above -- those are the
- * *ground* palette (anti-drift-locked against pergamino-tokens.test.ts's
- * own separate list); these four already exist in the "Ciudad Latina"
- * theme block at the top of globals.css, for the app's ordinary UI chrome.
- * `buildLabelRules` (BasemapLayer.tsx) resolves these the same way
- * `readPergaminoPalette` resolves ground tokens, so canvas text uses the
- * exact same ink/halo colours the rest of the app already does.
+ * --color-ink / --color-stone-deep / --color-teal-deep / --color-forest-deep").
+ * Not part of PERGAMINO_TOKEN_NAMES/PERGAMINO_FALLBACK_HEX above -- those
+ * are the *ground* palette (anti-drift-locked against
+ * pergamino-tokens.test.ts's own separate list); these five already exist
+ * in the "Ciudad Latina" theme block at the top of globals.css, for the
+ * app's ordinary UI chrome (--color-forest-deep is the one exception --
+ * added for, and only used by, the Pasonanca naming fix's
+ * label-poi-natural tier, but it lives in the shared theme block rather
+ * than a Pergamino-only one since it's still a lettering colour, not a
+ * ground fill). `buildLabelRules` (BasemapLayer.tsx) resolves these the
+ * same way `readPergaminoPalette` resolves ground tokens, so canvas text
+ * uses the exact same ink/halo colours the rest of the app already does.
  */
 export const PERGAMINO_LABEL_COLOR_NAMES = [
   "--color-ink",
   "--color-stone-deep",
   "--color-teal-deep",
   "--color-cream",
+  "--color-forest-deep",
 ] as const;
 
 export type PergaminoLabelColorName = (typeof PERGAMINO_LABEL_COLOR_NAMES)[number];
@@ -84,6 +89,7 @@ export const PERGAMINO_LABEL_FALLBACK_HEX: Record<PergaminoLabelColorName, strin
   "--color-stone-deep": "#7a6448",
   "--color-teal-deep": "#165259",
   "--color-cream": "#f6eedc",
+  "--color-forest-deep": "#3d5c2f",
 };
 
 /** Same resolve-with-fallback contract as readPergaminoPalette, for the four label colours. */

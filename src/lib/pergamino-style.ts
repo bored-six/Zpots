@@ -138,6 +138,46 @@ export function poiHasName(props: Record<string, unknown>): boolean {
 }
 
 /**
+ * `pois` layer `kind` values that name a large-scale natural or protected
+ * landscape feature -- a forest, a nature reserve, a protected area, a park
+ * or garden -- as opposed to a shop, an amenity, or civic infrastructure.
+ * Verified directly against the shipped `.pmtiles` archive (a script that
+ * walked the tile pyramid, not guesswork): `nature_reserve`, `park`,
+ * `protected_area`, `wood` and `garden` all occur as real `pois.kind`
+ * values in this archive. `forest` never occurs as a `pois` kind here --
+ * it's a `landuse` kind instead (see LANDUSE_GROUP_KINDS's "green" set,
+ * which is exactly the bug this fixes: a `landuse` polygon this size can
+ * never carry its own name) -- but it's kept anyway, both because a future
+ * cut of the archive could tag a `pois` feature that way and because it
+ * names Pasonanca Natural Park's own polygon kind. `wetland` was
+ * deliberately left out even though it occurs: the only two named wetland
+ * pois in this archive are "S1"/"S2" -- codes, not names worth labelling a
+ * landscape feature with -- so including it would have meant giving junk
+ * data the same treatment as a real place. `garden_centre` (a shop) is
+ * excluded on purpose too; it is not the same kind as `garden`.
+ */
+export const NATURAL_POI_KINDS: ReadonlySet<string> = new Set([
+  "nature_reserve",
+  "park",
+  "protected_area",
+  "forest",
+  "wood",
+  "garden",
+]);
+
+/**
+ * True for a `pois` layer feature that both carries a real name
+ * (poiHasName) and whose `kind` is one of NATURAL_POI_KINDS -- the guard
+ * for the large-green-shape naming fix's dedicated label tier
+ * (`label-poi-natural` in `buildLabelRules`, BasemapLayer.tsx). Never
+ * throws, regardless of what shape `props` is (mirrors poiHasName).
+ */
+export function isNaturalLandscapePoi(props: Record<string, unknown>): boolean {
+  const kind = typeof props?.kind === "string" ? props.kind : undefined;
+  return poiHasName(props) && kind !== undefined && NATURAL_POI_KINDS.has(kind);
+}
+
+/**
  * The five groups Pergamino's `landuse` layer is painted in (Step 2 --
  * see pergamino-map.md). Five tokens, not one flat fill: an undifferentiated
  * landuse fill would just reproduce the "blob" problem (Step 1) in a new

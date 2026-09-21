@@ -26,6 +26,7 @@ const EXPECTED_TOKENS: Record<string, string> = {
   "--color-terracotta-deep": "#8f3620",
   "--color-teal": "#1f6f78",
   "--color-teal-deep": "#165259",
+  "--color-forest-deep": "#3d5c2f",
   "--color-cardinal": "#9b2d20",
   "--color-vinta-red": "#c8342b",
   "--color-vinta-yellow": "#e8b63a",

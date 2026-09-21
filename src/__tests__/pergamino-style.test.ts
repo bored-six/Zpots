@@ -2,8 +2,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  NATURAL_POI_KINDS,
   PERGAMINO_LAYERS,
   PERGAMINO_WEIGHTS,
+  isNaturalLandscapePoi,
   landuseGroup,
   poiHasName,
   roadClass,
@@ -401,6 +403,51 @@ describe("poiHasName -- named-only guard for the pois ground dot (Step 3)", () =
   it("never throws on garbage", () => {
     expect(() => poiHasName(null as unknown as Record<string, unknown>)).not.toThrow();
     expect(() => poiHasName(undefined as unknown as Record<string, unknown>)).not.toThrow();
+  });
+});
+
+describe("NATURAL_POI_KINDS / isNaturalLandscapePoi -- the Pasonanca naming fix (pergamino-map.md)", () => {
+  it("NATURAL_POI_KINDS contains exactly the landscape kinds verified against the archive", () => {
+    // Verified directly against public/basemap/zamboanga.pmtiles's `pois`
+    // layer (script, not guesswork): nature_reserve, park, protected_area,
+    // wood and garden all occur as real pois.kind values in this archive.
+    // "forest" never occurs as a pois kind here (it's a landuse kind --
+    // see LANDUSE_GROUP_KINDS's "green" set); it's kept anyway since the
+    // reported bug named it explicitly and a future cut of the archive
+    // could carry a pois feature tagged that way. "wetland" was
+    // deliberately left out: the only two named wetland pois in the
+    // archive are "S1"/"S2" -- codes, not names worth putting on the map.
+    expect([...NATURAL_POI_KINDS].sort()).toEqual(
+      ["forest", "garden", "nature_reserve", "park", "protected_area", "wood"].sort(),
+    );
+  });
+
+  it("true for a named point whose kind is nature_reserve, park, protected_area, forest, wood, or garden", () => {
+    for (const kind of ["nature_reserve", "park", "protected_area", "forest", "wood", "garden"]) {
+      expect(isNaturalLandscapePoi({ kind, name: "Pasonanca Natural Park" })).toBe(true);
+    }
+  });
+
+  it("false for an unnamed feature, even with a natural kind", () => {
+    expect(isNaturalLandscapePoi({ kind: "nature_reserve" })).toBe(false);
+    expect(isNaturalLandscapePoi({ kind: "nature_reserve", name: "" })).toBe(false);
+    expect(isNaturalLandscapePoi({ kind: "nature_reserve", name: "   " })).toBe(false);
+  });
+
+  it("false for a named point whose kind is not a natural/landscape kind", () => {
+    expect(isNaturalLandscapePoi({ kind: "cafe", name: "Chowking" })).toBe(false);
+    expect(isNaturalLandscapePoi({ kind: "garden_centre", name: "Sunny Land Garden" })).toBe(
+      false,
+    );
+    expect(isNaturalLandscapePoi({ kind: "wetland", name: "S1" })).toBe(false);
+  });
+
+  it("never throws on garbage", () => {
+    expect(() => isNaturalLandscapePoi(null as unknown as Record<string, unknown>)).not.toThrow();
+    expect(() =>
+      isNaturalLandscapePoi(undefined as unknown as Record<string, unknown>),
+    ).not.toThrow();
+    expect(isNaturalLandscapePoi({ kind: 42, name: "x" })).toBe(false);
   });
 });
 
