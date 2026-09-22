@@ -24,6 +24,20 @@ import SpotsDeck from "@/components/SpotsDeck";
  * `lg:pl-24`, so centering here with `justify-center` centers the deck in
  * the space actually left over, not the raw viewport.
  *
+ * At `lg` the surrounding ground is `--color-ink`, not the page's usual
+ * `bg-cream` -- on a wide monitor a 480px column on cream reads as a page
+ * that failed to fill, not as a deliberate feed viewer. `ink` (not `tinta`,
+ * which the cards themselves use for `bg-tinta`) is one step lighter than
+ * the card surface, so the column still reads as a distinct panel floating
+ * on the ground rather than melting into it; `lg:shadow-2xl` on the column
+ * itself reinforces that edge. This only applies at `lg` -- phone stays
+ * edge-to-edge on the plain page background, untouched. `AppNav`'s rail
+ * (`bg-cream-deep`) deliberately stays cream rather than following suit:
+ * it's shared chrome mounted once in `app/layout.tsx` for every route, most
+ * of which still have a cream page background, and its own `border-r
+ * border-stone` already reads as the seam between navigation chrome and
+ * whatever the current page's content ground is.
+ *
  * `SpotsDeck` reads `useSearchParams()` (the `?spot=` deep link), which
  * requires a Suspense boundary for the prerendered shell (Next.js
  * static-bailout rule) -- same reasoning as login/page.tsx and
@@ -40,8 +54,8 @@ export default function Home() {
 
 function HomeContent() {
   return (
-    <div className="flex h-[calc(100dvh-4rem)] w-full justify-center lg:h-dvh">
-      <div className="h-full w-full lg:w-[480px]">
+    <div className="flex h-[calc(100dvh-4rem)] w-full justify-center lg:h-dvh lg:bg-ink">
+      <div className="h-full w-full lg:w-[480px] lg:shadow-2xl lg:shadow-black/50">
         <SpotsDeck />
       </div>
     </div>
