@@ -10,33 +10,31 @@ import SpotsDeck from "@/components/SpotsDeck";
  * Deliberately does not wrap in `ClipboardShell` -- that header belonged
  * to the pre-social-redesign map page. The persistent chrome for every
  * main route is now `AppNav` in `app/layout.tsx` (bottom bar / desktop
- * rail), which is already mounted around `{children}` there. Home only
- * owns its own two layouts: phone is the deck alone, edge to edge; desktop
- * (>= 1024px) centers that same deck as a single phone-width column
- * against the page background -- the way a vertical feed (Reels/TikTok)
- * reads on the web. There used to be a second column here, a full-height
- * map panned to whichever card was active, but every card already carries
- * its own map inset (SpotCardView -> MapInset) -- the second, larger one
- * was redundant and made the screen read as a panel instead of a screen
+ * rail), which is already mounted around `{children}` there. Home is the
+ * deck, full screen, at every breakpoint: phone is edge to edge, and at
+ * `lg` the deck fills everything to the right of the nav rail rather than
+ * sitting as a centered phone-width column -- a centered 480px column on a
+ * wide monitor left hundreds of pixels of dead ground on each side, which
+ * read as a page that failed to fill rather than a deliberate design
+ * (the centered-column attempt was reverted 2026-09-22, see CLAUDE.md item
+ * 7). There used to also be a second column here, a full-height map panned
+ * to whichever card was active, but every card already carries its own map
+ * inset (SpotCardView -> MapInset) -- that second, larger one was
+ * redundant and made the screen read as a panel instead of a screen
  * (removed 2026-09-22, see CLAUDE.md item 7).
  *
  * `main` in `app/layout.tsx` already reserves the left rail's width via
- * `lg:pl-24`, so centering here with `justify-center` centers the deck in
- * the space actually left over, not the raw viewport.
+ * `lg:pl-24`, so "full screen" here means filling the space actually left
+ * over beside the rail, not the raw viewport -- the deck must never slide
+ * under it.
  *
- * At `lg` the surrounding ground is `--color-ink`, not the page's usual
- * `bg-cream` -- on a wide monitor a 480px column on cream reads as a page
- * that failed to fill, not as a deliberate feed viewer. `ink` (not `tinta`,
- * which the cards themselves use for `bg-tinta`) is one step lighter than
- * the card surface, so the column still reads as a distinct panel floating
- * on the ground rather than melting into it; `lg:shadow-2xl` on the column
- * itself reinforces that edge. This only applies at `lg` -- phone stays
- * edge-to-edge on the plain page background, untouched. `AppNav`'s rail
- * (`bg-cream-deep`) deliberately stays cream rather than following suit:
- * it's shared chrome mounted once in `app/layout.tsx` for every route, most
- * of which still have a cream page background, and its own `border-r
- * border-stone` already reads as the seam between navigation chrome and
- * whatever the current page's content ground is.
+ * Spot photos are portrait; a full-bleed card on a wide, short viewport is
+ * strongly landscape, so `SpotPhoto`'s `object-cover` crops the top and
+ * bottom of the photo. That's an accepted consequence of filling the
+ * screen, not a bug to fight with a width cap. What *does* need capping is
+ * the text/actions column `SpotCardView` overlays on the photo -- see that
+ * component's `lg:max-w-[640px]` for why a full-bleed line length would be
+ * unreadable while the photo stays edge to edge.
  *
  * `SpotsDeck` reads `useSearchParams()` (the `?spot=` deep link), which
  * requires a Suspense boundary for the prerendered shell (Next.js
@@ -54,8 +52,8 @@ export default function Home() {
 
 function HomeContent() {
   return (
-    <div className="flex h-[calc(100dvh-4rem)] w-full justify-center lg:h-dvh lg:bg-ink">
-      <div className="h-full w-full lg:w-[480px] lg:shadow-2xl lg:shadow-black/50">
+    <div className="flex h-[calc(100dvh-4rem)] w-full lg:h-dvh">
+      <div className="h-full w-full">
         <SpotsDeck />
       </div>
     </div>

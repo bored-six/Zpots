@@ -11,17 +11,19 @@ import type { SpotCard } from "@/lib/spots";
  * beside the deck, panned to whichever card was active) is removed
  * entirely -- every spot card already carries its own map inset
  * (SpotCardView -> MapInset), so a second one was redundant screen real
- * estate, not a second feature. Desktop now centers the deck as a single
- * phone-width column instead (Reels/TikTok-style web feed), the same way
- * phone already presents it, just not edge-to-edge.
+ * estate, not a second feature. Desktop briefly centered the deck as a
+ * single phone-width column instead (Reels/TikTok-style web feed); that
+ * left dead space on wide monitors and was reverted the same day (see
+ * CLAUDE.md item 7) in favor of the deck filling the screen edge to edge
+ * beside the nav rail, the same way phone already presents it.
  *
- * jsdom does not lay out real pixels, so nothing here proves the column
- * is visually centered on screen -- only that (a) the second map is
+ * jsdom does not lay out real pixels, so nothing here proves the deck
+ * visually fills the viewport -- only that (a) the second map is
  * genuinely gone (no `MapInset` import/render survives in page.tsx at
- * all, not just hidden by CSS), and (b) the Tailwind classes the visual
- * centering depends on are present on the deck's wrapper. A real-browser
- * check (bounding rects, `.leaflet-container` counts) is required to
- * confirm the visual result -- see the PR notes for those numbers.
+ * all, not just hidden by CSS), and (b) no leftover width-cap/centering
+ * classes from the reverted column design survive on the deck's wrapper.
+ * A real-browser check (bounding rects) is required to confirm the
+ * visual result -- see the PR notes for those numbers.
  */
 
 const feedCerca = vi.fn();
@@ -153,29 +155,37 @@ describe("Home (/) -- the desktop side map is gone", () => {
   });
 });
 
-describe("Home (/) -- the deck is a centered, phone-width column on desktop", () => {
-  it("wraps SpotsDeck in an element capped to a phone-ish width at lg, not a flex-row split with a second column", async () => {
-    const Home = (await import("@/app/page")).default;
-    const { container } = render(<Home />);
-
+describe("Home (/) -- the deck fills the screen beside the nav rail on desktop", () => {
+  it("does not wrap SpotsDeck in a capped-width or centered column (the reverted design)", () => {
     const source = fs.readFileSync(path.join(process.cwd(), "src/app/page.tsx"), "utf-8");
 
     // The old two-column split -- gone.
     expect(source).not.toMatch(/lg:flex-row/);
 
-    // Some descendant of the root carries a capped lg width in the
-    // 480-560px range this task calls for, and the root/ancestor centers
-    // it (mx-auto or justify-center) rather than stretching it edge to
-    // edge the way the old flex-1 second column did.
-    const root = container.firstElementChild as HTMLElement;
-    const allElements = [root, ...Array.from(root.querySelectorAll("*"))] as HTMLElement[];
-    const cappedWidthEl = allElements.find((el) => /lg:w-\[(48\d|5[0-5]\d)px\]/.test(el.className));
-    expect(cappedWidthEl).toBeTruthy();
+    // None of the reverted centered-column design's classes survive:
+    // capped lg width, the ink ground it floated on, its shadow, or the
+    // justify-center that centered it. The deck must stretch edge to edge
+    // in the space `main`'s `lg:pl-24` leaves beside the rail, not float
+    // as a column inside it.
+    expect(source).not.toMatch(/lg:w-\[\d+px\]/);
+    expect(source).not.toMatch(/justify-center/);
+    expect(source).not.toMatch(/lg:bg-ink/);
+    expect(source).not.toMatch(/lg:shadow/);
+  });
 
-    const centeredSomewhere = allElements.some(
-      (el) => /\bjustify-center\b/.test(el.className) || /\bmx-auto\b/.test(el.className),
-    );
-    expect(centeredSomewhere).toBe(true);
+  it("HomeContent's own wrapper divs stay full width at every breakpoint", async () => {
+    const Home = (await import("@/app/page")).default;
+    const { container } = render(<Home />);
+
+    // Only page.tsx's own two wrapper divs -- not descendants belonging to
+    // SpotsDeck/SpotCardView, which have their own unrelated layout classes.
+    const root = container.firstElementChild as HTMLElement;
+    const deckWrapper = root.firstElementChild as HTMLElement;
+
+    for (const el of [root, deckWrapper]) {
+      expect(el.className).toMatch(/\bw-full\b/);
+      expect(el.className).not.toMatch(/lg:w-(?!full\b)\S+/);
+    }
   });
 });
 

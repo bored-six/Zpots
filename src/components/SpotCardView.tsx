@@ -172,7 +172,20 @@ export default function SpotCardView({
         </div>
       </div>
 
-      <div className="relative mt-auto flex flex-col gap-3 p-4 text-cream">
+      {/*
+       * `lg:max-w-[640px]` caps line length once the card itself is full
+       * screen (app/page.tsx doc comment) rather than a centered 480px
+       * column: at full screen width this block would otherwise stretch to
+       * the viewport, which on a wide monitor runs `card.note` out to
+       * 100+ characters per line. 640px lands the longest line (`h2`, the
+       * largest text here) around 60-70 characters at its font size --
+       * inside the ~45-75ch range readability guidance generally
+       * recommends -- while staying anchored left, where this block
+       * already sits, so the photo and `paseo-veil` gradient behind it
+       * stay full-bleed. Unset below `lg` so phone (already a
+       * phone-width column) is untouched.
+       */}
+      <div className="relative mt-auto flex flex-col gap-3 p-4 text-cream lg:max-w-[640px]">
         {isPreview ? (
           <div className="flex w-fit items-center gap-2">
             {authorBlock}
