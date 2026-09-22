@@ -5,8 +5,10 @@ import dynamic from "next/dynamic";
 import Bilingual from "@/components/Bilingual";
 import ClipboardShell from "@/components/ClipboardShell";
 
-// Same client-boundary reasoning as MapView.tsx: PostFlow's tap map pulls in
-// react-leaflet, which touches `window`, so it can only ever load client-side.
+// PostFlow's tap map pulls in react-leaflet, which touches `window`, so it
+// can only ever load client-side -- this is the ssr:false client boundary
+// that makes that legal, since next/dynamic with ssr:false cannot be called
+// from a Server Component.
 const PostFlow = dynamic(() => import("@/components/PostFlow"), {
   ssr: false,
   loading: () => (

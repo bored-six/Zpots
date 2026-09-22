@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { Layer as LeafletLayerInstance, Map as LeafletMap } from "leaflet";
 import Leaflet from "leaflet";
 import { TileLayer } from "react-leaflet";
-import type { LabelRule, PaintRule } from "protomaps-leaflet";
+import type { Feature, Label, LabelRule, LabelSymbolizer, PaintRule } from "protomaps-leaflet";
 
 import { probeBasemapArchive } from "@/lib/basemap-source";
 import {
@@ -31,6 +31,7 @@ import {
   isWaterLine,
   poiHasName,
   roadClass,
+  shortenNaturalPoiName,
 } from "@/lib/pergamino-style";
 
 /**
@@ -179,6 +180,47 @@ export function buildPaintRules(
 
 type FeatureFilterArg = { props: Record<string, unknown>; geomType: number };
 
+/**
+ * Wraps a LabelSymbolizer so `label-poi-natural` draws
+ * `shortenNaturalPoiName(feature.props.name)` instead of the raw archive
+ * name (label-tuning defect 1) -- protomaps-leaflet's own TextAttr only
+ * ever reads `feature.props[...]` verbatim; there's no options-level hook
+ * to transform the text it finds, so the rewrite has to happen here, at
+ * the one call site that already sits between the archive's feature and
+ * the symbolizer drawing it. Never mutates the tile-cache's own feature
+ * object (a fresh shallow clone is passed instead) since that object is
+ * shared with whatever else in protomaps-leaflet's paint/label pipeline
+ * reads the same parsed tile. Passes the feature through unchanged (same
+ * reference) whenever there is nothing to shorten, so this never adds
+ * needless allocation to the common case.
+ */
+// protomaps-leaflet's package root re-exports `Feature`/`Label`/`Layout`
+// but not the `Point` type its `place()` geometry argument is made of (it
+// stays an internal `@mapbox/point-geometry` detail) -- pulling the whole
+// parameter tuple off `LabelSymbolizer["place"]` instead of naming each
+// argument's type keeps this wrapper exact without a second, untracked
+// dependency on `@mapbox/point-geometry` just for one type.
+type PlaceArgs = Parameters<LabelSymbolizer["place"]>;
+
+function withShortenedNaturalPoiName(symbolizer: LabelSymbolizer): LabelSymbolizer {
+  return {
+    ...symbolizer,
+    place(...args: PlaceArgs): Label[] | undefined {
+      const [layout, geom, feature] = args;
+      const name = feature.props.name;
+      if (typeof name !== "string") return symbolizer.place(layout, geom, feature);
+
+      const shortened = shortenNaturalPoiName(name);
+      if (shortened === name) return symbolizer.place(layout, geom, feature);
+
+      return symbolizer.place(layout, geom, {
+        ...feature,
+        props: { ...feature.props, name: shortened },
+      } satisfies Feature);
+    },
+  };
+}
+
 /** True for a feature whose `kind` names one of the water layer's named point bodies (sea/bay/ocean/lake/strait). */
 const WATER_POINT_KINDS = new Set(["ocean", "bay", "strait", "fjord", "sea", "lake"]);
 
@@ -199,10 +241,15 @@ const WATER_POINT_KINDS = new Set(["ocean", "bay", "strait", "fjord", "sea", "la
  * never a second, independently-drifting one.
  *
  * Zoom tiers (never bare between the app's MIN_ZOOM=12 floor and 15,
- * see map-config.ts): settlement + district names from z11, major/arterial
- * street names from z12, river/stream and finer-grained district names
- * from z13, minor street names from z14, named points of interest from
- * z15 -- wide view reads as districts, close view reads as streets.
+ * see map-config.ts): settlement + macrohood (barangay-scale) district
+ * names from z11, major/arterial street names from z12, river/stream names
+ * from z13, minor street names and the finer neighbourhood (subdivision-
+ * scale) district names from z14, named points of interest from z15 -- wide
+ * view reads as districts, close view reads as streets. Neighbourhood
+ * joining at z14 rather than z13, and reading visibly lighter than
+ * macrohood once it does, is the label-tuning fix for real barangays
+ * (macrohood) getting drowned out by subdivisions (neighbourhood) -- see
+ * that rule's own doc comment below for the measured archive counts.
  *
  * One deliberate exception to that z15 POI floor: named natural/protected
  * landscape features (label-poi-natural, isNaturalLandscapePoi) start at
@@ -261,17 +308,29 @@ export function buildLabelRules(
       filter: (_zoom: number, feature: FeatureFilterArg) =>
         feature.props.kind === "macrohood",
     },
+    // Pushed to z14, one zoom later than macrohood's z11, and drawn
+    // visibly lighter (label-tuning defect 2): decoding
+    // public/basemap/zamboanga.pmtiles's `places` layer showed neighbourhood
+    // features (subdivisions -- "Sanbof Subdivision", "Southcom Village")
+    // outnumbering macrohood (real barangays -- "Tetuan", "Putik", "Guiwan")
+    // by roughly 6 to 1 at z13 (187 vs 32 in view), and the archive's own
+    // `min_zoom` is a flat 13 across every in-view neighbourhood feature (no
+    // per-feature grading to "honour" here -- see .claude/prds/pergamino-map.md's
+    // Change Log for the full measured counts). Giving macrohood a full zoom
+    // level on its own, then drawing neighbourhood smaller/lighter/tighter
+    // once it joins, is what makes the reading order legible at z13-z14
+    // rather than just moving the same collision one zoom later.
     {
       id: "label-district-neighbourhood",
       dataLayer: "places",
-      minzoom: 13,
+      minzoom: 14,
       symbolizer: new protomaps.CenteredTextSymbolizer({
-        font: `500 9.5px ${fonts.body}`,
+        font: `400 8.5px ${fonts.body}`,
         textTransform: "uppercase",
-        letterSpacing: 1.2,
+        letterSpacing: 0.8,
         fill: stoneDeep,
         stroke: cream,
-        width: 2,
+        width: 1.5,
       }),
       filter: (_zoom: number, feature: FeatureFilterArg) =>
         feature.props.kind === "neighbourhood",
@@ -351,13 +410,18 @@ export function buildLabelRules(
       id: "label-poi-natural",
       dataLayer: "pois",
       minzoom: 11,
-      symbolizer: new protomaps.CenteredTextSymbolizer({
-        font: `italic 500 12px ${fonts.display}`,
-        letterSpacing: 1.2,
-        fill: forestDeep,
-        stroke: cream,
-        width: 2,
-      }),
+      // withShortenedNaturalPoiName: caps very long protected-area/natural
+      // names (label-tuning defect 1) -- see shortenNaturalPoiName's own
+      // doc comment in pergamino-style.ts for the rule.
+      symbolizer: withShortenedNaturalPoiName(
+        new protomaps.CenteredTextSymbolizer({
+          font: `italic 500 12px ${fonts.display}`,
+          letterSpacing: 1.2,
+          fill: forestDeep,
+          stroke: cream,
+          width: 2,
+        }),
+      ),
       filter: (_zoom: number, feature: FeatureFilterArg) =>
         feature.geomType === protomaps.GeomType.Point && isNaturalLandscapePoi(feature.props),
     },

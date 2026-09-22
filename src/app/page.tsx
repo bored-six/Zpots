@@ -1,11 +1,8 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense } from "react";
 
-import Bilingual from "@/components/Bilingual";
-import MapInset from "@/components/MapInset";
 import SpotsDeck from "@/components/SpotsDeck";
-import type { SpotCard } from "@/lib/spots";
 
 /**
  * Home route (social-spots.md, "Spots deck" / navigation section).
@@ -13,11 +10,31 @@ import type { SpotCard } from "@/lib/spots";
  * Deliberately does not wrap in `ClipboardShell` -- that header belonged
  * to the pre-social-redesign map page. The persistent chrome for every
  * main route is now `AppNav` in `app/layout.tsx` (bottom bar / desktop
- * rail), which is already mounted around `{children}` there. Home only
- * owns its own two layouts: phone is the deck alone, each card carrying
- * its own map inset; desktop (>= 1024px) adds a second column, a
- * full-height map that pans to whichever card is active (`MapInset` with
- * `fill`).
+ * rail), which is already mounted around `{children}` there. Home is the
+ * deck, full screen, at every breakpoint: phone is edge to edge, and at
+ * `lg` the deck fills everything to the right of the nav rail rather than
+ * sitting as a centered phone-width column -- a centered 480px column on a
+ * wide monitor left hundreds of pixels of dead ground on each side, which
+ * read as a page that failed to fill rather than a deliberate design
+ * (the centered-column attempt was reverted 2026-09-22, see CLAUDE.md item
+ * 7). There used to also be a second column here, a full-height map panned
+ * to whichever card was active, but every card already carries its own map
+ * inset (SpotCardView -> MapInset) -- that second, larger one was
+ * redundant and made the screen read as a panel instead of a screen
+ * (removed 2026-09-22, see CLAUDE.md item 7).
+ *
+ * `main` in `app/layout.tsx` already reserves the left rail's width via
+ * `lg:pl-24`, so "full screen" here means filling the space actually left
+ * over beside the rail, not the raw viewport -- the deck must never slide
+ * under it.
+ *
+ * Spot photos are portrait; a full-bleed card on a wide, short viewport is
+ * strongly landscape, so `SpotPhoto`'s `object-cover` crops the top and
+ * bottom of the photo. That's an accepted consequence of filling the
+ * screen, not a bug to fight with a width cap. What *does* need capping is
+ * the text/actions column `SpotCardView` overlays on the photo -- see that
+ * component's `lg:max-w-[640px]` for why a full-bleed line length would be
+ * unreadable while the photo stays edge to edge.
  *
  * `SpotsDeck` reads `useSearchParams()` (the `?spot=` deep link), which
  * requires a Suspense boundary for the prerendered shell (Next.js
@@ -34,27 +51,10 @@ export default function Home() {
 }
 
 function HomeContent() {
-  const [activeCard, setActiveCard] = useState<SpotCard | null>(null);
-
   return (
-    <div className="flex h-dvh w-full flex-col lg:flex-row">
-      <div className="min-h-0 w-full flex-1 lg:w-[480px] lg:flex-none lg:border-r lg:border-stone">
-        <SpotsDeck onActiveCardChange={setActiveCard} />
-      </div>
-
-      <div className="hidden min-h-0 flex-1 lg:block">
-        {activeCard ? (
-          <MapInset
-            center={{ lat: activeCard.lat, lng: activeCard.lng }}
-            status={activeCard.status}
-            onExpand={() => {}}
-            fill
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm text-stone-deep">
-            <Bilingual k="loading" />
-          </div>
-        )}
+    <div className="flex h-[calc(100dvh-4rem)] w-full lg:h-dvh">
+      <div className="h-full w-full">
+        <SpotsDeck />
       </div>
     </div>
   );

@@ -85,13 +85,13 @@ describe("PlaceLabelsLayer", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("with a fake map at zoom 14: creates the placeLabels pane at zIndex 450 and adds one marker per visible label", () => {
+  it("with a fake map at zoom 14: creates the placeLabels pane at zIndex 340 (below the cityMask pane, label-tuning defect 3) and adds one marker per visible label", () => {
     const fake = createFakeMap(14);
 
     render(<PlaceLabelsLayer map={fake.map} />);
 
     expect(fake.raw.createPane).toHaveBeenCalledWith("placeLabels");
-    expect(fake.pane("placeLabels")?.style.zIndex).toBe("450");
+    expect(fake.pane("placeLabels")?.style.zIndex).toBe("340");
 
     const expected = visiblePlaceLabels(ZAMBOANGA_PLACES, 14).length;
     const group = lastAddedGroup(fake.raw);

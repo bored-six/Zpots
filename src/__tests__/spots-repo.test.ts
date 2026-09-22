@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CONFIRMATION_THRESHOLD, type Spot } from "@/lib/spots";
+import { CONFIRMATION_THRESHOLD } from "@/lib/spots";
 import type { NewSpotInput } from "@/lib/validation";
 
 // The repo module is expected to call getSupabaseClient() from this module

@@ -2,129 +2,109 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import L from "leaflet";
 
-import { ConfirmedPin, PhotoPinFrame, UnconfirmedPin } from "@/components/icons/pin-icons";
+import { PinChassis, PuntoPin } from "@/components/icons/pin-icons";
+import { PIN_TIER_SIZES, type PinTier } from "@/lib/pin-density";
+import { isSpotCategory, type SpotCategory } from "@/lib/spots";
 
 export type PinStatus = "unconfirmed" | "confirmed";
 
-const ICON_SIZE = 22;
+/**
+ * Every size a pin can render at -- pin-revamp-spec.md section 14.4. No
+ * pin ever shows a photo; photos stay on the deck card and in the popup.
+ */
+export type PinSize = 32 | 22 | 16 | 10;
 
-// The shared silhouette in pin-icons.tsx lives in a 0..32 / 0..32 viewBox
-// with its tail tapering to a point at (16, 30) -- 2px in from the bottom
-// edge, directly below the compass rose's center (16, 16). That point is
-// the spot the marker actually names, so it (not the box center) has to
-// be the Leaflet anchor. Scaled by 22/32 and rounded: (16, 30) -> (11, 21).
-const ICON_ANCHOR: [number, number] = [11, 21];
-const POPUP_ANCHOR: [number, number] = [0, -19];
+const PLAIN_SIZES: readonly PinSize[] = [32, 22, 16, 10];
 
-// These two hex values are the only ones allowed in this file, and they
-// must equal --color-stone-deep and --color-teal from globals.css.
-const PIN_COLOR: Record<PinStatus, string> = {
-  // Stone-deep -- muted, reads as "not vouched for yet".
-  unconfirmed: "#7a6448",
-  // Teal -- reads as "vouched for".
-  confirmed: "#1f6f78",
-};
+const DEFAULT_PLAIN_SIZE: PinSize = 22;
+
+const PUNTO_SIZE = 10;
+
+/** `PIN_TIER_SIZES` is the shared ladder ([32, 22, 16, 10]) -- reuse its index as the tier. */
+function tierForSize(size: number): PinTier {
+  return PIN_TIER_SIZES.indexOf(size as (typeof PIN_TIER_SIZES)[number]) as PinTier;
+}
+
+/**
+ * `iconAnchor = [size / 2, round(size * 30 / 32)]`, `popupAnchor = [0, -floor(size * 28 / 32)]`
+ * (pin-revamp-spec.md section 14.4). Derived from the shared rose's tail tip
+ * at (16, 30) in the 0..32 viewBox, scaled to `size` and rounded/floored to
+ * reproduce the pin redesign's original 22px anchor values exactly. The
+ * punto (size 10) does not use this formula -- see PUNTO_ANCHORS below.
+ */
+function anchorsForSize(size: number): { iconAnchor: [number, number]; popupAnchor: [number, number] } {
+  return {
+    iconAnchor: [size / 2, Math.round((size * 30) / 32)],
+    popupAnchor: [0, -Math.floor((size * 28) / 32)],
+  };
+}
+
+/**
+ * The punto (pin-revamp-spec.md section 14.5) drops the rose entirely and is
+ * anchored at its own centre, not the tail tip -- a fixed override, not the
+ * general anchor formula above.
+ */
+const PUNTO_ANCHORS = { iconAnchor: [5, 5] as [number, number], popupAnchor: [0, -6] as [number, number] };
 
 export interface CreatePinIconOptions {
   /**
    * Flags this render as the one right after a pin flipped Unconfirmed ->
-   * Confirmed. Only meaningful for `status: "confirmed"`. `pin-icons.tsx`
-   * is plain React with no hook into this static string, so the class
-   * gets spliced directly onto the halo `<path>` in the serialized markup
-   * -- see `.zpots-pin-icon--just-confirmed` in globals.css for why it has
-   * to land there rather than on a wrapper (stroke-dasharray/animation
-   * only take effect on the element that carries them).
+   * Confirmed (the "sello" moment, spec section 4.7). No-op unless
+   * `status: "confirmed"` and `size` renders a rose (not a punto).
+   * `PinChassis` renders the class on the seal `<g>` itself -- no more
+   * string-splicing the serialized markup.
    */
   justConfirmed?: boolean;
+  /** Read cue on the pin (spec section 2). Ignored only at size 10 (E1/E4). */
+  category?: SpotCategory;
+  /** Default 22. Any value not in `PinSize` throws `RangeError`. */
+  size?: PinSize;
+}
+
+function validCategory(category: SpotCategory | undefined): SpotCategory | undefined {
+  return category !== undefined && isSpotCategory(category) ? category : undefined;
 }
 
 /**
  * Renders the matching hand-drawn pin (see pin-icons.tsx) to static markup
- * and wraps it in a Leaflet DivIcon so it can be used as a marker icon.
- * A plain divIcon is used instead of L.icon() because these are inline
- * SVG components, not image files, and `zpots-pin-icon` opts the wrapper
- * out of Leaflet's default marker background/border/shadow styling.
+ * and wraps it in a Leaflet DivIcon so it can be used as a marker icon. A
+ * plain divIcon is used instead of L.icon() because these are inline SVG
+ * components, not image files, and `zpots-pin-icon` opts the wrapper out of
+ * Leaflet's default marker background/border/shadow styling.
  */
 export function createPinIcon(status: PinStatus, options?: CreatePinIconOptions): L.DivIcon {
-  const PinComponent = status === "confirmed" ? ConfirmedPin : UnconfirmedPin;
-
-  let markup = renderToStaticMarkup(
-    createElement(PinComponent, {
-      size: ICON_SIZE,
-      style: { color: PIN_COLOR[status] },
-    })
-  );
-
-  if (status === "confirmed" && options?.justConfirmed) {
-    // The first <path> ConfirmedPin renders is the combined
-    // compass+tail halo outline (see pin-icons.tsx COMPASS_POINTS +
-    // PIN_TAIL) -- exactly the "combined halo path" the CSS comment
-    // describes.
-    markup = markup.replace("<path ", '<path class="zpots-pin-icon--just-confirmed" ');
+  const size = options?.size ?? DEFAULT_PLAIN_SIZE;
+  if (!PLAIN_SIZES.includes(size)) {
+    throw new RangeError(`createPinIcon: size ${size} is not one of ${PLAIN_SIZES.join(", ")}`);
   }
 
-  return L.divIcon({
-    html: markup,
-    className: `zpots-pin-icon zpots-pin-icon--${status}`,
-    iconSize: [ICON_SIZE, ICON_SIZE],
-    iconAnchor: ICON_ANCHOR,
-    popupAnchor: POPUP_ANCHOR,
-  });
-}
+  const tier = tierForSize(size);
+  const category = validCategory(options?.category);
 
-// Photo pins (Mi mapa "mine" spots, social-spots.md UI spec: "every pin is
-// the spot's photo inside the compass-rose frame") are drawn at 44px, twice
-// the plain pin's 22px, so the anchor math below is the same
-// tail-tip-at-(16,30)-in-a-0..32-viewBox derivation as ICON_ANCHOR/
-// POPUP_ANCHOR above, just carried through at the larger scale instead of
-// re-measured from scratch.
-const PHOTO_ICON_SIZE = 44;
-const PHOTO_ICON_ANCHOR: [number, number] = [22, 41];
-const PHOTO_POPUP_ANCHOR: [number, number] = [0, -38];
+  if (size === PUNTO_SIZE) {
+    const html = renderToStaticMarkup(createElement(PuntoPin, { size, status }));
+    return L.divIcon({
+      html,
+      className: `zpots-pin-icon zpots-pin-icon--${status} zpots-pin-icon--tier-${tier} zpots-pin-icon--punto`,
+      iconSize: [size, size],
+      ...PUNTO_ANCHORS,
+    });
+  }
 
-// PhotoPinFrame's transparent window is a circle of radius 8.5 in the
-// shared 0..32 viewBox -- scaled to the 44px icon, that's this diameter.
-const PHOTO_HOLE_DIAMETER = Math.round(PHOTO_ICON_SIZE * ((8.5 * 2) / 32));
-
-/** Minimal HTML-attribute escape -- this string lands inside a divIcon's `html`, not JSX. */
-function escapeHtmlAttribute(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
-/**
- * Renders a spot's own photo, clipped to a circle, layered underneath the
- * matching-status `PhotoPinFrame` -- the frame's fill="none" window is what
- * lets the photo actually show through (see PhotoPinFrame's doc comment).
- * Used for "mine" pins on Mi mapa (social-spots.md); `createPinIcon` above
- * is unchanged and still backs the plain compass pins everywhere else.
- */
-export function createPhotoPinIcon(photoUrl: string, status: PinStatus): L.DivIcon {
-  const frameMarkup = renderToStaticMarkup(
-    createElement(PhotoPinFrame, {
-      size: PHOTO_ICON_SIZE,
-      style: { color: PIN_COLOR[status] },
-    })
+  const html = renderToStaticMarkup(
+    createElement(PinChassis, {
+      size,
+      status,
+      mode: category ? "open" : "closed",
+      category,
+      justConfirmed: options?.justConfirmed,
+    }),
   );
-
-  const holeOffset = (PHOTO_ICON_SIZE - PHOTO_HOLE_DIAMETER) / 2;
-  const safePhotoUrl = escapeHtmlAttribute(photoUrl);
-
-  const html = `<span class="zpots-pin-icon-photo-wrap" style="position:relative;display:block;width:${PHOTO_ICON_SIZE}px;height:${PHOTO_ICON_SIZE}px;">` +
-    `<span style="position:absolute;left:${holeOffset}px;top:${holeOffset}px;width:${PHOTO_HOLE_DIAMETER}px;height:${PHOTO_HOLE_DIAMETER}px;border-radius:50%;overflow:hidden;background:#f6eedc;">` +
-    `<img src="${safePhotoUrl}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" />` +
-    `</span>` +
-    `<span style="position:absolute;inset:0;">${frameMarkup}</span>` +
-    `</span>`;
 
   return L.divIcon({
     html,
-    className: "zpots-pin-icon zpots-pin-icon--photo",
-    iconSize: [PHOTO_ICON_SIZE, PHOTO_ICON_SIZE],
-    iconAnchor: PHOTO_ICON_ANCHOR,
-    popupAnchor: PHOTO_POPUP_ANCHOR,
+    className: `zpots-pin-icon zpots-pin-icon--${status} zpots-pin-icon--tier-${tier}`,
+    iconSize: [size, size],
+    ...anchorsForSize(size),
   });
 }

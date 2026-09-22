@@ -199,7 +199,7 @@ teal focus, no raw hex, no emojis, hand-drawn SVG icons only).
   Alegreya 700 24px, note max 2 lines, distance line, status pill. Actions row: **Guarda**
   (ghost cream, bookmark icon, becomes filled teal "Guardao" when saved) and **Ya anda yo aqui**
   (terracotta primary). Report is a small ghost icon button. Saving and unsaving are optimistic.
-- Map inset 112px, top-right: tinted tiles, one photo pin for this spot, no controls. Tap opens
+- Map inset 112px, top-right: tinted tiles, one pin for this spot, no controls. Tap opens
   `/mapa?spot=<id>` **only if** the spot is on my map (saved/been/mine); otherwise it expands
   inline to a 240px preview on the card. Desktop pans the right-column map instead.
 - Swipe: CSS scroll-snap `y mandatory`, keyboard up/down. Fetch 10, prefetch when within 3 of the
@@ -207,9 +207,10 @@ teal focus, no raw hex, no emojis, hand-drawn SVG icons only).
 
 ### Mi mapa (`/mapa`)
 - Signed-out: sign-in gate with `emptyMap` copy. Signed-in: `my_map()` results on the existing
-  SpotMap (bounds, tint, popup unchanged). Pin by source: `mine` = 44px photo pin in a teal
-  compass frame; `been` = solid teal compass pin; `saved` = hollow stone-deep compass pin.
-  Legend chip row at the top: Mios / Ya anda / Guardao (toggles filter, all on by default).
+  SpotMap (bounds, tint, popup unchanged). Pin by source: every pin is a Grabado category pin
+  (closed rose until the spot has a category). `mine`/`preview`/`famoso` take the spot's own
+  status; `been` = sealed teal; `saved` = hollow stone-deep. Photos are in the popup, never on
+  the pin. Legend chip row at the top: Mios / Ya anda / Guardao (toggles filter, all on by default).
   Popup adds **Quita** for saved spots. `?spot=<id>` opens that popup. Empty state: `emptyMap`.
   No clustering: a personal map is small.
 
@@ -315,3 +316,5 @@ colors, or layout. Visuals are checked in the browser by the orchestrator.
 | 2026-09-20 | Added city-shaped mask (`CityMask`, `city-outline.ts`, `data/zamboanga-city-outline.ts`) on every map | User: map must visibly cut off at the city |
 | 2026-09-20 | Deviations accepted: deep link past page 1 falls back to top; distance line English only; Gente Siguiendo via `profilesByIds`; `uploadAvatar` + `updateAvatarUrl` split | Test contracts / scope |
 | 2026-09-20 | Photo limit 10 MB, avatar limit 5 MB (bucket limits set in the dashboard) | User request |
+| 2026-09-22 | Tier 2 pins (22 px) drop the photo and show the category glyph instead; density ladder `[44, 32, 22, 16, 10]` picks a pin's size from nearest-neighbour pixel distance, recomputed on `zoomend` and data change only | An 11.7 px photo is a smear that tells the user less than the glyph does; deliberate deviation from "every pin is the spot's photo" under crowding (`.claude/handoff/pin-revamp-spec.md` 4.6/7.7) |
+| 2026-09-22 | No photo on any pin; every pin is a category pin; ladder `[32, 22, 16, 10]`; punto is an azulejo lozenge | User decision: category was invisible on photo pins and flickered in under crowding; a dot is off-style and collides with basemap POI dots (`pin-revamp-spec.md` §14) |

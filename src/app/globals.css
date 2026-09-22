@@ -351,15 +351,43 @@ select:focus-visible,
   filter: drop-shadow(0 1px 1px rgb(31 24 19 / 0.35));
 }
 
-/* Added by createPinIcon (lib/pin-icon.ts) directly on the pin's combined
-   halo path for one render right after a pin flips Unconfirmed ->
-   Confirmed -- draws the halo on with the same stroke-dasharray technique
-   as .paseo-mark, so the moment reads as "just earned" instead of the
-   badge simply appearing. */
+/* Grabado pins (.claude/handoff/pin-revamp-spec.md section 4.7): the punto
+   (10px dot, section 4.5) is a plain <svg>, not the rose markup the other
+   tiers use, so its own transform-origin has to be set here rather than
+   relying on the shared .zpots-pin-icon svg rule above. */
+.zpots-pin-icon--punto svg {
+  transform-origin: 50% 50%;
+}
+
+.zpots-seal {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+}
+
+/* Replaces the halo draw-on: the seal is pressed onto the pin. */
 .zpots-pin-icon--just-confirmed {
-  stroke-dasharray: 64;
-  stroke-dashoffset: 64;
-  animation: paseo-mark-draw var(--dur-base) var(--ease-paseo) both;
+  animation: zpots-seal-press var(--dur-base) var(--ease-settle) both;
+}
+
+.zpots-seal-pulse {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  opacity: 0;
+  animation: paseo-ring-pulse var(--dur-slow) var(--ease-paseo) var(--dur-base) forwards;
+}
+
+@keyframes zpots-seal-press {
+  from {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+  55% {
+    opacity: 1;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* Popup shell: warm card, soft corners, a VintaRule across the top edge
@@ -520,13 +548,15 @@ select:focus-visible,
   }
 }
 
-/* Draw-on stroke technique shared by .paseo-mark and
-   .zpots-pin-icon--just-confirmed below. Neither path sets a `pathLength`
-   attribute in its markup, so the dasharray/dashoffset values on each
-   class have to be a plain guess at (or slight overestimate of) that
-   path's real length rather than the usual `pathLength="1"` normalised
-   0-to-1 pattern -- if Wave 2 adds `pathLength="1"` to either path, these
-   values should become 1 and 1 instead. */
+/* Draw-on stroke technique used by .paseo-mark below. This path does not
+   set a `pathLength` attribute in its markup, so the dasharray/dashoffset
+   values have to be a plain guess at (or slight overestimate of) its real
+   length rather than the usual `pathLength="1"` normalised 0-to-1 pattern
+   -- if a `pathLength="1"` attribute is ever added to it, these values
+   should become 1 and 1 instead.
+   .zpots-pin-icon--just-confirmed no longer uses this keyframe: the pin's
+   "just confirmed" moment is the seal press (@keyframes zpots-seal-press,
+   above), not a stroke draw-on. */
 @keyframes paseo-mark-draw {
   from {
     stroke-dashoffset: 64;

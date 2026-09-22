@@ -178,6 +178,51 @@ export function isNaturalLandscapePoi(props: Record<string, unknown>): boolean {
 }
 
 /**
+ * The label-tuning fix for very long protected-area/natural names (e.g.
+ * "Great and Little Santa Cruz Islands Protected Landscape & Seascape",
+ * from this archive's `pois` layer) swamping the map at label-poi-natural's
+ * z11 floor -- a ~180km2 shape's name rendering as four-plus stacked lines
+ * over a small island is the loudest thing on screen. Two rules, in order:
+ *
+ * 1. Prefer the part of the name before a recognised protected-area
+ *    qualifier phrase ("Protected Landscape", "Natural Park", "Marine
+ *    Sanctuary", etc. -- the Philippine NIPAS/OSM vocabulary these names
+ *    are drawn from). "Great and Little Santa Cruz Islands Protected
+ *    Landscape & Seascape" becomes "Great and Little Santa Cruz Islands" --
+ *    still the real, recognisable name, not a truncation artifact.
+ * 2. If no qualifier is found (or the qualifier sits at the very start,
+ *    leaving nothing before it) and the name still exceeds
+ *    NATURAL_POI_NAME_MAX_CHARS, cut at the last whole word inside that
+ *    budget and append a single ellipsis character -- never mid-word, and
+ *    never silently drops the truncation marker (a bare cut would read as
+ *    a complete, different name; the ellipsis is what keeps it honest).
+ *
+ * A name already at or under the budget is returned unchanged, byte for
+ * byte -- most named natural POIs ("Pasonanca Natural Park") are already a
+ * reasonable single-line length and this must never touch them.
+ */
+export const NATURAL_POI_NAME_MAX_CHARS = 32;
+
+const NATURAL_POI_QUALIFIER_PATTERN =
+  /\s+(protected\s+(landscape(\s*(and|&)\s*seascape)?|seascape|area)|natural\s+(park|monument|reserve|biotic\s+area)|nature\s+reserve|wildlife\s+sanctuary|marine\s+(park|reserve|sanctuary)|watershed\s+forest\s+reserve|resource\s+reserve)\b/i;
+
+export function shortenNaturalPoiName(name: string): string {
+  const trimmed = name.trim();
+  if (trimmed.length <= NATURAL_POI_NAME_MAX_CHARS) return trimmed;
+
+  const qualifierMatch = trimmed.match(NATURAL_POI_QUALIFIER_PATTERN);
+  if (qualifierMatch?.index) {
+    const before = trimmed.slice(0, qualifierMatch.index).trim();
+    if (before.length > 0) return before;
+  }
+
+  const truncated = trimmed.slice(0, NATURAL_POI_NAME_MAX_CHARS);
+  const lastSpace = truncated.lastIndexOf(" ");
+  const base = (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated).trim();
+  return `${base}…`;
+}
+
+/**
  * The five groups Pergamino's `landuse` layer is painted in (Step 2 --
  * see pergamino-map.md). Five tokens, not one flat fill: an undifferentiated
  * landuse fill would just reproduce the "blob" problem (Step 1) in a new

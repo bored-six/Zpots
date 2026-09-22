@@ -26,8 +26,16 @@ function createFakeProtomaps(): FakeProtomapsModule {
     // Regular `function` expressions, not arrows -- buildLabelRules calls
     // these with `new` (see BasemapLayer.geometry-filter.test.tsx for why
     // an arrow-function mock implementation would break this).
+    // `place` is an echo stub, not a real protomaps-leaflet placer: it
+    // hands back whatever `feature` it was called with, so a test can
+    // assert on what `buildLabelRules` passed through (or rewrote) without
+    // needing a real Layout/Point[][]/canvas.
     CenteredTextSymbolizer: vi.fn().mockImplementation(function (options: unknown) {
-      return { kind: "centered-text", options };
+      return {
+        kind: "centered-text",
+        options,
+        place: vi.fn((_layout: unknown, _geom: unknown, feature: unknown) => feature),
+      };
     }),
     LineLabelSymbolizer: vi.fn().mockImplementation(function (options: unknown) {
       return { kind: "line-label", options };
@@ -101,13 +109,59 @@ describe("buildLabelRules -- settlement and districts (places)", () => {
     );
   });
 
-  it("label-district-neighbourhood matches kind: neighbourhood from z13", () => {
+  it("label-district-neighbourhood matches kind: neighbourhood from z14, not z13 (label-tuning defect 2)", () => {
     const rules = buildLabelRules(createFakeProtomaps(), fonts, labelColors);
     const rule = rules.find((r) => r.id === "label-district-neighbourhood")!;
-    expect(rule.minzoom).toBe(13);
-    expect(rule.filter?.(13, featureWith(GeomType.Point, { kind: "neighbourhood" }))).toBe(
+    // Measured against public/basemap/zamboanga.pmtiles: at z13 neighbourhood
+    // (187 in-view features -- subdivisions like "Sanbof Subdivision",
+    // "Southcom Village") already outnumbers macrohood (32 -- real
+    // barangays like "Tetuan", "Putik", "Guiwan") nearly 6 to 1, and the
+    // archive's own `min_zoom` for every in-view neighbourhood feature is
+    // already 13 (matching the old rule exactly), so simply "honouring the
+    // archive's min_zoom" doesn't change anything here -- the archive
+    // doesn't grade neighbourhood importance, so the rule has to.  Pushing
+    // this tier to z14 gives macrohood's real barangays a full zoom level
+    // (z11-z13) to read on their own before subdivisions join in.
+    expect(rule.minzoom).toBe(14);
+    expect(rule.filter?.(14, featureWith(GeomType.Point, { kind: "neighbourhood" }))).toBe(
       true,
     );
+  });
+
+  it("at z13, macrohood is active and neighbourhood is not -- the real barangays read alone first (label-tuning defect 2)", () => {
+    const rules = buildLabelRules(createFakeProtomaps(), fonts, labelColors);
+    const macrohood = rules.find((r) => r.id === "label-district-macrohood")!;
+    const neighbourhood = rules.find((r) => r.id === "label-district-neighbourhood")!;
+    expect((macrohood.minzoom ?? 0) <= 13).toBe(true);
+    expect((neighbourhood.minzoom ?? 0) <= 13).toBe(false);
+  });
+
+  it("label-district-neighbourhood reads as visually secondary to label-district-macrohood: smaller, lighter weight, less letter-spacing, thinner halo", () => {
+    const rules = buildLabelRules(createFakeProtomaps(), fonts, labelColors);
+    const macrohood = rules.find((r) => r.id === "label-district-macrohood")!;
+    const neighbourhood = rules.find((r) => r.id === "label-district-neighbourhood")!;
+    const macrohoodOptions = (
+      macrohood.symbolizer as {
+        options: { font: string; letterSpacing: number; width: number };
+      }
+    ).options;
+    const neighbourhoodOptions = (
+      neighbourhood.symbolizer as {
+        options: { font: string; letterSpacing: number; width: number };
+      }
+    ).options;
+
+    const fontSize = (font: string) => Number(font.match(/(\d+(?:\.\d+)?)px/)?.[1]);
+    const fontWeight = (font: string) => Number(font.match(/^(\d+)/)?.[1]);
+
+    expect(fontSize(neighbourhoodOptions.font)).toBeLessThan(
+      fontSize(macrohoodOptions.font),
+    );
+    expect(fontWeight(neighbourhoodOptions.font)).toBeLessThan(
+      fontWeight(macrohoodOptions.font),
+    );
+    expect(neighbourhoodOptions.letterSpacing).toBeLessThan(macrohoodOptions.letterSpacing);
+    expect(neighbourhoodOptions.width).toBeLessThan(macrohoodOptions.width);
   });
 });
 
@@ -243,6 +297,54 @@ describe("buildLabelRules -- named natural landscape points (the Pasonanca fix)"
     expect(options.font).toContain("italic");
     expect(options.fill).not.toBe(labelColors["--color-teal-deep"]);
     expect(options.fill).not.toBe(labelColors["--color-ink"]);
+  });
+
+  describe("label-poi-natural -- caps very long protected-area names before drawing (label-tuning defect 1)", () => {
+    type PlaceStub = (
+      layout: unknown,
+      geom: unknown,
+      feature: { props: Record<string, unknown> },
+    ) => { props: Record<string, unknown> } | undefined;
+
+    it("shortens the reported over-long name before delegating to the underlying symbolizer", () => {
+      const rules = buildLabelRules(createFakeProtomaps(), fonts, labelColors);
+      const rule = rules.find((r) => r.id === "label-poi-natural")!;
+      const feature = featureWith(GeomType.Point, {
+        name: "Great and Little Santa Cruz Islands Protected Landscape & Seascape",
+        kind: "protected_area",
+      });
+
+      const place = (rule.symbolizer as { place: PlaceStub }).place;
+      const result = place({}, [], feature);
+
+      expect(result?.props.name).toBe("Great and Little Santa Cruz Islands");
+      // Every other prop, and the geometry-derived fields, pass through untouched.
+      expect(result?.props.kind).toBe("protected_area");
+    });
+
+    it("passes a normal-length name through unchanged (same feature reference, no needless clone)", () => {
+      const rules = buildLabelRules(createFakeProtomaps(), fonts, labelColors);
+      const rule = rules.find((r) => r.id === "label-poi-natural")!;
+      const feature = featureWith(GeomType.Point, {
+        name: "Pasonanca Natural Park",
+        kind: "nature_reserve",
+      });
+
+      const place = (rule.symbolizer as { place: PlaceStub }).place;
+      const result = place({}, [], feature);
+
+      expect(result).toBe(feature);
+    });
+
+    it("a feature with no string name is passed through unchanged rather than throwing", () => {
+      const rules = buildLabelRules(createFakeProtomaps(), fonts, labelColors);
+      const rule = rules.find((r) => r.id === "label-poi-natural")!;
+      const feature = featureWith(GeomType.Point, { kind: "nature_reserve" });
+
+      const place = (rule.symbolizer as { place: PlaceStub }).place;
+      expect(() => place({}, [], feature)).not.toThrow();
+      expect(place({}, [], feature)).toBe(feature);
+    });
   });
 });
 
