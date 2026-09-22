@@ -8,31 +8,29 @@ import { isSpotCategory, type SpotCategory } from "@/lib/spots";
 
 export type PinStatus = "unconfirmed" | "confirmed";
 
-/** Every size a plain (non-photo) pin can render at -- pin-revamp-spec.md section 4.6. */
+/**
+ * Every size a pin can render at -- pin-revamp-spec.md section 14.4. No
+ * pin ever shows a photo; photos stay on the deck card and in the popup.
+ */
 export type PinSize = 32 | 22 | 16 | 10;
-/** Every size a photo pin can render at (photo pins never fall below the punto ladder's tier 1). */
-export type PhotoPinSize = 44 | 32;
 
 const PLAIN_SIZES: readonly PinSize[] = [32, 22, 16, 10];
-const PHOTO_SIZES: readonly PhotoPinSize[] = [44, 32];
 
 const DEFAULT_PLAIN_SIZE: PinSize = 22;
-const DEFAULT_PHOTO_SIZE: PhotoPinSize = 44;
 
 const PUNTO_SIZE = 10;
-const CLOSED_ONLY_SIZE = 16;
 
-/** `PIN_TIER_SIZES` is the shared ladder ([44, 32, 22, 16, 10]) -- reuse its index as the tier. */
+/** `PIN_TIER_SIZES` is the shared ladder ([32, 22, 16, 10]) -- reuse its index as the tier. */
 function tierForSize(size: number): PinTier {
   return PIN_TIER_SIZES.indexOf(size as (typeof PIN_TIER_SIZES)[number]) as PinTier;
 }
 
 /**
  * `iconAnchor = [size / 2, round(size * 30 / 32)]`, `popupAnchor = [0, -floor(size * 28 / 32)]`
- * (pin-revamp-spec.md section 4.6). Derived from the shared rose's tail tip
+ * (pin-revamp-spec.md section 14.4). Derived from the shared rose's tail tip
  * at (16, 30) in the 0..32 viewBox, scaled to `size` and rounded/floored to
- * reproduce the pin redesign's original 22px and 44px anchor values exactly.
- * The punto (size 10) does not use this formula -- see PUNTO_ANCHORS below.
+ * reproduce the pin redesign's original 22px anchor values exactly. The
+ * punto (size 10) does not use this formula -- see PUNTO_ANCHORS below.
  */
 function anchorsForSize(size: number): { iconAnchor: [number, number]; popupAnchor: [number, number] } {
   return {
@@ -42,7 +40,7 @@ function anchorsForSize(size: number): { iconAnchor: [number, number]; popupAnch
 }
 
 /**
- * The punto (pin-revamp-spec.md section 4.5) drops the rose entirely and is
+ * The punto (pin-revamp-spec.md section 14.5) drops the rose entirely and is
  * anchored at its own centre, not the tail tip -- a fixed override, not the
  * general anchor formula above.
  */
@@ -57,7 +55,7 @@ export interface CreatePinIconOptions {
    * string-splicing the serialized markup.
    */
   justConfirmed?: boolean;
-  /** Read cue on the pin (spec section 2). Ignored at size 16 and 10, and when invalid (E1). */
+  /** Read cue on the pin (spec section 2). Ignored only at size 10 (E1/E4). */
   category?: SpotCategory;
   /** Default 22. Any value not in `PinSize` throws `RangeError`. */
   size?: PinSize;
@@ -81,7 +79,7 @@ export function createPinIcon(status: PinStatus, options?: CreatePinIconOptions)
   }
 
   const tier = tierForSize(size);
-  const category = size === CLOSED_ONLY_SIZE ? undefined : validCategory(options?.category);
+  const category = validCategory(options?.category);
 
   if (size === PUNTO_SIZE) {
     const html = renderToStaticMarkup(createElement(PuntoPin, { size, status }));
@@ -106,81 +104,6 @@ export function createPinIcon(status: PinStatus, options?: CreatePinIconOptions)
   return L.divIcon({
     html,
     className: `zpots-pin-icon zpots-pin-icon--${status} zpots-pin-icon--tier-${tier}`,
-    iconSize: [size, size],
-    ...anchorsForSize(size),
-  });
-}
-
-/**
- * Photo hole diameter and offset (spec section 4.6): the transparent window
- * `PinChassis` leaves open in photo mode is a circle of radius 8.5 in the
- * shared 0..32 viewBox -- `round(size * 17 / 32)` scales that to `size`.
- */
-function photoHole(size: number): { diameter: number; offset: number } {
-  const diameter = Math.round((size * 17) / 32);
-  return { diameter, offset: (size - diameter) / 2 };
-}
-
-/** Minimal HTML-attribute escape -- this string lands inside a divIcon's `html`, not JSX. */
-function escapeHtmlAttribute(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
-export interface CreatePhotoPinIconOptions {
-  /** Flags this render as the one right after a pin flipped Unconfirmed -> Confirmed (spec section 4.7). */
-  justConfirmed?: boolean;
-  // No `category` here: a photo pin never renders a glyph (A2), so the field
-  // would be dead. When the tier drops the photo, SpotMap calls
-  // createPinIcon, which is where category goes (spec section 7.3).
-  /** Default 44. 44 or 32 render the photo; anything else throws `RangeError`. */
-  size?: PhotoPinSize;
-}
-
-/**
- * Renders a spot's own photo, clipped to a circle, layered underneath the
- * matching-status `PinChassis` in photo mode -- the frame's transparent
- * window is what lets the photo actually show through. Used for "mine"
- * (and famous-place preview) pins on Mi mapa (social-spots.md); `createPinIcon`
- * above is unchanged and still backs the plain compass pins everywhere else.
- */
-export function createPhotoPinIcon(
-  photoUrl: string,
-  status: PinStatus,
-  options?: CreatePhotoPinIconOptions,
-): L.DivIcon {
-  const size = options?.size ?? DEFAULT_PHOTO_SIZE;
-  if (!PHOTO_SIZES.includes(size)) {
-    throw new RangeError(`createPhotoPinIcon: size ${size} is not one of ${PHOTO_SIZES.join(", ")}`);
-  }
-
-  const tier = tierForSize(size);
-
-  const frameMarkup = renderToStaticMarkup(
-    createElement(PinChassis, {
-      size,
-      status,
-      mode: "photo",
-      justConfirmed: options?.justConfirmed,
-    }),
-  );
-
-  const { diameter: holeDiameter, offset: holeOffset } = photoHole(size);
-  const safePhotoUrl = escapeHtmlAttribute(photoUrl);
-
-  const html = `<span class="zpots-pin-icon-photo-wrap" style="position:relative;display:block;width:${size}px;height:${size}px;">` +
-    `<span style="position:absolute;left:${holeOffset}px;top:${holeOffset}px;width:${holeDiameter}px;height:${holeDiameter}px;border-radius:50%;overflow:hidden;background:#f6eedc;">` +
-    `<img src="${safePhotoUrl}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" />` +
-    `</span>` +
-    `<span style="position:absolute;inset:0;">${frameMarkup}</span>` +
-    `</span>`;
-
-  return L.divIcon({
-    html,
-    className: `zpots-pin-icon zpots-pin-icon--photo zpots-pin-icon--${status} zpots-pin-icon--tier-${tier}`,
     iconSize: [size, size],
     ...anchorsForSize(size),
   });

@@ -26,23 +26,6 @@ const ROSE =
 const TAIL = "M13.5,22 L16,30 L18.5,22 Z";
 
 /**
- * Photo mode only: the rose clipped to outside the window (r 8.5), because
- * in photo mode there is no cream disc to hide the kite bases and a filled
- * kite would paint over the photo. Each kite becomes a petal -- the tip,
- * the two edges down to where they cross the r 8.5 circle, and that
- * circle's arc between them (spec section 4.1).
- */
-const PETALS =
-  "M16,2 L17.81,7.7 A8.5,8.5 0 0 0 14.19,7.7 Z M30,16 L24.3,17.81 A8.5,8.5 0 0 0 24.3,14.19 Z M16,30 L14.19,24.3 A8.5,8.5 0 0 0 17.81,24.3 Z M2,16 L7.7,14.19 A8.5,8.5 0 0 0 7.7,17.81 Z";
-
-/**
- * The petals' two straight edges only, open (no arc), so the cream halo
- * stroke never crosses the photo window.
- */
-const PHOTO_HALO =
-  "M14.19,7.7 L16,2 L17.81,7.7 M24.3,14.19 L30,16 L24.3,17.81 M17.81,24.3 L16,30 L14.19,24.3 M7.7,17.81 L2,16 L7.7,14.19";
-
-/**
  * The seal (confirmed only, spec section 4.3): a band through the rose
  * with twelve chiselled teeth -- the crimped edge of a wax sello. Teeth
  * sit at 15deg + 30deg*k so none touches a kite.
@@ -117,8 +100,8 @@ export interface PinChassisProps extends SVGProps<SVGSVGElement> {
   /** Rendered width and height in pixels. Defaults to 22. */
   size?: number;
   status: PinStatus;
-  /** closed: no window. open: cream window + category glyph. photo: transparent window for a photo layered behind. */
-  mode: "closed" | "open" | "photo";
+  /** closed: no window. open: cream window + category glyph. */
+  mode: "closed" | "open";
   /** Only drawn when mode is "open". */
   category?: SpotCategory;
   /** Flags this as the render right after a pin flipped Unconfirmed -> Confirmed (the "sello" moment, spec section 4.7). No-op when status is "unconfirmed". */
@@ -126,11 +109,10 @@ export interface PinChassisProps extends SVGProps<SVGSVGElement> {
 }
 
 /**
- * The pin chassis: rose + tail (or petals, in photo mode), status styling,
- * and -- for confirmed pins -- the seal. Layer order is fixed (spec
- * section 4.4) and the halo is always the first <path> so `pin-icon.ts`
- * can rely on that when it needs to reach the first element in the
- * serialized markup.
+ * The pin chassis: rose + tail, status styling, and -- for confirmed pins --
+ * the seal. Layer order is fixed (spec section 4.4) and the halo is always
+ * the first <path> so `pin-icon.ts` can rely on that when it needs to reach
+ * the first element in the serialized markup.
  */
 export function PinChassis({
   size = 22,
@@ -143,7 +125,6 @@ export function PinChassis({
 }: PinChassisProps) {
   const statusColor = STATUS_COLOR[status];
   const isConfirmed = status === "confirmed";
-  const isPhoto = mode === "photo";
 
   const roseFillProps = isConfirmed
     ? { fill: statusColor, stroke: statusColor, strokeWidth: 1 }
@@ -164,15 +145,15 @@ export function PinChassis({
       focusable="false"
     >
       <path
-        d={isPhoto ? PHOTO_HALO : `${ROSE} ${TAIL}`}
+        d={`${ROSE} ${TAIL}`}
         fill="none"
         stroke="#f6eedc"
         strokeOpacity={0.95}
         strokeWidth={3.2}
         strokeLinejoin="round"
       />
-      <path d={isPhoto ? PETALS : ROSE} {...roseFillProps} strokeLinejoin="round" />
-      {!isPhoto && <path d={TAIL} {...roseFillProps} strokeLinejoin="round" />}
+      <path d={ROSE} {...roseFillProps} strokeLinejoin="round" />
+      <path d={TAIL} {...roseFillProps} strokeLinejoin="round" />
 
       {mode === "closed" &&
         (isConfirmed ? (
@@ -190,10 +171,6 @@ export function PinChassis({
           )}
           {category && <PinGlyph category={category} />}
         </>
-      )}
-
-      {mode === "photo" && !isConfirmed && (
-        <circle cx={16} cy={16} r={8.5} fill="none" stroke={statusColor} strokeWidth={1.6} />
       )}
 
       {isConfirmed && (
@@ -218,15 +195,29 @@ export function PinChassis({
   );
 }
 
-/** Punto (spec section 4.5): the rose's replacement at 10px, its own geometry, anchored at its own centre. */
+/**
+ * Punto azulejo (spec section 14.5): the rose's own degradation curve at
+ * 10px -- Grabado's lights-close-first-mass-remains physics applied to the
+ * rose's own concavities leaves its convex hull, a lozenge. Borrows the
+ * azulejo/Talavera lattice cell's shape (not the `AzulejoBand` component
+ * itself) because an ornament unit, not an object, is right for a mark that
+ * carries no category -- only presence and status. Exactly two <path>
+ * elements, halo first, anchored at its own centre (not the tail tip).
+ */
 export function PuntoPin({ size = 10, status }: { size?: number; status: PinStatus }) {
   return (
     <svg viewBox={VIEW_BOX} width={size} height={size} aria-hidden="true" focusable="false">
-      <circle cx={16} cy={16} r={11} fill="#f6eedc" />
+      <path d="M16,1 L31,16 L16,31 L1,16 Z" fill="#f6eedc" />
       {status === "confirmed" ? (
-        <circle cx={16} cy={16} r={8} fill="#1f6f78" />
+        <path d="M16,4 L28,16 L16,28 L4,16 Z" fill="#1f6f78" />
       ) : (
-        <circle cx={16} cy={16} r={8} fill="#f6eedc" fillOpacity={0.85} stroke="#7a6448" strokeWidth={2.4} />
+        <path
+          d="M16,4 L28,16 L16,28 L4,16 Z"
+          fill="#f6eedc"
+          fillOpacity={0.85}
+          stroke="#7a6448"
+          strokeWidth={3}
+        />
       )}
     </svg>
   );
@@ -239,8 +230,4 @@ export function UnconfirmedPin(props: PinIconProps) {
 
 export function ConfirmedPin(props: PinIconProps) {
   return <PinChassis {...props} status="confirmed" mode="closed" />;
-}
-
-export function PhotoPinFrame({ status = "confirmed", ...props }: PinIconProps & { status?: PinStatus }) {
-  return <PinChassis {...props} status={status} mode="photo" />;
 }
