@@ -63,4 +63,11 @@ describe("createPinIcon -- seal", () => {
     );
     expect(html).toContain("zpots-pin-icon--just-confirmed");
   });
+
+  it("a confirmed photo pin carries the seal on its own, with no justConfirmed flag", () => {
+    const html = String(
+      createPhotoPinIcon("https://example.com/p.jpg", "confirmed").options.html,
+    );
+    expect(html).toContain('data-part="seal"');
+  });
 });

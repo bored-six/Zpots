@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPinIcon } from "@/lib/pin-icon";
+import { createPhotoPinIcon, createPinIcon } from "@/lib/pin-icon";
 
 /**
  * grabado-pins spec, section 10.4 -- the category glyph option on
@@ -65,6 +65,16 @@ describe("createPinIcon -- category glyph", () => {
     const extractGlyph = (html: string) => html.match(/<g data-glyph="come">[\s\S]*?<\/g>/)?.[0];
     expect(extractGlyph(confirmedHtml)).toBeTruthy();
     expect(extractGlyph(confirmedHtml)).toBe(extractGlyph(unconfirmedHtml));
+  });
+
+  it("window ring stroke-width is the one numeric distinction between open and photo, unconfirmed", () => {
+    const openHtml = String(createPinIcon("unconfirmed", { category: "agua" }).options.html);
+    expect(openHtml).toContain('stroke-width="1.2"');
+
+    const photoHtml = String(
+      createPhotoPinIcon("https://example.com/spot.jpg", "unconfirmed").options.html,
+    );
+    expect(photoHtml).toContain('stroke-width="1.6"');
   });
 
   it("an invalid category is treated as undefined (E1)", () => {

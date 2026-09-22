@@ -207,3 +207,35 @@ against a second signal — here, `photoUrl` and `photoCredit` both count 16, wh
 typo: it turned "swap a placeholder" into "move a live feature into the database", a different
 piece of work. **Live trap for whoever writes migration 0007:** seeding by grepping `preview-` ids
 yields a 21st row named after the author constant.
+
+## [2026-09-22] - Grabado pin redesign: audited geometry, a dead trigger, and two test-process traps
+
+**The closest glyph pair was decided by the L1 audit, not by eye.** Comé (satti skewer) and
+Caminá (ridge) scored 11.4 at 8 px, the tightest of all fifteen pairs in `pin-glyphs.geometry.test.ts`'s
+silhouette audit. A flat-based 12-wide ridge looked fine but scored 10.5 against Agua (read as
+"a bar with a bump"); a 10-wide ridge scored 11.5 but fell under R6's 25% ink floor at 22.4%. The
+shipped ridge (10.8 wide base, tall and narrow) is the middle the audit chose, not the one that
+"looked most mountain-like" — taste lost to the number every time the two disagreed.
+
+**`moveend` is not a density trigger, by construction, not by oversight.** `pin-density.ts`
+recomputes tiers from the pixel distance between two projected points at a given zoom. Panning
+the map translates every point by the same vector, so pairwise pixel distance is invariant under
+pan — recomputing on `moveend` would be pure thrash with no observable effect. Only `zoomend`
+(distance scales with zoom) and a change to the rendered spot set (`spots`/`mapSpots`/
+`sourceFilter`) can change a tier. `SpotMap.tsx` has no `move`/`moveend`/`zoom` listener at all.
+
+**`userEvent` under fake timers can hang instead of failing.** Two tests set up
+`userEvent.setup({ advanceTimers: vi.advanceTimersByTime })` alongside `vi.useFakeTimers()` and
+hung to vitest's 5s per-test timeout rather than failing on an assertion — userEvent's internal
+pointer-delay timers don't reliably advance through that hook. `fireEvent.click` wrapped in `act`
+is synchronous and has no timer dependency; it is the safer choice whenever fake timers are
+already in play for the thing under test.
+
+**A defensive `typeof map.getZoom === "function"` guard was rejected — again the same rule.**
+`SpotMap.tsx` needed `map.getZoom()`, and a test double in `SpotMap.pergamino.test.tsx` lacked the
+method, so a guard was written to compile around it. The spec's author rejected it on sight,
+citing this file's own 2026-09-20 entry ("Extend an unfaithful test double, do not defend against
+it in production" — a guard for a state that cannot occur on a real `L.Map` is test-driven damage).
+The fix was one line: add `getZoom` to the fake. General rule, restated because it recurred: when
+a test double is missing a method every real instance has, fix the double, never the production
+code.

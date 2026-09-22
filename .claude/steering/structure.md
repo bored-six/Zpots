@@ -41,11 +41,17 @@ src/__tests__/      Vitest specs, one file per module under test
   `.leaflet-tile-pane` only (`sepia(0.38) saturate(0.72) contrast(0.92) brightness(1.04)
   hue-rotate(-6deg)`) — markers and popups live in other Leaflet panes, so the filter never
   touches them and they stay crisp.
-- **Silhouette:** pins are the same compass-rose mark as before, shrunk and sharpened
-  (`ICON_SIZE = 22`, was 32). Colors are `unconfirmed: #7a6448` (stone-deep) and
-  `confirmed: #1f6f78` (teal) — the only two hex values allowed in `src/lib/pin-icon.ts`,
-  and they must equal the matching tokens above. The halo stroke and unconfirmed fill use
-  cream (`#f6eedc`) so the mark still reads over the tinted tiles.
+- **Silhouette:** pins are the same compass-rose mark as before, now density-responsive: a
+  five-tier ladder `[44, 32, 22, 16, 10]` px (`PIN_TIER_SIZES` in `src/lib/pin-density.ts`),
+  chosen per pin from nearest-neighbour pixel distance on `zoomend` and data change (never
+  `moveend`); 22 stays the default when no size is given. Below tier 3 the rose becomes a
+  dotted "punto". Confirmed pins earn a seal ring (chiselled teeth) instead of a plain fill
+  swap, and category pins (tiers 0-2) show a Grabado glyph — a woodblock-stamp mass with
+  cream cuts knocked out of it — inside the rose's window. Four hex values are allowed in
+  `src/lib/pin-icon.ts`: `unconfirmed: #7a6448` (stone-deep), `confirmed: #1f6f78` (teal),
+  glyph mass `#2a2017` (ink), glyph cuts and windows `#f6eedc` (cream) — all four must equal
+  the matching tokens above. The halo stroke and unconfirmed fill use cream so the mark
+  still reads over the tinted tiles.
 - **Fonts (wired up via `next/font/google`, `display: "swap"`, in `src/app/layout.tsx`):**
   `Cinzel` (`--font-wordmark`) for the word "Zpots" only; `Alegreya` (`--font-display`) for
   headings, spot names, and the italic tagline; `Alegreya Sans` (`--font-body`) for
