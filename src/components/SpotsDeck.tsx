@@ -11,6 +11,7 @@ import { StoneArch } from "@/components/icons/ornaments";
 import SpotCardView from "@/components/SpotCardView";
 import { bilingualLabel } from "@/lib/copy";
 import { feedCerca, feedNuevo, feedSiguiendo, hoyRow, type FeedCursor, type HoyEntry } from "@/lib/feed-repo";
+import type { LatLng } from "@/lib/geo";
 import { isPreviewSpot, previewCards } from "@/lib/preview-spots";
 import { mySavedIds, saveSpot, unsaveSpot } from "@/lib/saves-repo";
 import type { SpotCard } from "@/lib/spots";
@@ -108,6 +109,7 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
   // timer expired.
   const [activeMove, setActiveMove] = useState<ActiveMove>({ index: 0, origin: "observed" });
   const activeIndex = activeMove.index;
+  const activeCard = cards[activeIndex];
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set());
   const [hoyEntries, setHoyEntries] = useState<HoyEntry[]>([]);
@@ -139,6 +141,22 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
    * be offered again once that slot settles above the threshold. That is
    * why cancelling promptly on user input matters more than the timeout. */
   const programmaticTargetRef = useRef<number | null>(null);
+  /**
+   * The walk's previous stop -- whichever card was active immediately
+   * before the current one, or `null` before anything has ever been active
+   * (a fresh load). A plain ref would read as stale-by-design here (reading
+   * `.current` during render is exactly the pattern this needs), but React's
+   * own rules forbid touching a ref's value during render -- so this is
+   * state instead, updated from the effect just below *after* each render
+   * commits. That one-render lag is exactly the "previous" the
+   * paseo-motion.md phone inset fix needs: the render for the card
+   * *becoming* active still reads last commit's value (the prior
+   * activation's coordinates), and only the render after that sees the new
+   * one. `SpotCardView`/`MapInsetInner` have no visibility into sibling
+   * cards, so `SpotsDeck` -- the only thing that knows both the active index
+   * and the full card list -- is the only place that can supply it.
+   */
+  const [previousActiveCenter, setPreviousActiveCenter] = useState<LatLng | null>(null);
 
   /**
    * Single stable identity across every render (`useCallback` with no
@@ -312,8 +330,33 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
   // Notifies the desktop two-column layout (app/page.tsx) which card is
   // active, so its right-column map can pan to it.
   useEffect(() => {
-    onActiveCardChange?.(cards[activeIndex] ?? null);
-  }, [cards, activeIndex, onActiveCardChange]);
+    onActiveCardChange?.(activeCard ?? null);
+  }, [activeCard, onActiveCardChange]);
+
+  // Records the just-active card's coordinates into `previousActiveCenter`
+  // -- deliberately *after* this render's JSX already read the old state
+  // value (see that state's own doc comment above), so the card becoming
+  // active this render still sees the walk's true previous stop, and only
+  // the *next* transition sees this one. Same justification as
+  // HandleGate.tsx's debounce effect: synchronizing this state with
+  // `activeCard` (an external-to-this-effect value driven by scroll/keys/
+  // Hoy taps) is the whole point of the effect, not a side effect of it.
+  // The updater-function form (rather than closing over
+  // `previousActiveCenter`) keeps this effect's own dependency array free
+  // of the very state it's setting, and bails out to the same object when
+  // the coordinates haven't actually changed so this never cascades beyond
+  // one extra render.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!activeCard) return;
+    setPreviousActiveCenter((current) => {
+      if (current && current.lat === activeCard.lat && current.lng === activeCard.lng) {
+        return current;
+      }
+      return { lat: activeCard.lat, lng: activeCard.lng };
+    });
+  }, [activeCard]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Prefetch the next page once the active card is within
   // PREFETCH_THRESHOLD of the end of what's loaded.
@@ -618,8 +661,6 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
     }
   }
 
-  const activeCard = cards[activeIndex];
-
   return (
     <div
       data-testid="spots-deck"
@@ -747,6 +788,8 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
                     savedIds.has(card.id) || confirmedIds.has(card.id) || card.author.id === auth.user?.id
                   }
                   authStatus={auth.status}
+                  active={index === activeIndex}
+                  previousCenter={previousActiveCenter}
                 />
               </div>
             ))}
