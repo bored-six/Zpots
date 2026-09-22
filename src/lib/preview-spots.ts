@@ -16,8 +16,11 @@ import type { MapSpot, SpotAuthor, SpotCard } from "@/lib/spots";
  *
  * Photos are hot-linked from Wikimedia Commons (CC BY-SA, CC BY, or CC0 --
  * see each entry's `photoCredit`) and carry their attribution, which the
- * card and popup render. Not every entry has a freely-licensed photo;
- * `photoUrl` is optional, but any entry that has one must carry a credit.
+ * card and popup render. Photoless entries (verified spots with no
+ * freely-licensed photo) were dropped -- they rendered as a flat cream
+ * placeholder -- so every entry currently has both `photoUrl` and
+ * `photoCredit`. `photoUrl` stays optional on the type for future curation,
+ * but any entry that has one must carry a credit.
  */
 const PREVIEW_ID_PREFIX = "preview-";
 
@@ -260,39 +263,6 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
     author: PREVIEW_AUTHOR,
     photoUrl: `${COMMONS}/e/eb/Manicahan_beach.jpg/1280px-Manicahan_beach.jpg`,
     photoCredit: "CyraFelix, CC0, Wikimedia Commons",
-  },
-  {
-    id: "preview-duyan-spot",
-    name: "Duyan Spot",
-    note: "Hammock hangout in Upper Cabatangan with a view deck, billiards and karaoke. Open till midnight.",
-    lat: 6.945938,
-    lng: 122.060937,
-    status: "confirmed",
-    confirmations: 2,
-    createdAt: PREVIEW_CREATED_AT,
-    author: PREVIEW_AUTHOR,
-  },
-  {
-    id: "preview-muruk-haven",
-    name: "Muruk Haven",
-    note: "A hiking trail area in Upper Pasonanca, about 30 minutes in on foot. Popular for trail running and biking.",
-    lat: 6.973313,
-    lng: 122.079937,
-    status: "confirmed",
-    confirmations: 2,
-    createdAt: PREVIEW_CREATED_AT,
-    author: PREVIEW_AUTHOR,
-  },
-  {
-    id: "preview-yakan-weaving-village",
-    name: "Yakan Weaving Village",
-    note: "A Yakan weaving shop and workshop in Calarian. Watch the looms work, buy fabric from the source.",
-    lat: 6.92491,
-    lng: 122.0222,
-    status: "confirmed",
-    confirmations: 2,
-    createdAt: PREVIEW_CREATED_AT,
-    author: PREVIEW_AUTHOR,
   },
   {
     id: "preview-canelar-barter-trade-center",

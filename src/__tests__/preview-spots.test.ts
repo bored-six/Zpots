@@ -29,8 +29,12 @@ describe("PREVIEW_SPOTS -- data contract", () => {
     expect(PREVIEW_SPOTS.length).toBeLessThanOrEqual(24);
   });
 
-  it("has grown to the full Famosos set of 20", () => {
-    expect(PREVIEW_SPOTS.length).toBe(20);
+  // Grown to 20 for the Famosos lane, then dropped to 17 when Duyan Spot,
+  // Muruk Haven and Yakan Weaving Village -- verified spots with no
+  // freely-licensed photo -- were removed rather than shown as a flat
+  // cream placeholder.
+  it("has the full Famosos set of 17, after dropping photoless entries", () => {
+    expect(PREVIEW_SPOTS.length).toBe(17);
   });
 
   it("every id is unique and carries the preview- prefix", () => {
@@ -53,24 +57,14 @@ describe("PREVIEW_SPOTS -- data contract", () => {
     }
   });
 
-  // A photo is optional (some verified spots have no freely-licensed photo
-  // yet), but the legal invariant that matters is unconditional: if a
-  // photoUrl is present, it must be https and it must carry a credit.
-  it("has an https photo and a credit whenever a photo is present, but a photo is optional", () => {
-    let withoutPhoto = 0;
+  // The photoless spots (Duyan Spot, Muruk Haven, Yakan Weaving Village)
+  // were removed rather than kept as a flat cream placeholder, so every
+  // remaining entry now carries both an https photoUrl and a credit.
+  it("has an https photo and a non-empty credit for every spot", () => {
     for (const spot of PREVIEW_SPOTS) {
-      if (spot.photoUrl === undefined) {
-        withoutPhoto += 1;
-        expect(spot.photoCredit).toBeUndefined();
-        continue;
-      }
       expect(spot.photoUrl).toMatch(/^https:\/\//);
       expect(spot.photoCredit?.trim().length ?? 0).toBeGreaterThan(0);
     }
-    // Duyan Spot, Muruk Haven, Yakan Weaving Village are real, user-named
-    // spots with verified coordinates but no freely-licensed photo. Canelar
-    // Barter Trade Center gained one (see the dedicated test below).
-    expect(withoutPhoto).toBe(3);
   });
 
   it("has a photo and credit for Canelar Barter Trade Center", () => {
@@ -171,6 +165,6 @@ describe("previewBounds", () => {
     expect(north).toBeGreaterThan(7.0); // Merloquet Falls, 7.31066
     expect(east).toBeGreaterThan(122.2); // Once Islas, 122.26361
     expect(south).toBeLessThan(6.88); // Great Santa Cruz Island, 6.8735
-    expect(west).toBeLessThan(122.03); // Yakan Weaving Village, 122.02220
+    expect(west).toBeLessThan(122.03); // La Vista del Mar, 122.02019
   });
 });
