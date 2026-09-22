@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { MapSpot, Spot } from "@/lib/spots";
+import type { MapSpot } from "@/lib/spots";
 
 /**
  * grabado-pins spec, section 10.8 -- `SpotMap`'s density-responsive icon
@@ -83,8 +83,10 @@ vi.mock("@/components/CityMask", () => ({
 import SpotMap from "@/components/SpotMap";
 
 // Fixtures A/B from spec section 5.3 -- A-B is ~189m apart, which the
-// worked table puts at tier 3 (16px) at z14 and the ceiling at z16.
-const SPOT_A: Spot = {
+// worked table puts at tier 3 (16px) at z14 and the ceiling at z16. `mine`
+// with no photoUrl renders through `iconForMapSpot`'s plain-status fallback,
+// the same createPinIcon(spot.status, ...) path a write-mode spot used to.
+const SPOT_A: MapSpot = {
   id: "spot-a",
   name: "Spot A",
   note: "note",
@@ -93,9 +95,11 @@ const SPOT_A: Spot = {
   status: "unconfirmed",
   confirmations: 0,
   createdAt: "2026-01-01T00:00:00.000Z",
+  author: { id: "user-1", handle: "kuya_ben", displayName: "Kuya Ben", avatarUrl: null },
+  source: "mine",
 };
 
-const SPOT_B: Spot = {
+const SPOT_B: MapSpot = {
   id: "spot-b",
   name: "Spot B",
   note: "note",
@@ -104,6 +108,8 @@ const SPOT_B: Spot = {
   status: "unconfirmed",
   confirmations: 0,
   createdAt: "2026-01-01T00:00:00.000Z",
+  author: { id: "user-1", handle: "kuya_ben", displayName: "Kuya Ben", avatarUrl: null },
+  source: "mine",
 };
 
 function makeMapSpot(overrides: Partial<MapSpot>): MapSpot {
@@ -142,7 +148,7 @@ afterEach(() => {
 
 describe("SpotMap -- density-responsive pin sizing", () => {
   it("two spots ~190m apart both size to tier 3 (16px) at the default zoom", () => {
-    render(<SpotMap authStatus="signed-in" spots={[SPOT_A, SPOT_B]} />);
+    render(<SpotMap authStatus="signed-in" mapSpots={[SPOT_A, SPOT_B]} />);
 
     const sizes = createPinIconSpy.mock.calls.map(
       (call) => (call[1] as { size?: number } | undefined)?.size,
@@ -151,7 +157,7 @@ describe("SpotMap -- density-responsive pin sizing", () => {
   });
 
   it("recomputes to tier 1 (32px) after a zoomend event bumps the zoom to 16", () => {
-    render(<SpotMap authStatus="signed-in" spots={[SPOT_A, SPOT_B]} />);
+    render(<SpotMap authStatus="signed-in" mapSpots={[SPOT_A, SPOT_B]} />);
 
     zoomState.zoom = 16;
     act(() => {
@@ -165,7 +171,7 @@ describe("SpotMap -- density-responsive pin sizing", () => {
   });
 
   it("a lone spot rides all the way up to tier 1 (32px), since nothing is nearby", () => {
-    render(<SpotMap authStatus="signed-in" spots={[SPOT_A]} />);
+    render(<SpotMap authStatus="signed-in" mapSpots={[SPOT_A]} />);
 
     expect(lastSize(createPinIconSpy)).toBe(32);
   });
@@ -236,7 +242,7 @@ describe("SpotMap -- density-responsive pin sizing", () => {
   });
 
   it("keeps the icon reference stable across an unrelated prop change and a same-zoom zoomend", () => {
-    const { rerender } = render(<SpotMap authStatus="signed-in" spots={[SPOT_A, SPOT_B]} />);
+    const { rerender } = render(<SpotMap authStatus="signed-in" mapSpots={[SPOT_A, SPOT_B]} />);
 
     expect(createPinIconSpy).toHaveBeenCalledWith(
       "unconfirmed",
@@ -246,7 +252,7 @@ describe("SpotMap -- density-responsive pin sizing", () => {
     const iconAfterFirstRender = markerIconCalls.at(-1);
 
     rerender(
-      <SpotMap authStatus="signed-in" spots={[SPOT_A, SPOT_B]} nickname="Different Name" />,
+      <SpotMap authStatus="signed-in" mapSpots={[SPOT_A, SPOT_B]} openSpotId="not-this-spot" />,
     );
     expect(markerIconCalls.at(-1)).toBe(iconAfterFirstRender);
 
@@ -257,8 +263,8 @@ describe("SpotMap -- density-responsive pin sizing", () => {
   });
 
   it("forwards a spot's category to createPinIcon", () => {
-    const categorised = { ...SPOT_A, category: "mira" } as Spot;
-    render(<SpotMap authStatus="signed-in" spots={[categorised]} />);
+    const categorised: MapSpot = { ...SPOT_A, category: "mira" };
+    render(<SpotMap authStatus="signed-in" mapSpots={[categorised]} />);
 
     expect(createPinIconSpy).toHaveBeenCalledWith(
       "unconfirmed",
@@ -270,7 +276,7 @@ describe("SpotMap -- density-responsive pin sizing", () => {
     vi.useFakeTimers();
     const onConfirmSpot = vi.fn().mockResolvedValue(undefined);
 
-    render(<SpotMap authStatus="signed-in" spots={[SPOT_A]} onConfirmSpot={onConfirmSpot} />);
+    render(<SpotMap authStatus="signed-in" mapSpots={[SPOT_A]} onConfirmSpot={onConfirmSpot} />);
 
     const popup = screen.getByTestId("popup");
     const confirmButton = within(popup).getByRole("button", { name: /confirm.*been here/i });
@@ -304,7 +310,7 @@ describe("SpotMap -- density-responsive pin sizing", () => {
     const onConfirmSpot = vi.fn().mockResolvedValue(undefined);
 
     const { unmount } = render(
-      <SpotMap authStatus="signed-in" spots={[SPOT_A]} onConfirmSpot={onConfirmSpot} />,
+      <SpotMap authStatus="signed-in" mapSpots={[SPOT_A]} onConfirmSpot={onConfirmSpot} />,
     );
 
     const popup = screen.getByTestId("popup");

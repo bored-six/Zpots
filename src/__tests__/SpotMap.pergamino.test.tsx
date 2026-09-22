@@ -88,7 +88,7 @@ beforeEach(() => {
 
 describe("SpotMap x Pergamino wiring", () => {
   it("passes the same live map instance to BasemapLayer and PlaceLabelsLayer", () => {
-    render(<SpotMap spots={[]} authStatus="signed-out" />);
+    render(<SpotMap authStatus="signed-out" />);
 
     expect(basemapLayerMock).toHaveBeenCalled();
     expect(placeLabelsLayerMock).toHaveBeenCalled();
@@ -101,7 +101,7 @@ describe("SpotMap x Pergamino wiring", () => {
   });
 
   it('shows the bilingual "Simplified map" chip when basemapMode is "raster"', () => {
-    render(<SpotMap spots={[]} authStatus="signed-out" />);
+    render(<SpotMap authStatus="signed-out" />);
 
     act(() => {
       modeChangeRef.current?.("raster");
@@ -117,7 +117,7 @@ describe("SpotMap x Pergamino wiring", () => {
   });
 
   it("gives the raster chip a title and an accessible description explaining why it's showing", () => {
-    render(<SpotMap spots={[]} authStatus="signed-out" />);
+    render(<SpotMap authStatus="signed-out" />);
 
     act(() => {
       modeChangeRef.current?.("raster");
@@ -135,7 +135,7 @@ describe("SpotMap x Pergamino wiring", () => {
   });
 
   it('renders no chip anywhere in the tree when basemapMode is "pergamino"', () => {
-    render(<SpotMap spots={[]} authStatus="signed-out" />);
+    render(<SpotMap authStatus="signed-out" />);
 
     act(() => {
       modeChangeRef.current?.("pergamino");
@@ -146,12 +146,12 @@ describe("SpotMap x Pergamino wiring", () => {
   });
 
   it("also renders no chip before any mode change fires (initial state)", () => {
-    render(<SpotMap spots={[]} authStatus="signed-out" />);
+    render(<SpotMap authStatus="signed-out" />);
     expect(screen.queryByText(COPY.simpleMap.en)).not.toBeInTheDocument();
   });
 
   it("renders the raster chip outside MapContainer's children, never covering the popup", () => {
-    render(<SpotMap spots={[]} authStatus="signed-out" />);
+    render(<SpotMap authStatus="signed-out" />);
 
     act(() => {
       modeChangeRef.current?.("raster");

@@ -1,14 +1,14 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { Spot } from "@/lib/spots";
+import type { MapSpot } from "@/lib/spots";
 
 /**
  * paseo-motion.md fix-round-2, finding 2 -- `createPinIcon`'s `justConfirmed`
- * option must reach the real /mapa write-mode marker, not just exist in
+ * option must reach the real Mi mapa marker, not just exist in
  * lib/pin-icon.ts. Mocks `@/lib/pin-icon` (pure wiring, not "does pin-icon.ts
  * do the right thing" -- that's pin-icon.just-confirmed.test.ts) and reuses
- * SpotMap.wiring.test.tsx's react-leaflet stand-in shape.
+ * SpotMap.density.test.tsx's react-leaflet stand-in shape.
  */
 const { createPinIconSpy, fakeMap, markerIconCalls } = vi.hoisted(() => ({
   createPinIconSpy: vi.fn(() => ({ options: { html: "<div/>" } })),
@@ -62,7 +62,7 @@ vi.mock("@/components/CityMask", () => ({
 
 import SpotMap from "@/components/SpotMap";
 
-const unconfirmedSpot: Spot = {
+const unconfirmedSpot: MapSpot = {
   id: "spot-1",
   name: "Rio Hondo Boardwalk",
   note: "Great sunset view.",
@@ -71,14 +71,15 @@ const unconfirmedSpot: Spot = {
   status: "unconfirmed",
   confirmations: 1,
   createdAt: "2026-01-01T00:00:00.000Z",
+  author: { id: "user-1", handle: "kuya_ben", displayName: "Kuya Ben", avatarUrl: null },
+  source: "mine",
 };
 
 function baseProps() {
   return {
-    spots: [unconfirmedSpot] as readonly Spot[],
+    mapSpots: [unconfirmedSpot] as readonly MapSpot[],
     confirmedSpotIds: new Set<string>(),
     authStatus: "signed-in" as const,
-    onCreateSpot: vi.fn().mockResolvedValue(undefined),
     onConfirmSpot: vi.fn().mockResolvedValue(undefined),
     onReportSpot: vi.fn().mockResolvedValue(undefined),
   };
@@ -97,7 +98,7 @@ describe("SpotMap -- just-confirmed pin wiring", () => {
   it("marks the spot's own pin justConfirmed: true once its confirm click resolves", async () => {
     const user = userEvent.setup();
     const props = baseProps();
-    render(<SpotMap {...props} spots={[unconfirmedSpot]} />);
+    render(<SpotMap {...props} mapSpots={[unconfirmedSpot]} />);
 
     const popup = screen.getByTestId("popup");
     await user.click(within(popup).getByRole("button", { name: /confirm.*been here/i }));
@@ -115,7 +116,7 @@ describe("SpotMap -- just-confirmed pin wiring", () => {
   it("threads the density size on every call and never changes it on confirm", async () => {
     const user = userEvent.setup();
     const props = baseProps();
-    render(<SpotMap {...props} spots={[unconfirmedSpot]} />);
+    render(<SpotMap {...props} mapSpots={[unconfirmedSpot]} />);
 
     const popup = screen.getByTestId("popup");
     await user.click(within(popup).getByRole("button", { name: /confirm.*been here/i }));
@@ -149,14 +150,14 @@ describe("SpotMap -- just-confirmed pin wiring", () => {
    */
   it("keeps the spot's own pin icon reference stable across an unrelated re-render", () => {
     const props = baseProps();
-    const { rerender } = render(<SpotMap {...props} spots={[unconfirmedSpot]} />);
+    const { rerender } = render(<SpotMap {...props} mapSpots={[unconfirmedSpot]} />);
 
     const callsAfterFirstRender = createPinIconSpy.mock.calls.length;
     const iconAfterFirstRender = markerIconCalls.at(-1);
 
-    // Unrelated re-render: a new `nickname` value -- not one of
+    // Unrelated re-render: a new `openSpotId` value -- not one of
     // createPinIcon's inputs (status, justConfirmed) -- with the same spot.
-    rerender(<SpotMap {...props} spots={[unconfirmedSpot]} nickname="Different Name" />);
+    rerender(<SpotMap {...props} mapSpots={[unconfirmedSpot]} openSpotId="not-this-spot" />);
 
     expect(createPinIconSpy.mock.calls.length).toBe(callsAfterFirstRender);
     expect(markerIconCalls.at(-1)).toBe(iconAfterFirstRender);
