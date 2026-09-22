@@ -3,56 +3,52 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MapSpot } from "@/lib/spots";
 
 /**
- * grabado-pins spec, section 10.8 -- `SpotMap`'s density-responsive icon
- * sizing (section 5). Mocks `@/lib/pin-icon` (pure wiring, not "does
- * pin-icon.ts do the right thing" -- that's pin-icon.size/category/seal
- * .test.ts) and reuses `SpotMap.just-confirmed.test.tsx`'s react-leaflet
- * stand-in shape, with `getZoom` backed by a mutable module-level zoom so a
- * test can move it and fire the captured `zoomend` handler.
+ * grabado-pins spec, section 10.8, revised by section 14.10 for revision 2
+ * -- `SpotMap`'s density-responsive icon sizing (section 5), now with no
+ * photo pin anywhere and a four-tier ladder [32, 22, 16, 10]. Mocks
+ * `@/lib/pin-icon` (pure wiring, not "does pin-icon.ts do the right
+ * thing" -- that's pin-icon.size/category/seal.test.ts) and reuses
+ * `SpotMap.just-confirmed.test.tsx`'s react-leaflet stand-in shape, with
+ * `getZoom` backed by a mutable module-level zoom so a test can move it and
+ * fire the captured `zoomend` handler.
  *
- * THIS FILE IS EXPECTED TO FAIL RED: `SpotMap.tsx` does not read the map's
- * zoom, does not import `pin-density.ts` (which doesn't exist yet), and
- * never passes a `size`/`category` option to either icon factory. A couple
- * of assertions below (icon reference stability across an unrelated prop)
- * already hold today on their own -- each is folded into a test that also
- * asserts a currently-missing `size` option, so every test here fails for a
- * real reason.
+ * THIS FILE IS EXPECTED TO FAIL RED against the revision-1 implementation:
+ * `SpotMap.tsx` still routes photo-eligible sources through
+ * `createPhotoPinIcon`, still includes `photoUrl` in the `mapSpots` cache
+ * key, and the ladder's tier numbering is still five rungs off by one.
  */
-const { createPinIconSpy, createPhotoPinIconSpy, fakeMap, markerIconCalls, zoomState, zoomendHandlers } =
-  vi.hoisted(() => {
-    const zoomState = { zoom: 14 };
-    const zoomendHandlers: Array<() => void> = [];
-    // Every `icon` prop react-leaflet's real `Marker` ever received, in
-    // render order -- a mock that dropped the `icon` prop entirely could
-    // never catch an identity-stability regression.
-    const markerIconCalls: unknown[] = [];
-    const fakeMap = {
-      on: (event: string, fn: () => void) => {
-        if (event === "zoomend") zoomendHandlers.push(fn);
-      },
-      off: () => {},
-      setMaxBounds: () => {},
-      getPane: () => ({ style: {} }) as unknown as HTMLElement,
-      createPane: () => ({ style: {} }) as unknown as HTMLElement,
-      addLayer: () => {},
-      removeLayer: () => {},
-      getZoom: () => zoomState.zoom,
-      getContainer: () => document.createElement("div"),
-    };
+const { createPinIconSpy, fakeMap, markerIconCalls, zoomState, zoomendHandlers } = vi.hoisted(() => {
+  const zoomState = { zoom: 14 };
+  const zoomendHandlers: Array<() => void> = [];
+  // Every `icon` prop react-leaflet's real `Marker` ever received, in
+  // render order -- a mock that dropped the `icon` prop entirely could
+  // never catch an identity-stability regression.
+  const markerIconCalls: unknown[] = [];
+  const fakeMap = {
+    on: (event: string, fn: () => void) => {
+      if (event === "zoomend") zoomendHandlers.push(fn);
+    },
+    off: () => {},
+    setMaxBounds: () => {},
+    getPane: () => ({ style: {} }) as unknown as HTMLElement,
+    createPane: () => ({ style: {} }) as unknown as HTMLElement,
+    addLayer: () => {},
+    removeLayer: () => {},
+    getZoom: () => zoomState.zoom,
+    getContainer: () => document.createElement("div"),
+  };
 
-    return {
-      createPinIconSpy: vi.fn(() => ({ options: { html: "<div/>" } })),
-      createPhotoPinIconSpy: vi.fn(() => ({ options: { html: "<div/>" } })),
-      markerIconCalls,
-      fakeMap,
-      zoomState,
-      zoomendHandlers,
-    };
-  });
+  return {
+    createPinIconSpy: vi.fn(() => ({ options: { html: "<div/>" } })),
+    markerIconCalls,
+    fakeMap,
+    zoomState,
+    zoomendHandlers,
+  };
+});
 
 vi.mock("@/lib/pin-icon", () => ({
   createPinIcon: createPinIconSpy,
-  createPhotoPinIcon: createPhotoPinIconSpy,
 }));
 
 vi.mock("react-leaflet", async () => {
@@ -136,7 +132,6 @@ function lastSize(spy: typeof createPinIconSpy): number | undefined {
 beforeEach(() => {
   vi.resetAllMocks();
   createPinIconSpy.mockImplementation(() => ({ options: { html: "<div/>" } }));
-  createPhotoPinIconSpy.mockImplementation(() => ({ options: { html: "<div/>" } }));
   zoomState.zoom = 14;
   zoomendHandlers.length = 0;
   markerIconCalls.length = 0;
@@ -147,7 +142,7 @@ afterEach(() => {
 });
 
 describe("SpotMap -- density-responsive pin sizing", () => {
-  it("two spots ~190m apart both size to tier 3 (16px) at the default zoom", () => {
+  it("two spots ~190m apart both size to tier 2 (16px) at the default zoom", () => {
     render(<SpotMap authStatus="signed-in" mapSpots={[SPOT_A, SPOT_B]} />);
 
     const sizes = createPinIconSpy.mock.calls.map(
@@ -156,7 +151,7 @@ describe("SpotMap -- density-responsive pin sizing", () => {
     expect(sizes).toEqual([16, 16]);
   });
 
-  it("recomputes to tier 1 (32px) after a zoomend event bumps the zoom to 16", () => {
+  it("recomputes to tier 0 (32px) after a zoomend event bumps the zoom to 16", () => {
     render(<SpotMap authStatus="signed-in" mapSpots={[SPOT_A, SPOT_B]} />);
 
     zoomState.zoom = 16;
@@ -170,13 +165,13 @@ describe("SpotMap -- density-responsive pin sizing", () => {
     expect(lastTwoSizes).toEqual([32, 32]);
   });
 
-  it("a lone spot rides all the way up to tier 1 (32px), since nothing is nearby", () => {
+  it("a lone spot rides all the way up to tier 0 (32px), since nothing is nearby", () => {
     render(<SpotMap authStatus="signed-in" mapSpots={[SPOT_A]} />);
 
     expect(lastSize(createPinIconSpy)).toBe(32);
   });
 
-  it("at z14 a mine-with-photo spot and a saved spot both render as plain 16px glyphs, no photo icon", () => {
+  it("at z14 a mine-with-photo spot and a saved spot both render as plain 16px glyphs, photoUrl never reaches the icon options", () => {
     const mine = makeMapSpot({ id: "map-a", source: "mine", photoUrl: "https://example.com/p.jpg" });
     const saved = makeMapSpot({
       id: "map-b",
@@ -187,37 +182,38 @@ describe("SpotMap -- density-responsive pin sizing", () => {
 
     render(<SpotMap authStatus="signed-in" mapSpots={[mine, saved]} />);
 
-    expect(createPhotoPinIconSpy).not.toHaveBeenCalled();
-    const sizes = createPinIconSpy.mock.calls.map(
-      (call) => (call[1] as { size?: number } | undefined)?.size,
-    );
+    const calls = createPinIconSpy.mock.calls as [unknown, Record<string, unknown>?][];
+    const sizes = calls.map((call) => (call[1] as { size?: number } | undefined)?.size);
     expect(sizes).toEqual([16, 16]);
+    for (const call of calls) {
+      expect(call[1]).not.toHaveProperty("photoUrl");
+    }
   });
 
-  it("at z16 the photo spot switches to createPhotoPinIcon(size 44) and the saved spot to size 32", () => {
+  it("at z16 both spots ride to size 32 and forward their own category, no photo option anywhere", () => {
     zoomState.zoom = 16;
-    const mine = makeMapSpot({ id: "map-a", source: "mine", photoUrl: "https://example.com/p.jpg" });
+    const mine = makeMapSpot({ id: "map-a", source: "mine", category: "come" });
     const saved = makeMapSpot({
       id: "map-b",
       source: "saved",
       lat: 6.9231,
       lng: 122.079,
+      category: "agua",
     });
 
     render(<SpotMap authStatus="signed-in" mapSpots={[mine, saved]} />);
 
-    expect(createPhotoPinIconSpy).toHaveBeenCalledWith(
-      "https://example.com/p.jpg",
+    expect(createPinIconSpy).toHaveBeenCalledWith(
       "unconfirmed",
-      expect.objectContaining({ size: 44 }),
+      expect.objectContaining({ size: 32, category: "come" }),
     );
     expect(createPinIconSpy).toHaveBeenCalledWith(
       "unconfirmed",
-      expect.objectContaining({ size: 32 }),
+      expect.objectContaining({ size: 32, category: "agua" }),
     );
   });
 
-  it("hiding the saved source via sourceFilter leaves the mine spot alone, riding to size 44", () => {
+  it("hiding the saved source via sourceFilter leaves the mine spot alone, riding to size 32 via createPinIcon", () => {
     const mine = makeMapSpot({ id: "map-a", source: "mine", photoUrl: "https://example.com/p.jpg" });
     const saved = makeMapSpot({
       id: "map-b",
@@ -234,11 +230,26 @@ describe("SpotMap -- density-responsive pin sizing", () => {
       />,
     );
 
-    expect(createPhotoPinIconSpy).toHaveBeenCalledWith(
-      "https://example.com/p.jpg",
+    expect(createPinIconSpy).toHaveBeenCalledWith(
       "unconfirmed",
-      expect.objectContaining({ size: 44 }),
+      expect.objectContaining({ size: 32 }),
     );
+  });
+
+  it("a been-source spot always renders confirmed, regardless of its own status", () => {
+    const been = makeMapSpot({ id: "map-been", source: "been", status: "unconfirmed" });
+
+    render(<SpotMap authStatus="signed-in" mapSpots={[been]} />);
+
+    expect(createPinIconSpy).toHaveBeenCalledWith("confirmed", expect.anything());
+  });
+
+  it("a saved-source spot always renders unconfirmed, even when its real status is confirmed (E22)", () => {
+    const saved = makeMapSpot({ id: "map-saved", source: "saved", status: "confirmed" });
+
+    render(<SpotMap authStatus="signed-in" mapSpots={[saved]} />);
+
+    expect(createPinIconSpy).toHaveBeenCalledWith("unconfirmed", expect.anything());
   });
 
   it("keeps the icon reference stable across an unrelated prop change and a same-zoom zoomend", () => {

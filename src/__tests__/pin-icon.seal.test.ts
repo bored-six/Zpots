@@ -1,16 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { createPhotoPinIcon, createPinIcon } from "@/lib/pin-icon";
+import { createPinIcon } from "@/lib/pin-icon";
 
 /**
- * grabado-pins spec, section 10.5 -- the confirmed-only seal ring (section
- * 4.3) and its just-confirmed press/pulse (section 4.7).
+ * grabado-pins spec, section 10.5, revised by section 14.10 for revision 2
+ * (no photo on any pin; the seal now also renders at size 16).
  *
- * THIS FILE IS EXPECTED TO FAIL RED: no seal markup exists yet anywhere in
- * `pin-icon.ts`'s output, and `justConfirmed` still splices its class onto
- * the halo `<path>` instead of the seal `<g>`. One sub-assertion (the
- * unconfirmed no-op case) is already true today on its own -- it's folded
- * into a test with the punto no-op case, which does fail today, so the
- * whole test is genuinely red.
+ * THIS FILE IS EXPECTED TO FAIL RED against the revision-1 implementation:
+ * size 16 is still closed-only, so the new size-16 seal test fails.
  */
 describe("createPinIcon -- seal", () => {
   it("confirmed markup carries the seal; unconfirmed never does", () => {
@@ -56,18 +52,10 @@ describe("createPinIcon -- seal", () => {
     expect(puntoHtml).not.toContain("zpots-seal-pulse");
   });
 
-  it("a confirmed photo pin also gets the just-confirmed class when flagged", () => {
+  it("size 16 confirmed + justConfirmed presses the seal, same as every other glyph-eligible size", () => {
     const html = String(
-      createPhotoPinIcon("https://example.com/p.jpg", "confirmed", { justConfirmed: true })
-        .options.html,
+      createPinIcon("confirmed", { size: 16, justConfirmed: true }).options.html,
     );
-    expect(html).toContain("zpots-pin-icon--just-confirmed");
-  });
-
-  it("a confirmed photo pin carries the seal on its own, with no justConfirmed flag", () => {
-    const html = String(
-      createPhotoPinIcon("https://example.com/p.jpg", "confirmed").options.html,
-    );
-    expect(html).toContain('data-part="seal"');
+    expect(html).toMatch(/<g class="zpots-seal zpots-pin-icon--just-confirmed" data-part="seal">/);
   });
 });

@@ -32,7 +32,6 @@ const { createPinIconSpy, fakeMap, markerIconCalls } = vi.hoisted(() => ({
 
 vi.mock("@/lib/pin-icon", () => ({
   createPinIcon: createPinIconSpy,
-  createPhotoPinIcon: vi.fn(() => ({ options: { html: "<div/>" } })),
 }));
 
 vi.mock("react-leaflet", async () => {

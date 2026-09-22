@@ -4,9 +4,7 @@ import {
   computePinTiers,
   DENSITY_SEARCH_PX,
   nearestNeighbourPx,
-  PHOTO_CEILING_TIER,
   PIN_TIER_SIZES,
-  PLAIN_CEILING_TIER,
   PUNTO_TIER,
   projectPx,
   tierForDistance,
@@ -14,11 +12,13 @@ import {
 } from "@/lib/pin-density";
 
 /**
- * grabado-pins spec (.claude/handoff/pin-revamp-spec.md), section 10.1.
+ * grabado-pins spec (.claude/handoff/pin-revamp-spec.md), section 10.1,
+ * revised by section 14.10 for revision 2 (no photo on any pin; four-tier
+ * ladder [32, 22, 16, 10]).
  *
- * THIS FILE IS EXPECTED TO FAIL RED: `src/lib/pin-density.ts` does not exist
- * yet. Do not create a stub to make the import resolve -- implement the
- * module for real instead.
+ * THIS FILE IS EXPECTED TO FAIL RED against the revision-1 implementation:
+ * `PIN_TIER_SIZES` still has five rungs, `tierForDistance` still takes a
+ * `ceiling` argument, and `DensityPoint` still has `wantsPhoto`.
  */
 
 describe("projectPx", () => {
@@ -113,65 +113,51 @@ describe("nearestNeighbourPx", () => {
 
 describe("tierForDistance", () => {
   it.each([
-    [Infinity, 0, 0],
-    [Infinity, 1, 1],
-    [31.9, 1, 2],
-    [22, 1, 2],
-    [21.9, 1, 3],
-    [16, 1, 3],
-    [15.9, 1, 4],
-    [5, 1, 4],
-    [44, 0, 0],
-    [43.9, 0, 1],
-  ] as const)("tierForDistance(%p, %p) -> %p", (distance, ceiling, expected) => {
-    expect(tierForDistance(distance, ceiling)).toBe(expected);
+    [Infinity, 0],
+    [32, 0],
+    [31.9, 1],
+    [22, 1],
+    [21.9, 2],
+    [16, 2],
+    [15.9, 3],
+    [0, 3],
+  ] as const)("tierForDistance(%p) -> %p", (distance, expected) => {
+    expect(tierForDistance(distance)).toBe(expected);
   });
 });
 
 describe("computePinTiers", () => {
   // Fixtures A/B/C from spec section 5.3.
-  const A: DensityPoint = { key: "spot:a", lat: 6.9214, lng: 122.079, wantsPhoto: false };
-  const B: DensityPoint = { key: "spot:b", lat: 6.9231, lng: 122.079, wantsPhoto: false };
-  const C: DensityPoint = { key: "spot:c", lat: 6.9214, lng: 122.0805, wantsPhoto: false };
+  const A: DensityPoint = { key: "spot:a", lat: 6.9214, lng: 122.079 };
+  const B: DensityPoint = { key: "spot:b", lat: 6.9231, lng: 122.079 };
+  const C: DensityPoint = { key: "spot:c", lat: 6.9214, lng: 122.0805 };
 
-  it("z14: A and B (189m apart) both settle on tier 3, the plain ceiling's floor for that gap", () => {
+  it("z14: A and B (189m apart, ~19.95px) both settle on tier 2 (16px)", () => {
     const tiers = computePinTiers([A, B], 14);
-    expect(tiers.get(A.key)).toBe(3);
-    expect(tiers.get(B.key)).toBe(3);
+    expect(tiers.get(A.key)).toBe(2);
+    expect(tiers.get(B.key)).toBe(2);
   });
 
-  it("z16: A and B are far enough apart to ride to the photo ceiling (tier 0) when they want a photo", () => {
-    const tiers = computePinTiers(
-      [
-        { ...A, wantsPhoto: true },
-        { ...B, wantsPhoto: true },
-      ],
-      16,
-    );
-    expect(tiers.get(A.key)).toBe(PHOTO_CEILING_TIER);
-    expect(tiers.get(B.key)).toBe(PHOTO_CEILING_TIER);
-  });
-
-  it("z16: the same pair without photos rides only to the plain ceiling (tier 1)", () => {
+  it("z16: A and B are far enough apart to ride to the ceiling (tier 0, 32px)", () => {
     const tiers = computePinTiers([A, B], 16);
-    expect(tiers.get(A.key)).toBe(PLAIN_CEILING_TIER);
-    expect(tiers.get(B.key)).toBe(PLAIN_CEILING_TIER);
+    expect(tiers.get(A.key)).toBe(0);
+    expect(tiers.get(B.key)).toBe(0);
   });
 
-  it("z12: A and B (now ~5px apart) both fall to the punto tier regardless of ceiling", () => {
+  it("z12: A and B (now ~5px apart) both fall to the punto tier", () => {
     const tiers = computePinTiers([A, B], 12);
     expect(tiers.get(A.key)).toBe(PUNTO_TIER);
     expect(tiers.get(B.key)).toBe(PUNTO_TIER);
   });
 
   it("a point with a non-finite lat gets no entry, does not throw, and leaves the others unaffected", () => {
-    const bad: DensityPoint = { key: "spot:bad", lat: NaN, lng: 122.079, wantsPhoto: false };
+    const bad: DensityPoint = { key: "spot:bad", lat: NaN, lng: 122.079 };
     expect(() => computePinTiers([A, bad, B, C], 14)).not.toThrow();
 
     const tiers = computePinTiers([A, bad, B, C], 14);
     expect(tiers.has("spot:bad")).toBe(false);
-    expect(tiers.get(A.key)).toBe(3);
-    expect(tiers.get(B.key)).toBe(3);
+    expect(tiers.get(A.key)).toBe(2);
+    expect(tiers.get(B.key)).toBe(2);
   });
 
   it("is deterministic: two calls with the same input produce an equal map", () => {
@@ -183,10 +169,12 @@ describe("computePinTiers", () => {
 });
 
 describe("PIN_TIER_SIZES", () => {
-  it("is strictly descending and its first entry is DENSITY_SEARCH_PX", () => {
+  it("is strictly descending, its first entry is DENSITY_SEARCH_PX, and it has exactly four rungs", () => {
     for (let i = 1; i < PIN_TIER_SIZES.length; i++) {
       expect(PIN_TIER_SIZES[i]).toBeLessThan(PIN_TIER_SIZES[i - 1]);
     }
     expect(PIN_TIER_SIZES[0]).toBe(DENSITY_SEARCH_PX);
+    expect(PIN_TIER_SIZES).toHaveLength(4);
+    expect(PIN_TIER_SIZES[PUNTO_TIER]).toBe(10);
   });
 });

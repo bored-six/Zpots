@@ -1,16 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { createPhotoPinIcon, createPinIcon } from "@/lib/pin-icon";
+import { createPinIcon } from "@/lib/pin-icon";
 
 /**
- * grabado-pins spec, section 10.4 -- the category glyph option on
- * `createPinIcon`.
+ * grabado-pins spec, section 10.4, revised by section 14.10 for revision 2
+ * (no photo on any pin; the glyph now also renders at size 16).
  *
- * THIS FILE IS EXPECTED TO FAIL RED: `pin-icon.ts` does not accept a
- * `category` option yet, so no glyph markup, seal, or window ring exists to
- * assert on. A couple of the spec's sub-assertions (e.g. "no category means
- * no data-glyph") are already vacuously true today with no category support
- * at all -- those are folded into a test with a genuinely-failing
- * assertion so every test here fails for a real reason, not a vacuous one.
+ * THIS FILE IS EXPECTED TO FAIL RED against the revision-1 implementation:
+ * size 16 is still closed-only (no `data-glyph`), so both the open-ring
+ * test and the byte-identical-across-sizes test fail.
  */
 const CATEGORY_ORDER = ["come", "senta", "camina", "agua", "mira", "compra"] as const;
 
@@ -67,14 +64,27 @@ describe("createPinIcon -- category glyph", () => {
     expect(extractGlyph(confirmedHtml)).toBe(extractGlyph(unconfirmedHtml));
   });
 
-  it("window ring stroke-width is the one numeric distinction between open and photo, unconfirmed", () => {
-    const openHtml = String(createPinIcon("unconfirmed", { category: "agua" }).options.html);
-    expect(openHtml).toContain('stroke-width="1.2"');
+  it("the open unconfirmed window ring is stroke-width 1.2 with an r=8.5 window at every glyph-eligible size", () => {
+    for (const size of [32, 22, 16] as const) {
+      const html = String(createPinIcon("unconfirmed", { category: "agua", size }).options.html);
+      expect(html).toContain('stroke-width="1.2"');
+      expect(html).toContain('r="8.5"');
+    }
+  });
 
-    const photoHtml = String(
-      createPhotoPinIcon("https://example.com/spot.jpg", "unconfirmed").options.html,
+  it("size 16 with a category renders the glyph", () => {
+    const html = String(createPinIcon("unconfirmed", { category: "agua", size: 16 }).options.html);
+    expect(html).toContain('data-glyph="agua"');
+  });
+
+  it("the glyph markup for a category is byte-identical across every glyph-eligible size", () => {
+    const extractGlyph = (html: string) => html.match(/<g data-glyph="come">[\s\S]*?<\/g>/)?.[0];
+    const glyphs = [32, 22, 16].map((size) =>
+      extractGlyph(String(createPinIcon("unconfirmed", { category: "come", size }).options.html)),
     );
-    expect(photoHtml).toContain('stroke-width="1.6"');
+    expect(glyphs[0]).toBeTruthy();
+    expect(glyphs[1]).toBe(glyphs[0]);
+    expect(glyphs[2]).toBe(glyphs[0]);
   });
 
   it("an invalid category is treated as undefined (E1)", () => {
