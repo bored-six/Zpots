@@ -25,16 +25,8 @@ import {
   MIN_ZOOM,
   ZAMBOANGA_CENTER,
 } from "@/lib/map-config";
-import { createPhotoPinIcon, createPinIcon, type PhotoPinSize, type PinSize } from "@/lib/pin-icon";
-import {
-  computePinTiers,
-  PHOTO_CEILING_TIER,
-  PHOTO_LAST_TIER,
-  PIN_TIER_SIZES,
-  PLAIN_CEILING_TIER,
-  type DensityPoint,
-  type PinTier,
-} from "@/lib/pin-density";
+import { createPinIcon, type PinSize } from "@/lib/pin-icon";
+import { computePinTiers, PIN_TIER_SIZES, type DensityPoint, type PinTier } from "@/lib/pin-density";
 import type { MapSource, MapSpot } from "@/lib/spots";
 import type { ReportReason } from "@/lib/validation";
 
@@ -193,38 +185,20 @@ function mapSpotDensityKey(id: string): string {
   return `map:${id}`;
 }
 
-/** Largest tier a computed map didn't produce an entry for (E9/defensive) falls back to the kind's ceiling. */
-function tierFor(tiers: ReadonlyMap<string, PinTier>, key: string, wantsPhoto: boolean): PinTier {
-  return tiers.get(key) ?? (wantsPhoto ? PHOTO_CEILING_TIER : PLAIN_CEILING_TIER);
+/** Largest tier a computed map didn't produce an entry for (E9/defensive) falls back to the ceiling. */
+function tierFor(tiers: ReadonlyMap<string, PinTier>, key: string): PinTier {
+  return tiers.get(key) ?? 0;
 }
 
 /**
- * `saved`/`been` are the two sources Mi mapa renders as *status* pins by
- * rule (social-spots.md: `been` = solid, `saved` = hollow); every other
- * source with a photo is the photo (spec section 5.4/A5). Written as a
- * denylist typed on `MapSource` on purpose: it compiles against today's
- * union with no literal for a member (e.g. a future famous-place source,
- * famous-spots-seed.md) that does not exist yet, and that source starts
- * showing its photo the moment `MapSource` gains it, with no edit here.
- */
-function isPhotoEligibleSource(source: MapSource): boolean {
-  return source !== "saved" && source !== "been";
-}
-
-/** `wantsPhoto` mirrors `iconForMapSpot`'s own photo-eligibility rule (spec section 5.4). */
-function wantsPhotoFor(spot: MapSpot): boolean {
-  return isPhotoEligibleSource(spot.source) && Boolean(spot.photoUrl);
-}
-
-/**
- * Mi mapa pin-by-source rule (social-spots.md): `mine`/`preview` use the
- * spot's own actual `status`; `saved`/`been` derive a pseudo-status from
- * `source` instead (`been` -> confirmed, `saved` -> unconfirmed) --
- * deliberately independent of the spot's real confirmation status, since a
+ * Mi mapa pin-by-source rule (social-spots.md, pin-revamp-spec.md section
+ * 14.2 A5): `mine`/`preview` (and any future source) use the spot's own
+ * actual `status`; `saved`/`been` derive a pseudo-status from `source`
+ * instead (`been` -> confirmed, `saved` -> unconfirmed) -- deliberately
+ * independent of the spot's real confirmation status, since a
  * saved-but-unconfirmed spot and an unconfirmed spot you dropped yourself
- * should still look different. `createPhotoPinIcon` is only reached when
- * the spot wants a photo *and* the current tier still shows one (spec
- * section 5.4/7.5) -- crowding drops the photo before the glyph returns.
+ * should still look different. No pin ever renders a photo; `spot.photoUrl`
+ * never reaches an icon factory or a cache key.
  */
 function iconForMapSpot(
   spot: MapSpot,
@@ -233,28 +207,16 @@ function iconForMapSpot(
   getIcon: PinIconCacheGetter,
 ): L.DivIcon {
   const category = spot.category;
-  const key = `${spot.source}:${spot.photoUrl ?? ""}:${spot.status}:${category ?? "-"}:${tier}:${justConfirmed}`;
+  const status = spot.source === "been" ? "confirmed" : spot.source === "saved" ? "unconfirmed" : spot.status;
+  const key = `${spot.source}:${status}:${category ?? "-"}:${tier}:${justConfirmed}`;
 
-  return getIcon(spot.id, key, () => {
-    if (isPhotoEligibleSource(spot.source)) {
-      if (spot.photoUrl && tier <= PHOTO_LAST_TIER) {
-        return createPhotoPinIcon(spot.photoUrl, spot.status, {
-          justConfirmed,
-          size: PIN_TIER_SIZES[tier] as PhotoPinSize,
-        });
-      }
-      return createPinIcon(spot.status, {
-        justConfirmed,
-        category,
-        size: PIN_TIER_SIZES[tier] as PinSize,
-      });
-    }
-    return createPinIcon(spot.source === "been" ? "confirmed" : "unconfirmed", {
+  return getIcon(spot.id, key, () =>
+    createPinIcon(status, {
       justConfirmed,
       category,
       size: PIN_TIER_SIZES[tier] as PinSize,
-    });
-  });
+    }),
+  );
 }
 
 /**
@@ -344,7 +306,6 @@ export default function SpotMap({
     key: mapSpotDensityKey(spot.id),
     lat: spot.lat,
     lng: spot.lng,
-    wantsPhoto: wantsPhotoFor(spot),
   }));
   const pinTiers = computePinTiers(densityPoints, zoom);
 
@@ -457,7 +418,7 @@ export default function SpotMap({
             position={[spot.lat, spot.lng]}
             icon={iconForMapSpot(
               spot,
-              tierFor(pinTiers, mapSpotDensityKey(spot.id), wantsPhotoFor(spot)),
+              tierFor(pinTiers, mapSpotDensityKey(spot.id)),
               justConfirmedIds.has(spot.id),
               getMapSpotIcon,
             )}
