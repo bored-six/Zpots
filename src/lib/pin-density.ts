@@ -1,24 +1,22 @@
 /**
- * Density-responsive pin sizing (pin-revamp-spec.md section 5). Pure: no
+ * Density-responsive pin sizing (pin-revamp-spec.md section 5, ladder
+ * re-derived by section 14.3 for revision 2 -- no photo on any pin, so
+ * there is one ceiling, not two, and the top rung is 32, not 44). Pure: no
  * Leaflet, no DOM, no React. `SpotMap` calls `computePinTiers` on `zoomend`
  * and on render, never on `move`/`moveend` -- pixel distance between two
  * spots is invariant under pan.
  */
 
-export const PIN_TIER_SIZES = [44, 32, 22, 16, 10] as const;
-export type PinTier = 0 | 1 | 2 | 3 | 4;
-export const PHOTO_CEILING_TIER: PinTier = 0;
-export const PLAIN_CEILING_TIER: PinTier = 1;
-export const PHOTO_LAST_TIER: PinTier = 1; // tiers > 1 drop the photo
-export const GLYPH_LAST_TIER: PinTier = 2; // tiers > 2 drop the glyph (closed rose)
-export const PUNTO_TIER: PinTier = 4;
-export const DENSITY_SEARCH_PX = 44; // = PIN_TIER_SIZES[0]
+export const PIN_TIER_SIZES = [32, 22, 16, 10] as const;
+export type PinTier = 0 | 1 | 2 | 3;
+export const GLYPH_LAST_TIER: PinTier = 2; // tiers > 2 have no glyph
+export const PUNTO_TIER: PinTier = 3;
+export const DENSITY_SEARCH_PX = 32; // = PIN_TIER_SIZES[0]
 
 export interface DensityPoint {
   key: string;
   lat: number;
   lng: number;
-  wantsPhoto: boolean;
 }
 
 const TILE_SIZE = 256;
@@ -90,9 +88,9 @@ export function nearestNeighbourPx(
   return result;
 }
 
-/** Largest tier ≤ ceiling whose size ≤ d; PUNTO_TIER if none. d = Infinity → ceiling. */
-export function tierForDistance(nearestPx: number, ceiling: PinTier): PinTier {
-  for (let tier = ceiling; tier <= PUNTO_TIER; tier++) {
+/** Smallest index t with PIN_TIER_SIZES[t] <= d; PUNTO_TIER if none. d = Infinity → 0. */
+export function tierForDistance(nearestPx: number): PinTier {
+  for (let tier = 0; tier <= PUNTO_TIER; tier++) {
     if (PIN_TIER_SIZES[tier] <= nearestPx) {
       return tier as PinTier;
     }
@@ -115,9 +113,8 @@ export function computePinTiers(points: readonly DensityPoint[], zoom: number): 
 
   const tiers = new Map<string, PinTier>();
   for (const point of validPoints) {
-    const ceiling = point.wantsPhoto ? PHOTO_CEILING_TIER : PLAIN_CEILING_TIER;
     const distance = nearest.get(point.key) ?? Infinity;
-    tiers.set(point.key, tierForDistance(distance, ceiling));
+    tiers.set(point.key, tierForDistance(distance));
   }
 
   return tiers;
