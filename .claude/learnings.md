@@ -239,3 +239,32 @@ it in production" — a guard for a state that cannot occur on a real `L.Map` is
 The fix was one line: add `getZoom` to the fake. General rule, restated because it recurred: when
 a test double is missing a method every real instance has, fix the double, never the production
 code.
+
+## [2026-09-22] - Grabado pin redesign, revision 2: a cue that only shows under crowding is no cue
+
+**A cue that only appears under crowding is worse than no cue.** Revision 1 designed the category
+glyph as the photo's fallback (tier 2 only), so it was invisible on every pin a user actually saw
+at rest and only flickered in on zoom, once crowding dropped the photo. Rule: a semantic cue on a
+marker is either present at the marker's *largest* size or it is not a cue — do not ship a cue
+that depends on crowding to appear.
+
+**The 8 × 8 silhouette audit grid was mislabelled.** `pin-glyphs.geometry.test.ts`'s audit
+comment called its grid "one device pixel of the glyph at the 22px tier"; at 22px the safe square
+is actually 9.9px, so the grid models an ~18px pin, not 22. The ranking and every distance number
+were still correct — only the label was wrong. Always derive the grid size from the safe-square
+pixel size (`14.4 * size / 32`), not from memory of which tier it was written for.
+
+**A round punto collided with the basemap's own point symbol.** `BasemapLayer` draws `pois`
+ground points with `protomaps.CircleSymbolizer` — a small circle. A round 10px punto pin risked
+being mistaken for a basemap POI dot at a glance. The fix was geometric, not cosmetic: the punto
+azulejo (a lozenge) is the rose's own convex hull, the same "lights close first, mass remains"
+degradation curve the Grabado glyphs already use, so it isn't an arbitrary shape swap. General
+rule: check a new marker silhouette against the ground layer's own point symbols, not only
+against the other markers in the same set.
+
+**Unresolved: `CLAUDE.md` item 2 still says "clusters stack" while `social-spots.md` has said
+"No clustering" since 2026-09-20, and revision 1 of this spec (section 5.8) argued for the
+density ladder over clustering without flagging the contradiction it left in `CLAUDE.md`.**
+Revision 2 fixed the photo→category half of item 2 but left "clusters stack" alone pending user
+confirmation (`pin-revamp-spec.md` §14.9) — do not silently "fix" that phrase in a future pass
+without that confirmation; it is a locked product decision, not a typo.

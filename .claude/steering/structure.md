@@ -41,19 +41,17 @@ src/__tests__/      Vitest specs, one file per module under test
   `.leaflet-tile-pane` only (`sepia(0.38) saturate(0.72) contrast(0.92) brightness(1.04)
   hue-rotate(-6deg)`) — markers and popups live in other Leaflet panes, so the filter never
   touches them and they stay crisp.
-- **Silhouette:** pins are the same compass-rose mark as before, now density-responsive: a
-  five-tier ladder `[44, 32, 22, 16, 10]` px (`PIN_TIER_SIZES` in `src/lib/pin-density.ts`),
-  chosen per pin from nearest-neighbour pixel distance on `zoomend` and data change (never
-  `moveend`); 22 stays the default when no size is given. Only the smallest tier, 10px
-  (tier 4), is a dotted "punto". Confirmed pins earn a seal ring (chiselled teeth) instead
-  of a plain fill swap, and plain pins show a Grabado glyph — a woodblock-stamp mass with
-  cream cuts knocked out of it — inside the rose's window at their two largest sizes, 32
-  and 22px (tiers 1-2). A photo pin never carries a glyph: tier 0 (44px) is reachable only
-  through `createPhotoPinIcon`, whose options have no `category` field by design. Four hex
-  values are allowed in `src/lib/pin-icon.ts`: `unconfirmed: #7a6448` (stone-deep),
-  `confirmed: #1f6f78` (teal), glyph mass `#2a2017` (ink), glyph cuts and windows
-  `#f6eedc` (cream) — all four must equal the matching tokens above. The halo stroke and
-  unconfirmed fill use cream so the mark still reads over the tinted tiles.
+- **Silhouette:** Pins are the same compass-rose mark, density-responsive on a four-tier ladder
+  `[32, 22, 16, 10]` px (`PIN_TIER_SIZES` in `src/lib/pin-density.ts`), chosen per pin from
+  nearest-neighbour pixel distance on `zoomend` and data change (never `moveend`); 22 is the
+  default when no size is given. **No pin ever shows a photo** — photos live on the deck card and
+  in the popup. Tiers 0–2 (32/22/16) show the spot's Grabado category glyph (one ink mass, cream
+  knife-cuts) in the rose's cream window; a spot without a category shows the closed rose. Tier 3
+  (10 px) is the punto azulejo, a cream-haloed lozenge — the rose's hull with its lights closed —
+  that carries status by colour and nothing else. Confirmed pins earn the seal ring. Four hex
+  values are allowed in `src/lib/pin-icon.ts`: `#7a6448` (stone-deep, unconfirmed), `#1f6f78`
+  (teal, confirmed), `#2a2017` (ink, glyph mass), `#f6eedc` (cream, cuts/windows/halo) — all
+  equal to the matching tokens.
 - **Fonts (wired up via `next/font/google`, `display: "swap"`, in `src/app/layout.tsx`):**
   `Cinzel` (`--font-wordmark`) for the word "Zpots" only; `Alegreya` (`--font-display`) for
   headings, spot names, and the italic tagline; `Alegreya Sans` (`--font-body`) for
