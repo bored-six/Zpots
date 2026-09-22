@@ -31,7 +31,9 @@ Build these, nothing else:
 6. **Profiles and follows** — @handle, avatar, "Mi paseo" route map of dropped + confirmed spots,
    photo grid, follower and following counts. Follow is "Camina con".
 7. **Bottom nav** Paseo · Mapa · camera · Gente · Yo. Phone (375px) and desktop are both
-   first-class; desktop uses a two-column layout with the map beside the walk.
+   first-class; desktop centers the deck as a single phone-width column (480px) against the
+   page background, Reels/TikTok-style, not a two-column layout with a side map (that second
+   map was removed 2026-09-22 as redundant — every card already carries its own map inset).
 
 Browsing the Paseo and the map needs no account. Posting, confirming, reporting, and following
 require signing in (email + password or Google via Supabase Auth).

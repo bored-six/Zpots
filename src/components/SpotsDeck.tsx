@@ -78,16 +78,7 @@ function laneCopyKey(lane: Lane): "cerca" | "nuevo" | "siguiendo" | "famosos" {
  * the `?spot=` deep link, and optimistic save/been actions -- everything
  * `SpotCardView` itself has no way to know about on its own.
  */
-interface SpotsDeckProps {
-  /**
-   * Reports the currently active card whenever it changes -- used on
-   * desktop (`app/page.tsx`) to pan the right-column map to it. Optional:
-   * the deck works exactly the same without a listener.
-   */
-  onActiveCardChange?: (card: SpotCard | null) => void;
-}
-
-export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
+export default function SpotsDeck() {
   const auth = useAuth();
   const location = useLocation();
   const searchParams = useSearchParams();
@@ -327,12 +318,6 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
     };
   }, [auth.status]);
 
-  // Notifies the desktop two-column layout (app/page.tsx) which card is
-  // active, so its right-column map can pan to it.
-  useEffect(() => {
-    onActiveCardChange?.(activeCard ?? null);
-  }, [activeCard, onActiveCardChange]);
-
   // Records the just-active card's coordinates into `previousActiveCenter`
   // -- deliberately *after* this render's JSX already read the old state
   // value (see that state's own doc comment above), so the card becoming
@@ -487,9 +472,9 @@ export default function SpotsDeck({ onActiveCardChange }: SpotsDeckProps = {}) {
 
   // Scroll-driven active index (paseo-motion.md prerequisite fix): a finger
   // swipe never updated activeIndex at all -- it only moved on arrow keys, a
-  // Hoy tap, or the ?spot= deep link -- desyncing the desktop map
-  // (onActiveCardChange) and the +/-2 render window from what's actually on
-  // screen. Observes every currently mounted slot against the scroller
+  // Hoy tap, or the ?spot= deep link -- desyncing the +/-2 render window
+  // from what's actually on screen. Observes every currently mounted slot
+  // against the scroller
   // itself and adopts whichever one crosses ACTIVE_VISIBILITY_THRESHOLD.
   //
   // Disconnects and re-creates on every +/-2 window shift, which in

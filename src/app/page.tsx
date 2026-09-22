@@ -1,11 +1,8 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense } from "react";
 
-import Bilingual from "@/components/Bilingual";
-import MapInset from "@/components/MapInset";
 import SpotsDeck from "@/components/SpotsDeck";
-import type { SpotCard } from "@/lib/spots";
 
 /**
  * Home route (social-spots.md, "Spots deck" / navigation section).
@@ -14,10 +11,18 @@ import type { SpotCard } from "@/lib/spots";
  * to the pre-social-redesign map page. The persistent chrome for every
  * main route is now `AppNav` in `app/layout.tsx` (bottom bar / desktop
  * rail), which is already mounted around `{children}` there. Home only
- * owns its own two layouts: phone is the deck alone, each card carrying
- * its own map inset; desktop (>= 1024px) adds a second column, a
- * full-height map that pans to whichever card is active (`MapInset` with
- * `fill`).
+ * owns its own two layouts: phone is the deck alone, edge to edge; desktop
+ * (>= 1024px) centers that same deck as a single phone-width column
+ * against the page background -- the way a vertical feed (Reels/TikTok)
+ * reads on the web. There used to be a second column here, a full-height
+ * map panned to whichever card was active, but every card already carries
+ * its own map inset (SpotCardView -> MapInset) -- the second, larger one
+ * was redundant and made the screen read as a panel instead of a screen
+ * (removed 2026-09-22, see CLAUDE.md item 7).
+ *
+ * `main` in `app/layout.tsx` already reserves the left rail's width via
+ * `lg:pl-24`, so centering here with `justify-center` centers the deck in
+ * the space actually left over, not the raw viewport.
  *
  * `SpotsDeck` reads `useSearchParams()` (the `?spot=` deep link), which
  * requires a Suspense boundary for the prerendered shell (Next.js
@@ -34,27 +39,10 @@ export default function Home() {
 }
 
 function HomeContent() {
-  const [activeCard, setActiveCard] = useState<SpotCard | null>(null);
-
   return (
-    <div className="flex h-[calc(100dvh-4rem)] w-full flex-col lg:h-dvh lg:flex-row">
-      <div className="min-h-0 w-full flex-1 lg:w-[480px] lg:flex-none lg:border-r lg:border-stone">
-        <SpotsDeck onActiveCardChange={setActiveCard} />
-      </div>
-
-      <div className="hidden min-h-0 flex-1 lg:block">
-        {activeCard ? (
-          <MapInset
-            center={{ lat: activeCard.lat, lng: activeCard.lng }}
-            status={activeCard.status}
-            onExpand={() => {}}
-            fill
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm text-stone-deep">
-            <Bilingual k="loading" />
-          </div>
-        )}
+    <div className="flex h-[calc(100dvh-4rem)] w-full justify-center lg:h-dvh">
+      <div className="h-full w-full lg:w-[480px]">
+        <SpotsDeck />
       </div>
     </div>
   );
