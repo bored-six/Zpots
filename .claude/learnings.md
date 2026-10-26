@@ -268,3 +268,9 @@ density ladder over clustering without flagging the contradiction it left in `CL
 Revision 2 fixed the photo→category half of item 2 but left "clusters stack" alone pending user
 confirmation (`pin-revamp-spec.md` §14.9) — do not silently "fix" that phrase in a future pass
 without that confirmation; it is a locked product decision, not a typo.
+
+## 2026-10-27 - Deploy
+- Vercel project is `zpots` under heiyos-projects, live at https://zpots.vercel.app, Git-connected so pushes to main auto-deploy. `vercel link` needs `--project zpots` because the folder name "Zpots" has a capital and Vercel rejects it.
+- `vercel env add <NAME> preview` (CLI 51.7) keeps demanding a git branch even with `--yes`; add preview env vars through the REST API (`POST /v10/projects/<id>/env`, target `["preview"]`) instead.
+- GitHub Pages was turned off 2026-10-27. It had been serving README.md through Jekyll, which looked like a broken site.
+- The Supabase host in .env.local (valvqevwsprvyicvitsd.supabase.co) returned NXDOMAIN on 2026-10-27, so every DB-backed lane fails while Famosos (static data) still works. If the project is restored or replaced, update both .env.local and the Vercel env vars, then redeploy.
