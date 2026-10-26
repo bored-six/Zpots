@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { Spot } from "@/lib/spots";
+import type { MapSpot } from "@/lib/spots";
 
 /**
  * Frozen-style mock, same shape as SpotMap.test.tsx's -- static rendering
@@ -43,7 +43,7 @@ vi.mock("react-leaflet", async () => {
 
 import SpotMap from "@/components/SpotMap";
 
-function makeSpot(overrides: Partial<Spot> = {}): Spot {
+function makeMapSpot(overrides: Partial<MapSpot> = {}): MapSpot {
   return {
     id: "spot-1",
     name: "Rio Hondo Boardwalk",
@@ -53,15 +53,16 @@ function makeSpot(overrides: Partial<Spot> = {}): Spot {
     status: "unconfirmed",
     confirmations: 0,
     createdAt: "2026-01-01T00:00:00.000Z",
+    author: { id: "user-1", handle: "kuya_ben", displayName: "Kuya Ben", avatarUrl: null },
+    source: "mine",
     ...overrides,
   };
 }
 
-function baseProps(spots: readonly Spot[]) {
+function baseProps(mapSpots: readonly MapSpot[]) {
   return {
-    spots,
+    mapSpots,
     authStatus: "signed-out" as const,
-    onCreateSpot: vi.fn().mockResolvedValue(undefined),
     onConfirmSpot: vi.fn().mockResolvedValue(undefined),
     onReportSpot: vi.fn().mockResolvedValue(undefined),
   };
@@ -69,7 +70,7 @@ function baseProps(spots: readonly Spot[]) {
 
 describe("SpotMap popup -- photo and confirmation count", () => {
   it("renders an img with alt 'Photo of <name>' when the spot has a photoUrl", () => {
-    const spot = makeSpot({ photoUrl: "https://example.com/photo.jpg" });
+    const spot = makeMapSpot({ photoUrl: "https://example.com/photo.jpg" });
     render(<SpotMap {...baseProps([spot])} />);
     const popup = screen.getByTestId("popup");
 
@@ -80,7 +81,7 @@ describe("SpotMap popup -- photo and confirmation count", () => {
   });
 
   it("renders no img and a photo-placeholder when the spot has no photoUrl", () => {
-    const spot = makeSpot({ photoUrl: undefined });
+    const spot = makeMapSpot({ photoUrl: undefined });
     render(<SpotMap {...baseProps([spot])} />);
     const popup = screen.getByTestId("popup");
 
@@ -89,7 +90,7 @@ describe("SpotMap popup -- photo and confirmation count", () => {
   });
 
   it("swaps the img for the placeholder when the img fires an error event", () => {
-    const spot = makeSpot({ photoUrl: "https://example.com/broken.jpg" });
+    const spot = makeMapSpot({ photoUrl: "https://example.com/broken.jpg" });
     render(<SpotMap {...baseProps([spot])} />);
     const popup = screen.getByTestId("popup");
 
@@ -101,7 +102,7 @@ describe("SpotMap popup -- photo and confirmation count", () => {
   });
 
   it("renders '0 confirmations' for a spot with zero confirmations", () => {
-    const spot = makeSpot({ confirmations: 0 });
+    const spot = makeMapSpot({ confirmations: 0 });
     render(<SpotMap {...baseProps([spot])} />);
     const popup = screen.getByTestId("popup");
 
@@ -109,7 +110,7 @@ describe("SpotMap popup -- photo and confirmation count", () => {
   });
 
   it("renders '1 confirmation' (singular) for a spot with exactly one confirmation", () => {
-    const spot = makeSpot({ confirmations: 1 });
+    const spot = makeMapSpot({ confirmations: 1 });
     render(<SpotMap {...baseProps([spot])} />);
     const popup = screen.getByTestId("popup");
 
@@ -117,7 +118,7 @@ describe("SpotMap popup -- photo and confirmation count", () => {
   });
 
   it("renders 'N confirmations' (plural) for a spot with more than one confirmation", () => {
-    const spot = makeSpot({ confirmations: 2, status: "confirmed" });
+    const spot = makeMapSpot({ confirmations: 2, status: "confirmed" });
     render(<SpotMap {...baseProps([spot])} />);
     const popup = screen.getByTestId("popup");
 

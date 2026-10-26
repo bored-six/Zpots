@@ -15,7 +15,7 @@ import { BookmarkFilledIcon, BookmarkIcon } from "@/components/icons/social-icon
 import SpotPhoto from "@/components/SpotPhoto";
 import type { AuthStatus } from "@/lib/auth";
 import { bilingualLabel, COPY } from "@/lib/copy";
-import { formatDistance } from "@/lib/geo";
+import { formatDistance, type LatLng } from "@/lib/geo";
 import { isPreviewSpot } from "@/lib/preview-spots";
 import type { Spot, SpotCard } from "@/lib/spots";
 import { useJustConfirmed } from "@/lib/use-just-confirmed";
@@ -46,6 +46,24 @@ interface SpotCardViewProps {
    * doesn't track auth status still gets a working, ungated Save button.
    */
   authStatus?: AuthStatus;
+  /**
+   * Whether this card is the deck's current active one (`SpotsDeck.tsx`'s
+   * `activeMove.index`) -- forwarded to `MapInset` so its per-card travel
+   * animation only ever runs on the one card actually being swiped to.
+   * Optional, defaulting to `true` (a lone card rendered outside the deck,
+   * e.g. in a test, behaves exactly as it always has).
+   */
+  active?: boolean;
+  /**
+   * The walk's current stop -- the previously-active card's own
+   * coordinates -- supplied live by `SpotsDeck`, the only thing that knows
+   * both "which card is active" and "the full card list". `null`/
+   * `undefined` when nothing has been active yet (the very first card on a
+   * fresh load). Forwarded straight to `MapInset`'s own `previousCenter`,
+   * which reads it fresh at the exact moment this card activates; see its
+   * doc comment for why.
+   */
+  previousCenter?: LatLng | null;
 }
 
 const SAVE_BUTTON_BASE_CLASS =
@@ -77,6 +95,8 @@ export default function SpotCardView({
   onReport,
   isOnMyMap = false,
   authStatus = "signed-in",
+  active = true,
+  previousCenter = null,
 }: SpotCardViewProps) {
   const [insetExpanded, setInsetExpanded] = useState(false);
   const [showSaveGate, setShowSaveGate] = useState(false);
@@ -142,6 +162,8 @@ export default function SpotCardView({
         <div className="pointer-events-auto">
           <MapInset
             center={{ lat: card.lat, lng: card.lng }}
+            active={active}
+            previousCenter={previousCenter}
             status={card.status}
             justConfirmed={justConfirmed}
             size={insetExpanded ? 240 : 112}
@@ -150,7 +172,20 @@ export default function SpotCardView({
         </div>
       </div>
 
-      <div className="relative mt-auto flex flex-col gap-3 p-4 text-cream">
+      {/*
+       * `lg:max-w-[640px]` caps line length once the card itself is full
+       * screen (app/page.tsx doc comment) rather than a centered 480px
+       * column: at full screen width this block would otherwise stretch to
+       * the viewport, which on a wide monitor runs `card.note` out to
+       * 100+ characters per line. 640px lands the longest line (`h2`, the
+       * largest text here) around 60-70 characters at its font size --
+       * inside the ~45-75ch range readability guidance generally
+       * recommends -- while staying anchored left, where this block
+       * already sits, so the photo and `paseo-veil` gradient behind it
+       * stay full-bleed. Unset below `lg` so phone (already a
+       * phone-width column) is untouched.
+       */}
+      <div className="relative mt-auto flex flex-col gap-3 p-4 text-cream lg:max-w-[640px]">
         {isPreview ? (
           <div className="flex w-fit items-center gap-2">
             {authorBlock}

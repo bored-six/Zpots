@@ -18,6 +18,22 @@ vi.mock("next/navigation", () => ({
 }));
 
 /**
+ * `MapInset` is a `next/dynamic` boundary, so under jsdom only its loading
+ * placeholder ever renders -- the inset's real control, and the "Open on
+ * the map" name that lives on it in `MapInsetInner`, never reach the DOM.
+ * Stand in a plain button carrying the same accessible name and the same
+ * `onExpand` wiring: what this file tests is SpotCardView's tap handler,
+ * not the Leaflet inset.
+ */
+vi.mock("@/components/MapInset", () => ({
+  default: ({ onExpand }: { onExpand: () => void }) => (
+    <button type="button" onClick={onExpand}>
+      <span className="sr-only">Open on the map</span>
+    </button>
+  ),
+}));
+
+/**
  * SpotCardView (social-spots.md UI spec, "Card:") -- one card in the Spots
  * deck. Per the user's rule, this only checks behavior/text/accessible
  * names: author identity, distance, and that save/been/report are reachable

@@ -130,6 +130,21 @@ class FakeIntersectionObserver {
   }
 }
 
+/**
+ * The observer that is *currently* live and watching `target`.
+ *
+ * SpotsDeck tears down and re-creates its observer every time the +/-2
+ * render window shifts, so `instances.at(-1)` is only right if no effect
+ * has re-run since -- under full-suite load one often has, and firing at
+ * a disconnected observer silently does nothing. Pick by what is actually
+ * being observed instead of by arrival order.
+ */
+function liveObserverFor(target: Element) {
+  return [...FakeIntersectionObserver.instances]
+    .reverse()
+    .find((observer) => !observer.disconnected && observer.observed.includes(target));
+}
+
 function fireIntersection(observer: FakeIntersectionObserver, target: Element, ratio: number) {
   observer.callback(
     [
@@ -215,14 +230,17 @@ describe("SpotsDeck -- scroll-driven active index", () => {
     await screen.findAllByTestId("spot-card");
     expect(screen.getByTestId("spots-deck").getAttribute("data-active-id")).toBe("spot-0");
 
-    const observer = FakeIntersectionObserver.instances.at(-1);
-    expect(observer).toBeTruthy();
     const targetSlot = Array.from(container.querySelectorAll(".paseo-slot")).find(
       (el) => el.getAttribute("data-index") === "2",
     );
     expect(targetSlot).toBeTruthy();
+    const observer = await waitFor(() => {
+      const live = liveObserverFor(targetSlot!);
+      expect(live).toBeTruthy();
+      return live!;
+    });
 
-    fireIntersection(observer!, targetSlot!, 0.9);
+    fireIntersection(observer, targetSlot!, 0.9);
 
     await waitFor(() =>
       expect(screen.getByTestId("spots-deck").getAttribute("data-active-id")).toBe("spot-2"),
@@ -249,14 +267,20 @@ describe("SpotsDeck -- scroll-driven active index", () => {
     feedCerca.mockResolvedValue(makeCards(10));
     render(<SpotsDeck />);
     await screen.findAllByTestId("spot-card");
-    const firstObserver = FakeIntersectionObserver.instances.at(-1)!;
+    const firstObserver = await waitFor(() => {
+      const live = FakeIntersectionObserver.instances.filter((observer) => !observer.disconnected);
+      expect(live.length).toBeGreaterThan(0);
+      return live.at(-1)!;
+    });
 
     const deck = screen.getByTestId("spots-deck");
     deck.focus();
     await userEvent.keyboard("{ArrowDown}");
     await waitFor(() => expect(deck.getAttribute("data-active-id")).toBe("spot-1"));
 
-    expect(firstObserver.disconnected).toBe(true);
+    // The teardown is an effect cleanup, so it can land a tick after the
+    // active id does -- wait for it rather than reading it synchronously.
+    await waitFor(() => expect(firstObserver.disconnected).toBe(true));
     expect(FakeIntersectionObserver.instances.length).toBeGreaterThan(1);
   });
 

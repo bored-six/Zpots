@@ -146,23 +146,6 @@ export function subscribeToAuth(callback: (user: AuthUser | null) => void): () =
   return () => subscription.unsubscribe();
 }
 
-/** Validates against MAX_NICKNAME_LENGTH (throws on >), trims, calls auth.updateUser({ data: { nickname } }). '' clears it. */
-export async function updateNickname(nickname: string): Promise<AuthUser> {
-  const trimmed = nickname.trim();
-  if (trimmed.length > MAX_NICKNAME_LENGTH) {
-    throw new Error(`Nickname must be at most ${MAX_NICKNAME_LENGTH} characters.`);
-  }
-
-  const client = getSupabaseClient();
-  const { data, error } = await client.auth.updateUser({ data: { nickname: trimmed } });
-
-  if (error || !data.user) {
-    throw new Error("Failed to update nickname.", { cause: error });
-  }
-
-  return toAuthUser(data.user);
-}
-
 /** section 2.4 table. mode affects only the user_already_exists copy. Never returns ''. */
 export function authErrorMessage(error: unknown, mode: "signin" | "signup"): string {
   void mode; // Reserved for a future mode-specific variant of the user_already_exists copy.

@@ -25,7 +25,6 @@ import {
   signUp,
   subscribeToAuth,
   toAuthUser,
-  updateNickname,
 } from "@/lib/auth";
 
 type FakeSupabaseUser = {
@@ -376,63 +375,6 @@ describe("subscribeToAuth", () => {
     stop();
 
     expect(unsubscribe).toHaveBeenCalledTimes(1);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// updateNickname
-// ---------------------------------------------------------------------------
-describe("updateNickname", () => {
-  it(`throws on a ${MAX_NICKNAME_LENGTH + 1}-character nickname without calling the client`, async () => {
-    const updateUserMock = vi.fn();
-    const client = makeAuthClient({ updateUser: updateUserMock });
-    vi.mocked(getSupabaseClient).mockReturnValue(client as never);
-
-    await expect(updateNickname("n".repeat(MAX_NICKNAME_LENGTH + 1))).rejects.toBeTruthy();
-    expect(updateUserMock).not.toHaveBeenCalled();
-  });
-
-  it("trims the value and sends { data: { nickname } }", async () => {
-    const updateUserMock = vi
-      .fn()
-      .mockResolvedValue({ data: { user: makeUser({ user_metadata: { nickname: "Ate Joy" } }) }, error: null });
-    const client = makeAuthClient({ updateUser: updateUserMock });
-    vi.mocked(getSupabaseClient).mockReturnValue(client as never);
-
-    await updateNickname("  Ate Joy  ");
-
-    expect(updateUserMock).toHaveBeenCalledWith({ data: { nickname: "Ate Joy" } });
-  });
-
-  it("resolves to the updated AuthUser", async () => {
-    const updateUserMock = vi
-      .fn()
-      .mockResolvedValue({ data: { user: makeUser({ user_metadata: { nickname: "Ate Joy" } }) }, error: null });
-    const client = makeAuthClient({ updateUser: updateUserMock });
-    vi.mocked(getSupabaseClient).mockReturnValue(client as never);
-
-    await expect(updateNickname("Ate Joy")).resolves.toMatchObject({ nickname: "Ate Joy" });
-  });
-
-  it("'' clears the nickname", async () => {
-    const updateUserMock = vi
-      .fn()
-      .mockResolvedValue({ data: { user: makeUser({ user_metadata: { nickname: "" } }) }, error: null });
-    const client = makeAuthClient({ updateUser: updateUserMock });
-    vi.mocked(getSupabaseClient).mockReturnValue(client as never);
-
-    await updateNickname("");
-
-    expect(updateUserMock).toHaveBeenCalledWith({ data: { nickname: "" } });
-  });
-
-  it("rejects when the client reports an error", async () => {
-    const client = makeAuthClient({
-      updateUser: vi.fn().mockResolvedValue({ data: { user: null }, error: new Error("nope") }),
-    });
-    vi.mocked(getSupabaseClient).mockReturnValue(client as never);
-
-    await expect(updateNickname("Ben")).rejects.toBeTruthy();
   });
 });
 

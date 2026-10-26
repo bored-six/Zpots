@@ -16,8 +16,11 @@ import type { MapSpot, SpotAuthor, SpotCard } from "@/lib/spots";
  *
  * Photos are hot-linked from Wikimedia Commons (CC BY-SA, CC BY, or CC0 --
  * see each entry's `photoCredit`) and carry their attribution, which the
- * card and popup render. Not every entry has a freely-licensed photo;
- * `photoUrl` is optional, but any entry that has one must carry a credit.
+ * card and popup render. Photoless entries (verified spots with no
+ * freely-licensed photo) were dropped -- they rendered as a flat cream
+ * placeholder -- so every entry currently has both `photoUrl` and
+ * `photoCredit`. `photoUrl` stays optional on the type for future curation,
+ * but any entry that has one must carry a credit.
  */
 const PREVIEW_ID_PREFIX = "preview-";
 
@@ -35,6 +38,7 @@ const COMMONS = "https://upload.wikimedia.org/wikipedia/commons/thumb";
 export const PREVIEW_SPOTS: readonly SpotCard[] = [
   {
     id: "preview-fort-pilar",
+    category: "mira",
     name: "Fort Pilar",
     note: "The 1635 Spanish fort and the open-air shrine. Candles at dusk, museum inside.",
     lat: 6.90111,
@@ -50,6 +54,7 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
   },
   {
     id: "preview-paseo-del-mar",
+    category: "senta",
     name: "Paseo del Mar",
     note: "Bayside promenade next to the fort. Street food stalls, sea breeze, best after sunset.",
     lat: 6.9017,
@@ -65,6 +70,7 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
   },
   {
     id: "preview-pasonanca-park",
+    category: "camina",
     name: "Pasonanca Park",
     note: "The city's green lung since 1912. Look for the tree house and the swimming pools.",
     lat: 6.95334,
@@ -80,6 +86,7 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
   },
   {
     id: "preview-santa-cruz-island",
+    category: "agua",
     name: "Great Santa Cruz Island",
     note: "Pink sand beach, a short boat ride from Paseo del Mar. Book at the tourism desk, mornings only.",
     lat: 6.8735,
@@ -95,6 +102,7 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
   },
   {
     id: "preview-plaza-pershing",
+    category: "senta",
     name: "Plaza Pershing",
     note: "The old town square in front of City Hall. Sit under the trees and watch the city go by.",
     lat: 6.9058,
@@ -110,6 +118,7 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
   },
   {
     id: "preview-merloquet-falls",
+    category: "agua",
     name: "Merloquet Falls",
     note: "A three-tier waterfall past Sibulao, a trek in on foot. Cold, clear pools good for swimming.",
     lat: 7.31066,
@@ -123,6 +132,7 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
   },
   {
     id: "preview-metropolitan-cathedral",
+    category: "mira",
     name: "Metropolitan Cathedral",
     note: "The city's Catholic cathedral downtown, rebuilt after the 2013 siege. Mass times posted at the door.",
     lat: 6.90893,
@@ -138,6 +148,7 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
   },
   {
     id: "preview-taluksangay-mosque",
+    category: "mira",
     name: "Taluksangay Mosque",
     note: "A long-standing mosque built over the water in Taluksangay, on stilts like the barangay around it.",
     lat: 6.95072,
@@ -153,6 +164,7 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
   },
   {
     id: "preview-zamboanga-city-hall",
+    category: "mira",
     name: "Zamboanga City Hall",
     note: "The city government's seat facing Plaza Pershing, colonial-era facade, about 190 m from the plaza.",
     lat: 6.90391,
@@ -168,6 +180,7 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
   },
   {
     id: "preview-climaco-freedom-park",
+    category: "senta",
     name: "Climaco Freedom Park",
     note: "Hilltop park and cross named for slain mayor Cesar Climaco, with a view over the city.",
     lat: 6.96486,
@@ -181,6 +194,7 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
   },
   {
     id: "preview-bolong-beach",
+    category: "agua",
     name: "Bolong Beach",
     note: "A quieter beach east of downtown, past Manicahan. Locals grill by the shore on weekends.",
     lat: 7.09787,
@@ -194,6 +208,7 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
   },
   {
     id: "preview-lantawan-grassland",
+    category: "camina",
     name: "Lantawan Grassland",
     note: "Open grassland with a night view of the city lights below. Bring a jacket, it gets breezy.",
     lat: 6.96474,
@@ -207,6 +222,7 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
   },
   {
     id: "preview-la-vista-del-mar",
+    category: "mira",
     name: "La Vista del Mar",
     note: "A hillside viewpoint over the strait in Calarian, popular for sunset and pasalubong stops.",
     lat: 6.92454,
@@ -220,6 +236,7 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
   },
   {
     id: "preview-grand-masjid-barbara",
+    category: "mira",
     name: "Grand Masjid Barbara",
     note: "A large mosque in Barangay Barbara, one of the city's most visible landmarks off the highway.",
     lat: 6.90347,
@@ -235,6 +252,7 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
   },
   {
     id: "preview-once-islas",
+    category: "agua",
     name: "Once Islas",
     note: "One of eleven islets off Zamboanga, this one hosting Siromon Beach Resort. Boat access only.",
     lat: 7.14917,
@@ -250,6 +268,7 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
   },
   {
     id: "preview-manicahan-beach",
+    category: "agua",
     name: "Manicahan Beach",
     note: "An easy-to-miss beach in Manicahan, past the barangay center. Locals call it underrated.",
     lat: 7.00941,
@@ -262,40 +281,8 @@ export const PREVIEW_SPOTS: readonly SpotCard[] = [
     photoCredit: "CyraFelix, CC0, Wikimedia Commons",
   },
   {
-    id: "preview-duyan-spot",
-    name: "Duyan Spot",
-    note: "Hammock hangout in Upper Cabatangan with a view deck, billiards and karaoke. Open till midnight.",
-    lat: 6.945938,
-    lng: 122.060937,
-    status: "confirmed",
-    confirmations: 2,
-    createdAt: PREVIEW_CREATED_AT,
-    author: PREVIEW_AUTHOR,
-  },
-  {
-    id: "preview-muruk-haven",
-    name: "Muruk Haven",
-    note: "A hiking trail area in Upper Pasonanca, about 30 minutes in on foot. Popular for trail running and biking.",
-    lat: 6.973313,
-    lng: 122.079937,
-    status: "confirmed",
-    confirmations: 2,
-    createdAt: PREVIEW_CREATED_AT,
-    author: PREVIEW_AUTHOR,
-  },
-  {
-    id: "preview-yakan-weaving-village",
-    name: "Yakan Weaving Village",
-    note: "A Yakan weaving shop and workshop in Calarian. Watch the looms work, buy fabric from the source.",
-    lat: 6.92491,
-    lng: 122.0222,
-    status: "confirmed",
-    confirmations: 2,
-    createdAt: PREVIEW_CREATED_AT,
-    author: PREVIEW_AUTHOR,
-  },
-  {
     id: "preview-canelar-barter-trade-center",
+    category: "compra",
     name: "Canelar Barter Trade Center",
     note: "The barter trade marketplace in Canelar, stalls of goods brought in from across the Sulu Sea.",
     lat: 6.91393,

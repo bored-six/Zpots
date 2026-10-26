@@ -22,11 +22,12 @@ describe("createPinIcon just-confirmed flag", () => {
     expect(String(icon.options.html)).not.toMatch(/zpots-pin-icon--just-confirmed/);
   });
 
-  it("with the flag, confirmed markup gets the class on the first (halo) path", () => {
+  it("with the flag, confirmed markup gets the class on the seal group", () => {
     const icon = createPinIcon("confirmed", { justConfirmed: true });
     const html = String(icon.options.html);
 
-    expect(html).toMatch(/^<svg[^>]*><path[^>]*class="zpots-pin-icon--just-confirmed"/);
+    expect(html).toMatch(/<g class="zpots-seal zpots-pin-icon--just-confirmed" data-part="seal">/);
+    expect(html).not.toMatch(/<path[^>]*class="zpots-pin-icon--just-confirmed"/);
   });
 
   it("the flag is a no-op for an unconfirmed pin", () => {

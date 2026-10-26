@@ -33,7 +33,9 @@ Two locked decisions move. Neither is being quietly contradicted.
    it is the personal map plus a fixed, curated 20-pin base layer, which is precisely the
    "famous spots are already on the map" the user asked for. `social-spots.md` gets a Change Log
    line. `CLAUDE.md` item 2 ("On the full map every pin is the spot's photo…") needs no change;
-   item 6's Mi paseo description does.
+   item 6's Mi paseo description does. [2026-09-22: photo pins removed; `famoso` reuses `preview`
+   styling, which is now the Grabado category pin — `pin-revamp-spec.md` §14. This "needs no
+   change" line is now wrong; see that note.]
 
 ## Requirements
 
@@ -237,7 +239,9 @@ does against `mine`/`been`. Without them a saved famous spot returns two rows th
 not collapse, because `source` differs.
 
 Pin styling: `famoso` reuses today's `preview` styling (44px photo pin), so nothing visibly
-changes for a signed-out visitor. Legend gains a fourth toggle. **Four checkboxes in a
+changes for a signed-out visitor. [2026-09-22: photo pins removed; `famoso` reuses `preview`
+styling, which is now the Grabado category pin — `pin-revamp-spec.md` §14.] Legend gains a
+fourth toggle. **Four checkboxes in a
 `flex gap-4` row at 375px is a real layout risk** — `famosos-lane.md` hit exactly this with four
 lane tabs. Verify at phone width.
 
@@ -783,7 +787,8 @@ The reviewer uses this list verbatim.
    `nickname`. Not mentioned in any PRD. Deleted in Wave 1b.
 4. **`social-spots.md:211`** — "Pin by source: `mine` = 44px photo pin… `been` = solid teal…
    `saved` = hollow stone-deep." It never gained the `preview` source that shipped later, and now
-   needs `famoso`. Fix alongside item 1.
+   needs `famoso`. Fix alongside item 1. [2026-09-22: photo pins removed; `famoso` reuses
+   `preview` styling, which is now the Grabado category pin — `pin-revamp-spec.md` §14.]
 
 ## Push-back on the framing I was given
 

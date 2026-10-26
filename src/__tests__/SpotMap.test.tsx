@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { MapSpot, Spot } from "@/lib/spots";
+import type { MapSpot } from "@/lib/spots";
 
 // We deliberately avoid rendering real Leaflet in jsdom (it needs real layout
 // measurement and is flaky in a headless DOM). Instead we replace
@@ -117,18 +117,25 @@ function extractLatLng(position: unknown): { lat: number; lng: number } {
   throw new Error(`Unrecognized marker position shape: ${JSON.stringify(position)}`);
 }
 
-const unconfirmedSpot: Spot = {
-  id: "spot-1",
-  name: "Rio Hondo Boardwalk",
-  note: "Great sunset view, watch your step on loose planks.",
-  lat: 6.9,
-  lng: 122.05,
-  status: "unconfirmed",
-  confirmations: 0,
-  createdAt: "2026-01-01T00:00:00.000Z",
-};
+function makeMapSpot(overrides: Partial<MapSpot> = {}): MapSpot {
+  return {
+    id: "spot-1",
+    name: "Rio Hondo Boardwalk",
+    note: "Great sunset view, watch your step on loose planks.",
+    lat: 6.9,
+    lng: 122.05,
+    status: "unconfirmed",
+    confirmations: 0,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    author: { id: "user-1", handle: "kuya_ben", displayName: "Kuya Ben", avatarUrl: null },
+    source: "mine",
+    ...overrides,
+  };
+}
 
-const confirmedSpot: Spot = {
+const unconfirmedSpot: MapSpot = makeMapSpot();
+
+const confirmedSpot: MapSpot = makeMapSpot({
   id: "spot-2",
   name: "Pasonanca Park",
   note: "Nice picnic spot with a small zoo nearby.",
@@ -137,11 +144,11 @@ const confirmedSpot: Spot = {
   status: "confirmed",
   confirmations: 3,
   createdAt: "2026-01-02T00:00:00.000Z",
-};
+});
 
 describe("SpotMap", () => {
   it("renders a MapContainer centered on ZAMBOANGA_CENTER at DEFAULT_ZOOM", () => {
-    render(<SpotMap spots={[]} />);
+    render(<SpotMap mapSpots={[]} />);
     const map = screen.getByTestId("map-container");
     expect(JSON.parse(map.getAttribute("data-center") ?? "null")).toEqual(
       ZAMBOANGA_CENTER,
@@ -150,7 +157,7 @@ describe("SpotMap", () => {
   });
 
   it("renders exactly one BasemapLayer and no raster tile layer", () => {
-    render(<SpotMap spots={[]} />);
+    render(<SpotMap mapSpots={[]} />);
 
     // The vector "Pergamino" basemap (BasemapLayer) replaces the raw
     // TileLayer SpotMap used to render directly -- SpotMap's own tree must
@@ -171,18 +178,18 @@ describe("SpotMap", () => {
     expect(BASEMAP_ATTRIBUTION).toContain("OpenStreetMap");
   });
 
-  it("renders zero markers for an empty spots array without crashing", () => {
-    render(<SpotMap spots={[]} />);
+  it("renders zero markers for an empty mapSpots array without crashing", () => {
+    render(<SpotMap mapSpots={[]} />);
     expect(screen.queryAllByTestId("marker")).toHaveLength(0);
   });
 
   it("renders exactly one Marker per spot", () => {
-    render(<SpotMap spots={[unconfirmedSpot, confirmedSpot]} />);
+    render(<SpotMap mapSpots={[unconfirmedSpot, confirmedSpot]} />);
     expect(screen.getAllByTestId("marker")).toHaveLength(2);
   });
 
   it("positions each Marker at [lat, lng] -- not [lng, lat]", () => {
-    render(<SpotMap spots={[unconfirmedSpot, confirmedSpot]} />);
+    render(<SpotMap mapSpots={[unconfirmedSpot, confirmedSpot]} />);
     const markers = screen.getAllByTestId("marker");
     const positions = markers.map((m) =>
       extractLatLng(JSON.parse(m.getAttribute("data-position") ?? "null")),
@@ -217,21 +224,20 @@ describe("SpotMap", () => {
   // upstream row, not something the UI should ever be able to produce on its
   // own -- must not take down every other pin on the map. It's skipped
   // instead.
-  it("skips a spots[] row with a non-finite coordinate instead of crashing, and still renders the rest", () => {
-    const badSpot: Spot = { ...unconfirmedSpot, id: "spot-bad", lat: NaN, lng: 122.05 };
+  it("skips a mapSpots row with a non-finite (NaN) coordinate instead of crashing, and still renders the rest", () => {
+    const badSpot = makeMapSpot({ id: "spot-bad", lat: NaN, lng: 122.05 });
 
-    expect(() => render(<SpotMap spots={[badSpot, confirmedSpot]} />)).not.toThrow();
+    expect(() => render(<SpotMap mapSpots={[badSpot, confirmedSpot]} />)).not.toThrow();
     expect(screen.getAllByTestId("marker")).toHaveLength(1);
   });
 
   it("skips a mapSpots row with an undefined coordinate instead of crashing, and still renders the rest", () => {
-    const goodMapSpot: MapSpot = { ...unconfirmedSpot, source: "mine" };
-    const badMapSpot: MapSpot = {
-      ...confirmedSpot,
+    const goodMapSpot: MapSpot = makeMapSpot({ source: "mine" });
+    const badMapSpot: MapSpot = makeMapSpot({
       id: "spot-bad-2",
       source: "saved",
       lat: undefined as unknown as number,
-    };
+    });
 
     expect(() =>
       render(<SpotMap authStatus="signed-in" mapSpots={[badMapSpot, goodMapSpot]} />),
@@ -240,7 +246,7 @@ describe("SpotMap", () => {
   });
 
   it("shows name, note, and 'Unconfirmed' label in the popup for an unconfirmed spot", () => {
-    render(<SpotMap spots={[unconfirmedSpot]} />);
+    render(<SpotMap mapSpots={[unconfirmedSpot]} />);
     const popup = screen.getByTestId("popup");
     expect(within(popup).getByText(unconfirmedSpot.name)).toBeInTheDocument();
     expect(within(popup).getByText(unconfirmedSpot.note)).toBeInTheDocument();
@@ -250,7 +256,7 @@ describe("SpotMap", () => {
   });
 
   it("shows name, note, and 'Confirmed' label in the popup for a confirmed spot", () => {
-    render(<SpotMap spots={[confirmedSpot]} />);
+    render(<SpotMap mapSpots={[confirmedSpot]} />);
     const popup = screen.getByTestId("popup");
     expect(within(popup).getByText(confirmedSpot.name)).toBeInTheDocument();
     expect(within(popup).getByText(confirmedSpot.note)).toBeInTheDocument();
@@ -264,7 +270,7 @@ describe("SpotMap", () => {
   });
 
   it("renders a note containing HTML-special characters as literal text, not injected markup", () => {
-    const dangerousSpot: Spot = {
+    const dangerousSpot = makeMapSpot({
       id: "spot-3",
       name: "Test & \"Danger\" Spot",
       note: `<b>bold</b> & <script>alert(1)</script> "quoted" 'text'`,
@@ -273,9 +279,9 @@ describe("SpotMap", () => {
       status: "unconfirmed",
       confirmations: 0,
       createdAt: "2026-01-03T00:00:00.000Z",
-    };
+    });
 
-    render(<SpotMap spots={[dangerousSpot]} />);
+    render(<SpotMap mapSpots={[dangerousSpot]} />);
     const popup = screen.getByTestId("popup");
 
     // The literal string must appear as text content...

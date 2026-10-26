@@ -65,13 +65,13 @@ import { MAX_BOUNDS, MIN_ZOOM } from "@/lib/map-config";
 
 describe("SpotMap Zamboanga City restriction", () => {
   it("passes MAX_BOUNDS as maxBounds to MapContainer", () => {
-    render(<SpotMap spots={[]} />);
+    render(<SpotMap />);
     const map = screen.getByTestId("map-container");
     expect(JSON.parse(map.getAttribute("data-max-bounds") ?? "null")).toEqual(MAX_BOUNDS);
   });
 
   it("sets maxBoundsViscosity so panning bounces back at the edge instead of scrolling freely", () => {
-    render(<SpotMap spots={[]} />);
+    render(<SpotMap />);
     const map = screen.getByTestId("map-container");
     // 1.0 is a hard stop -- the standard choice unless there's a reason to
     // allow rubber-banding past the bounds.
@@ -79,7 +79,7 @@ describe("SpotMap Zamboanga City restriction", () => {
   });
 
   it("passes MIN_ZOOM through to MapContainer's minZoom prop", () => {
-    render(<SpotMap spots={[]} />);
+    render(<SpotMap />);
     const map = screen.getByTestId("map-container");
     expect(map.getAttribute("data-min-zoom")).toBe(String(MIN_ZOOM));
   });

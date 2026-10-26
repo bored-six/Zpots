@@ -12,11 +12,9 @@ import { previewBounds, previewMapSpots } from "@/lib/preview-spots";
 import { myMap, unsaveSpot } from "@/lib/saves-repo";
 import type { MapSource, MapSpot } from "@/lib/spots";
 
-// Leaflet touches `window`, so SpotMap can only load on the client -- the
-// same ssr:false client boundary MapView.tsx uses for the write-mode map.
-// Mi mapa is read-only (mapSpots/openSpotId/onUnsave/sourceFilter) and
-// doesn't fit MapView's write-mode prop contract, so this loads SpotMap
-// directly instead of going through MapView.
+// Leaflet touches `window`, so SpotMap can only load on the client -- this
+// is the ssr:false client boundary that makes that legal, since next/dynamic
+// with ssr:false cannot be called from a Server Component.
 const SpotMap = dynamic(() => import("@/components/SpotMap"), {
   ssr: false,
   loading: () => (
